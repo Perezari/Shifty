@@ -1,0 +1,16 @@
+{
+  "name": "Shifty — מעקב משמרות",
+  "short_name": "Shifty",
+  "description": "מעקב שעות עבודה, משמרות והערכת שכר — מקומי, מהיר, ללא הרשמה.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f5f7",
+  "theme_color": "#f4f5f7",
+  "icons": [
+    { "src": "assets/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

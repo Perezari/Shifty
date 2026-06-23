@@ -1,0 +1,1069 @@
+/* ============================================================
+   Shifty — app controller & views
+   ============================================================ */
+(function () {
+  const S = window.Shifty;
+  const { fmt, store, calc } = S;
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const HOUR = calc.HOUR;
+
+  const state = {
+    view: "now",
+    periodOffset: 0,   // shifts view billing-period offset
+    calOffset: 0,      // calendar view month offset
+    cloudStage: "email", // cloud auth form: "email" | "code"
+    cloudEmail: "",
+    tick: null,
+    live: {},          // nodes updated by ticker
+  };
+
+  /* ---------- tiny helpers ---------- */
+  function h(html) {
+    const t = document.createElement("template");
+    t.innerHTML = html.trim();
+    return t.content.firstElementChild;
+  }
+  function haptic(ms) { try { navigator.vibrate && navigator.vibrate(ms || 8); } catch (e) {} }
+
+  let toastTimer;
+  function toast(msg) {
+    const host = $("#toast-host");
+    host.innerHTML = "";
+    const t = h(`<div class="toast">${msg}</div>`);
+    host.appendChild(t);
+    requestAnimationFrame(() => t.classList.add("show"));
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(() => t.remove(), 250);
+    }, 2200);
+  }
+
+  /* ---------- theme ---------- */
+  function applyTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+    const c = getComputedStyle(document.body).backgroundColor;
+    const meta = $("#theme-color-meta");
+    if (meta) meta.setAttribute("content", c);
+  }
+  function toggleTheme() {
+    const s = store.getSettings();
+    const next = s.theme === "dark" ? "light" : "dark";
+    store.setSettings({ theme: next });
+    applyTheme(next);
+    haptic();
+  }
+
+  /* ============================================================
+     NOW VIEW
+     ============================================================ */
+  function renderNow() {
+    const s = store.getSettings();
+    const active = store.getActive();
+    const now = Date.now();
+    const root = $("#view-root");
+
+    const goal = calc.standardHoursFor(now, s);
+    const R = 106, C = 2 * Math.PI * R;
+
+    const el = h(`
+      <section class="now fade-in">
+        <div class="now-stage">
+          <div class="now-status ${active ? "working" : ""}" id="now-status"></div>
+          <div class="now-date">${fmt.dateFull(now)}</div>
+
+          <div class="ring-wrap" id="ring-wrap">
+            <svg viewBox="0 0 252 252">
+              <defs>
+                <linearGradient id="ringGrad" gradientUnits="userSpaceOnUse" x1="20" y1="20" x2="232" y2="232">
+                  <stop offset="0" stop-color="var(--accent-strong)"/>
+                  <stop offset="1" stop-color="var(--accent)"/>
+                </linearGradient>
+              </defs>
+              <circle class="ring-halo" cx="126" cy="126" r="92" fill="none" stroke-width="1.5"/>
+              <circle class="ring-halo" cx="126" cy="126" r="73" fill="none" stroke-width="1.5"/>
+              <circle class="ring-track" cx="126" cy="126" r="${R}" fill="none" stroke-width="18"/>
+              <line class="ring-tick" x1="126" y1="11" x2="126" y2="17"/>
+              <circle class="ring-fill" id="ring-fill" cx="126" cy="126" r="${R}" fill="none" stroke-width="18"
+                      stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}"/>
+              <circle class="ring-knob" id="ring-knob" data-hidden="1" cx="126" cy="20" r="7"/>
+            </svg>
+            <div class="ring-center">
+              <div class="ring-time idle" id="ring-time">00:00:00</div>
+              <div class="ring-label" id="ring-label">לא במשמרת</div>
+              <div class="ring-sub" id="ring-sub"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="now-stats">
+          <div class="stat">
+            <div class="stat-head"><div class="stat-k" id="stat1-k">שעות היום</div><span class="stat-ico" id="stat1-ico"></span></div>
+            <div class="stat-v" id="stat1-v">0:00</div>
+          </div>
+          <div class="stat money">
+            <div class="stat-head"><div class="stat-k" id="stat2-k">שכר היום</div><span class="stat-ico"><svg class="ico" width="15" height="15" viewBox="0 0 24 24"><path d="M7 4v10a4 4 0 0 0 4 4h3M7 9h9M17 20V10a4 4 0 0 0-4-4h-3"/></svg></span></div>
+            <div class="stat-v money" id="stat2-v">${fmt.money(0, s.currency)}</div>
+          </div>
+        </div>
+
+        <div class="now-actions" id="now-actions"></div>
+
+        <div class="now-goal" id="now-goal">
+          <div class="now-goal-head">
+            <span class="k" id="goal-head-k">היעד היומי</span>
+            <span class="v" id="goal-readout">0:00 / ${fmt.hoursToHM(goal)} ש׳</span>
+          </div>
+          <div class="now-goal-bar"><div class="now-goal-fill" id="goal-fill"></div></div>
+          <div class="now-goal-sub">
+            <span class="rem" id="goal-rem">נותרו ${fmt.hoursToHM(goal)} ליעד</span>
+          </div>
+          <div class="now-goal-proj">
+            <span class="k" id="goal-proj-k">צפי שכר בסיום היעד</span>
+            <span class="v" id="goal-proj-v">${fmt.money(0, s.currency)}</span>
+          </div>
+        </div>
+      </section>
+    `);
+    root.innerHTML = "";
+    root.appendChild(el);
+
+    $("#stat1-ico").innerHTML = '<svg class="ico" width="15" height="15" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
+
+    renderNowActions(active);
+
+    state.live = {
+      mode: "now",
+      ringFill: $("#ring-fill"), ringTime: $("#ring-time"),
+      ringLabel: $("#ring-label"), ringSub: $("#ring-sub"),
+      ringWrap: $("#ring-wrap"), ringKnob: $("#ring-knob"),
+      status: $("#now-status"),
+      stat1k: $("#stat1-k"), stat1v: $("#stat1-v"),
+      stat2k: $("#stat2-k"), stat2v: $("#stat2-v"),
+      goalReadout: $("#goal-readout"), goalFill: $("#goal-fill"), goalRem: $("#goal-rem"),
+      goalProjK: $("#goal-proj-k"), goalProjV: $("#goal-proj-v"),
+      C, goal, R,
+    };
+    updateNow();
+  }
+
+  // position the leading knob on the arc (SVG is CSS-rotated -90deg, so angle 0 = top)
+  function positionKnob(knob, progress, r) {
+    if (!knob) return;
+    if (progress <= 0) { knob.dataset.hidden = "1"; return; }
+    knob.dataset.hidden = "0";
+    const a = progress * 2 * Math.PI;
+    knob.setAttribute("cx", (126 + r * Math.cos(a)).toFixed(1));
+    knob.setAttribute("cy", (126 + r * Math.sin(a)).toFixed(1));
+  }
+
+  function renderNowActions(active) {
+    const wrap = $("#now-actions");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    const onBreak = active && store.activeBreak(active);
+
+    if (!active) {
+      wrap.appendChild(btn("btn-primary", icoPlay() + "התחל משמרת", () => doStart()));
+      wrap.appendChild(btn("btn-secondary", "הוספת משמרת ידנית", () => openShiftEditor(null)));
+    } else if (onBreak) {
+      const banner = h(`<div class="break-banner">בהפסקה <span id="brk-timer" style="direction:ltr;font-variant-numeric:tabular-nums">0:00</span></div>`);
+      wrap.appendChild(banner);
+      wrap.appendChild(btn("btn-soft", "סיים הפסקה", () => doEndBreak()));
+      wrap.appendChild(btn("btn-danger", icoStop() + "סיים משמרת", () => doEnd()));
+    } else {
+      const row = h(`<div class="btn-row"></div>`);
+      row.appendChild(btn("btn-ghost", "התחל הפסקה", () => doStartBreak()));
+      row.appendChild(btn("btn-danger", icoStop() + "סיים משמרת", () => doEnd()));
+      wrap.appendChild(row);
+    }
+  }
+
+  function updateNow() {
+    const L = state.live;
+    if (!L || L.mode !== "now") return;
+    const s = store.getSettings();
+    const active = store.getActive();
+    const now = Date.now();
+    let netH = 0, payNow = 0; // fed to the shared goal strip below
+
+    if (active) {
+      const b = calc.shiftBreakdown(active, s, now);
+      const onBreak = store.activeBreak(active);
+      netH = b.netHours; payNow = b.pay;
+      const progress = Math.min(1, b.netHours / L.goal);
+      L.ringFill.setAttribute("stroke-dashoffset", (L.C * (1 - progress)).toFixed(1));
+      positionKnob(L.ringKnob, progress, L.R);
+      L.ringWrap.classList.toggle("working", !onBreak); // breathe only while truly working
+      L.ringTime.classList.remove("idle");
+      L.ringTime.textContent = fmt.hms(b.netMs);
+      L.ringLabel.textContent = onBreak ? "בהפסקה" : "זמן עבודה";
+      L.ringSub.textContent = "התחלה " + fmt.clock(active.start);
+      L.status.textContent = "במשמרת" + (active.isHoliday ? " · שבת/חג" : "");
+      L.status.classList.add("working");
+
+      L.stat1k.textContent = "שעות נטו";
+      L.stat1v.textContent = fmt.hoursToHM(b.netHours);
+      L.stat2k.textContent = "שכר במשמרת";
+      L.stat2v.textContent = fmt.money(b.pay, s.currency);
+
+      if (onBreak) {
+        const bt = $("#brk-timer");
+        if (bt) bt.textContent = fmt.hms(now - new Date(onBreak.start).getTime());
+      }
+    } else {
+      // today's totals
+      const today = calc.aggregate(store.getShifts(), s, calc.dayRange(now), now);
+      netH = today.netHours; payNow = today.total;
+      const progress = Math.min(1, today.netHours / L.goal);
+      L.ringFill.setAttribute("stroke-dashoffset", (L.C * (1 - progress)).toFixed(1));
+      positionKnob(L.ringKnob, progress, L.R);
+      L.ringWrap.classList.toggle("working", false); // idle = perfectly still
+      L.ringTime.classList.toggle("idle", today.netHours === 0);
+      L.ringTime.textContent = today.netHours > 0 ? fmt.hms(today.netHours * HOUR) : "00:00:00";
+      L.ringLabel.textContent = today.netHours > 0 ? "עבדת היום" : "לא במשמרת";
+      L.ringSub.textContent = "";
+      L.status.textContent = "מוכן להתחיל";
+      L.status.classList.remove("working");
+
+      L.stat1k.textContent = "שעות היום";
+      L.stat1v.textContent = fmt.hoursToHM(today.netHours);
+      L.stat2k.textContent = "שכר היום";
+      L.stat2v.textContent = fmt.money(today.total, s.currency);
+    }
+
+    // ---- מסלול היעד: daily-goal + projection strip (live, runs in both states) ----
+    if (L.goalFill) {
+      const goalH = L.goal;
+      const pct = Math.max(0, Math.min(1, goalH > 0 ? netH / goalH : 0));
+      L.goalFill.style.width = (pct * 100).toFixed(1) + "%";
+      L.goalReadout.textContent = fmt.hoursToHM(netH) + " / " + fmt.hoursToHM(goalH) + " ש׳";
+
+      const remH = goalH - netH;
+      if (remH <= 0.001) {
+        L.goalRem.textContent = "הגעת ליעד ✓";
+        L.goalRem.classList.add("done");
+      } else {
+        L.goalRem.textContent = "נותרו " + fmt.hoursToHM(remH) + " ליעד";
+        L.goalRem.classList.remove("done");
+      }
+
+      if (s.monthlyIncomeGoal > 0) {
+        const period = calc.aggregate(store.getShifts(), s, calc.shiftPeriod(now, s.monthStartDay, 0), now);
+        L.goalProjK.textContent = "יעד חודשי";
+        L.goalProjV.textContent = fmt.moneyShort(period.total, s.currency) + " מתוך " + fmt.moneyShort(s.monthlyIncomeGoal, s.currency);
+      } else {
+        L.goalProjK.textContent = "צפי שכר בסיום היעד";
+        const projected = netH > 0.001 ? payNow * (goalH / netH) : null;
+        L.goalProjV.textContent = projected == null ? "—" : fmt.money(projected, s.currency);
+      }
+    }
+  }
+
+  /* lifecycle actions */
+  function doStart() { store.startShift(); haptic(12); renderNow(); toast("המשמרת התחילה ✓"); }
+  function doEnd() {
+    const s = store.getSettings();
+    const sh = store.getActive();
+    const b = calc.shiftBreakdown(sh, s, Date.now());
+    store.endShift(); haptic(12); renderNow();
+    toast(`משמרת נסגרה · ${fmt.hoursToHM(b.netHours)} שע׳ · ${fmt.money(b.pay, s.currency)}`);
+  }
+  function doStartBreak() { store.startBreak(); haptic(); renderNow(); }
+  function doEndBreak() { store.endBreak(); haptic(); renderNow(); }
+
+  /* ============================================================
+     SHIFTS VIEW
+     ============================================================ */
+  function renderShifts() {
+    const s = store.getSettings();
+    const now = Date.now();
+    const range = calc.shiftPeriod(now, s.monthStartDay, state.periodOffset);
+    const all = store.getShifts();
+    const list = all.filter((sh) => calc.inRange(sh, range));
+    const agg = calc.aggregate(all, s, range, now);
+    const root = $("#view-root");
+
+    const label = fmt.dayMonth(range.start) + " – " + fmt.dayMonth(new Date(range.end.getTime() - 1));
+
+    const el = h(`
+      <section class="fade-in">
+        <div class="period-bar">
+          <button id="per-prev" aria-label="הקודם">${icoChevron("right")}</button>
+          <div class="period-label">${label}</div>
+          <button id="per-next" aria-label="הבא">${icoChevron("left")}</button>
+        </div>
+
+        <div class="summary-card">
+          <div class="cell"><div class="summary-k">שעות</div><div class="summary-v" id="sum-hours">${fmt.hoursToHM(agg.netHours)}</div></div>
+          <div class="cell"><div class="summary-k">משמרות</div><div class="summary-v">${agg.count}</div></div>
+          <div class="cell"><div class="summary-k">סה״כ</div><div class="summary-v" id="sum-total">${fmt.moneyShort(agg.total, s.currency)}</div></div>
+        </div>
+
+        <div id="shift-list"></div>
+      </section>
+    `);
+    root.innerHTML = "";
+    root.appendChild(el);
+
+    const listHost = $("#shift-list");
+    if (!list.length) {
+      listHost.appendChild(h(`
+        <div class="empty">
+          <div class="big">🗓️</div>
+          <div class="t">אין משמרות בתקופה זו</div>
+          <div class="s">לחץ על ＋ למעלה כדי להוסיף משמרת</div>
+        </div>`));
+    } else {
+      for (const sh of list) listHost.appendChild(shiftRow(sh, s, now));
+    }
+
+    $("#per-prev").onclick = () => { state.periodOffset--; renderShifts(); }; // earlier (RTL: right = back)
+    $("#per-next").onclick = () => { state.periodOffset++; renderShifts(); }; // later
+
+    // capture refs for live (per-second) updates — only the ongoing shift in view
+    const active = store.getActive();
+    const liveRow = active && calc.inRange(active, range)
+      ? listHost.querySelector(`[data-id="${active.id}"]`)
+      : null;
+    state.live = {
+      mode: "shifts",
+      range,
+      ongoingId: liveRow ? active.id : null,
+      sumHours: $("#sum-hours"),
+      sumTotal: $("#sum-total"),
+      rowMeta: liveRow ? liveRow.querySelector(".shift-meta") : null,
+      rowMoney: liveRow ? liveRow.querySelector(".shift-money") : null,
+    };
+  }
+
+  function shiftMetaHtml(b) {
+    const parts = [`${fmt.hoursToHM(b.netHours)} שע׳`];
+    if (b.breakMs > 0) parts.push(`הפסקה ${Math.round(b.breakMs / 60000)}׳`);
+    if (b.overtimeHours > 0.01) parts.push(`נ.ש ${fmt.hoursToHM(b.overtimeHours)}`);
+    if (b.isHoliday) parts.push("שבת/חג");
+    return parts.join('<span class="sep">·</span>');
+  }
+
+  function shiftRow(sh, s, now) {
+    const b = calc.shiftBreakdown(sh, s, now);
+    const d = new Date(sh.start);
+    const timeStr = b.ongoing
+      ? `${fmt.clock(sh.start)} – <span class="live">עכשיו</span>`
+      : `${fmt.clock(sh.start)} – ${fmt.clock(sh.end)}`;
+
+    const row = h(`
+      <div class="shift-row" role="button" data-id="${sh.id}">
+        <div class="shift-date">
+          <div class="d">${d.getDate()}</div>
+          <div class="dow">${fmt.dowShort(d)}</div>
+        </div>
+        <div class="shift-main">
+          <div class="shift-line">
+            <div class="shift-time">${timeStr}</div>
+            <div class="shift-money">${fmt.money(b.pay, s.currency)}</div>
+          </div>
+          <div class="shift-meta">${shiftMetaHtml(b)}</div>
+        </div>
+      </div>`);
+    row.onclick = () => openShiftEditor(sh.id);
+    return row;
+  }
+
+  // update only the live numbers on the shifts screen (no full re-render)
+  function updateShiftsLive() {
+    const L = state.live;
+    if (!L || L.mode !== "shifts" || !L.ongoingId) return;
+    const active = store.getActive();
+    if (!active || active.id !== L.ongoingId) { renderShifts(); return; } // state changed
+    const s = store.getSettings();
+    const now = Date.now();
+    const b = calc.shiftBreakdown(active, s, now);
+    if (L.rowMeta) L.rowMeta.innerHTML = shiftMetaHtml(b);
+    if (L.rowMoney) L.rowMoney.textContent = fmt.money(b.pay, s.currency);
+    const agg = calc.aggregate(store.getShifts(), s, L.range, now);
+    if (L.sumHours) L.sumHours.textContent = fmt.hoursToHM(agg.netHours);
+    if (L.sumTotal) L.sumTotal.textContent = fmt.moneyShort(agg.total, s.currency);
+  }
+
+  /* ============================================================
+     CALENDAR VIEW — a "work heat-map": each worked day filled by hours/standard
+     ============================================================ */
+  function sameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  function renderCalendar() {
+    const s = store.getSettings();
+    const now = new Date();
+    const base = new Date(now.getFullYear(), now.getMonth() + state.calOffset, 1);
+    const year = base.getFullYear(), month = base.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDow = new Date(year, month, 1).getDay(); // 0=Sun
+    const root = $("#view-root");
+
+    // group this month's shifts by day-of-month
+    const byDay = {};
+    for (const sh of store.getShifts()) {
+      const d = new Date(sh.start);
+      if (d.getFullYear() === year && d.getMonth() === month) {
+        const b = calc.shiftBreakdown(sh, s, Date.now());
+        const k = d.getDate();
+        (byDay[k] || (byDay[k] = { net: 0, pay: 0, n: 0 }));
+        byDay[k].net += b.netHours; byDay[k].pay += b.pay; byDay[k].n++;
+      }
+    }
+    const agg = calc.aggregate(store.getShifts(), s, { start: new Date(year, month, 1), end: new Date(year, month + 1, 1) }, Date.now());
+
+    const el = h(`
+      <section class="fade-in">
+        <div class="period-bar">
+          <button id="cal-prev" aria-label="הקודם">${icoChevron("right")}</button>
+          <div class="period-label">${fmt.monthName(month)} ${year}</div>
+          <button id="cal-next" aria-label="הבא">${icoChevron("left")}</button>
+        </div>
+
+        <div class="cal-weekdays">${fmt.DOW.map((d) => `<span>${d.replace("׳", "")}</span>`).join("")}</div>
+        <div class="cal-grid" id="cal-grid"></div>
+
+        <div class="cal-summary">
+          <div class="cell"><div class="k">ימי עבודה</div><div class="v">${agg.workedDays}</div></div>
+          <div class="cell"><div class="k">שעות</div><div class="v">${fmt.hoursToHM(agg.netHours)}</div></div>
+          <div class="cell"><div class="k">סה״כ</div><div class="v">${fmt.moneyShort(agg.total, s.currency)}</div></div>
+        </div>
+      </section>
+    `);
+    root.innerHTML = "";
+    root.appendChild(el);
+
+    const grid = $("#cal-grid");
+    const cells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+    const gridStart = new Date(year, month, 1 - firstDow);
+    for (let i = 0; i < cells; i++) {
+      const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+      const inMonth = date.getMonth() === month;
+      const isToday = sameDay(date, now);
+      const data = inMonth ? byDay[date.getDate()] : null;
+      const cell = h(`<button class="cal-day${inMonth ? "" : " out"}${isToday ? " today" : ""}${data ? " worked" : ""}">
+        <span class="num">${date.getDate()}</span>
+        ${data ? `<span class="hrs">${fmt.hoursToHM(data.net)}</span>` : ""}
+      </button>`);
+      if (data) {
+        const std = calc.standardHoursFor(date, s);
+        const prog = Math.max(0, Math.min(1, std > 0 ? data.net / std : 0));
+        cell.style.background = `color-mix(in srgb, var(--accent) ${(9 + prog * 17).toFixed(0)}%, transparent)`;
+      }
+      if (inMonth) cell.onclick = () => openDayDetail(date);
+      grid.appendChild(cell);
+    }
+
+    $("#cal-prev").onclick = () => { state.calOffset--; renderCalendar(); }; // ‹ earlier (RTL: right = back)
+    $("#cal-next").onclick = () => { state.calOffset++; renderCalendar(); }; // later
+    state.live = { mode: "calendar" };
+  }
+
+  function openDayDetail(date) {
+    const s = store.getSettings();
+    const dayShifts = store.getShifts()
+      .filter((sh) => sameDay(new Date(sh.start), date))
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+
+    const sheet = h(`
+      <div class="sheet">
+        <div class="sheet-grip"></div>
+        <h3 class="sheet-title">${fmt.dateFull(date)}</h3>
+        <div id="day-list"></div>
+        <div class="sheet-actions" style="margin-top:14px">
+          <button class="btn btn-primary" id="day-add">${icoPlus()}הוספת משמרת ליום זה</button>
+        </div>
+      </div>`);
+    openSheet(sheet);
+
+    const list = $("#day-list", sheet);
+    if (!dayShifts.length) {
+      list.appendChild(h(`<div class="empty" style="padding:30px 10px"><div class="t">אין משמרת ביום זה</div></div>`));
+    } else {
+      for (const sh of dayShifts) {
+        const b = calc.shiftBreakdown(sh, s, Date.now());
+        const meta = [`${fmt.hoursToHM(b.netHours)} שע׳`];
+        if (b.breakMs > 0) meta.push(`הפסקה ${Math.round(b.breakMs / 60000)}׳`);
+        if (b.isHoliday) meta.push("שבת/חג");
+        const row = h(`
+          <div class="shift-row" role="button" style="margin-bottom:10px">
+            <div class="shift-main">
+              <div class="shift-line">
+                <div class="shift-time">${b.ongoing ? `${fmt.clock(sh.start)} – <span class="live">עכשיו</span>` : `${fmt.clock(sh.start)} – ${fmt.clock(sh.end)}`}</div>
+                <div class="shift-money">${fmt.money(b.pay, s.currency)}</div>
+              </div>
+              <div class="shift-meta">${meta.join('<span class="sep">·</span>')}</div>
+            </div>
+          </div>`);
+        row.onclick = () => openShiftEditor(sh.id);
+        list.appendChild(row);
+      }
+    }
+    $("#day-add", sheet).onclick = () => openShiftEditor(null, date);
+  }
+
+  /* ============================================================
+     SETTINGS VIEW
+     ============================================================ */
+  function renderSettings() {
+    const s = store.getSettings();
+    const root = $("#view-root");
+    const el = h(`<section class="fade-in"></section>`);
+
+    appendCloudSection(el);
+
+    el.appendChild(h(`<div class="section-title">שכר ומקום עבודה</div>`));
+    const g1 = group();
+    g1.appendChild(textRow("שם מקום עבודה", "workplaceName", s));
+    g1.appendChild(numRow("שכר לשעה", "hourlyWage", s, { unit: s.currency, step: 0.5 }));
+    el.appendChild(g1);
+
+    el.appendChild(h(`<div class="section-title">שעות תקן ליום</div>`));
+    el.appendChild(h(`<div class="group-note">השעות התקניות לכל יום (שעות:דקות). מעבר להן נספרות שעות נוספות, והן גם היעד בטבעת במסך «עכשיו».</div>`));
+    const gDays = group();
+    for (let d = 0; d < 7; d++) gDays.appendChild(dayHoursRow(d, s));
+    el.appendChild(gDays);
+
+    el.appendChild(h(`<div class="section-title">שעות נוספות</div>`));
+    const g2 = group();
+    g2.appendChild(numRow("שעתיים ראשונות", "overtime1Mult", s, { unit: "%", percent: true, step: 5, hint: "ברירת מחדל 125%" }));
+    g2.appendChild(numRow("מעבר לכך", "overtime2Mult", s, { unit: "%", percent: true, step: 5, hint: "ברירת מחדל 150%" }));
+    el.appendChild(g2);
+
+    el.appendChild(h(`<div class="section-title">הפסקות, שבת ולילה</div>`));
+    const g3 = group();
+    g3.appendChild(numRow("הפסקה אוטומטית", "autoBreakMinutes", s, { unit: "דק׳", step: 5, hint: "יורד מכל משמרת ארוכה" }));
+    g3.appendChild(numRow("מעל כמה שעות", "autoBreakAfterHours", s, { unit: "שע׳", step: 0.5 }));
+    g3.appendChild(numRow("תוספת שבת/חג", "holidayMult", s, { unit: "%", percent: true, step: 5, hint: "כשמשמרת מסומנת כשבת/חג" }));
+    g3.appendChild(toggleRow("חישוב שעות לילה", "nightEnabled", s));
+    g3.appendChild(numRow("שעת התחלת לילה", "nightStart", s, { unit: ":00", step: 1, min: 0, max: 23 }));
+    g3.appendChild(numRow("שעת סיום לילה", "nightEnd", s, { unit: ":00", step: 1, min: 0, max: 23 }));
+    g3.appendChild(numRow("תוספת לילה", "nightMult", s, { unit: "%", percent: true, step: 5 }));
+    el.appendChild(g3);
+
+    el.appendChild(h(`<div class="section-title">נסיעות ותקופה</div>`));
+    const g4 = group();
+    g4.appendChild(numRow("החזר נסיעות ליום", "travelPerDay", s, { unit: s.currency, step: 1 }));
+    g4.appendChild(numRow("תקרת נסיעות חודשית", "travelMonthlyCap", s, { unit: s.currency, step: 50, hint: "0 = ללא תקרה" }));
+    g4.appendChild(numRow("יום תחילת חודש", "monthStartDay", s, { step: 1, min: 1, max: 28, hint: "מחזור חישוב חודשי" }));
+    g4.appendChild(numRow("יעד הכנסה חודשי", "monthlyIncomeGoal", s, { unit: s.currency, step: 100, hint: "0 = כבוי" }));
+    el.appendChild(g4);
+
+    el.appendChild(h(`<div class="section-title">תצוגה וגיבוי</div>`));
+    const g5 = group();
+    g5.appendChild(themeRow(s));
+    g5.appendChild(textRow("שם האפליקציה", "appName", s));
+    el.appendChild(g5);
+
+    const g6 = group();
+    g6.appendChild(actionRow("גיבוי נתונים", "ייצוא לקובץ", doExport));
+    g6.appendChild(actionRow("שחזור מגיבוי", "ייבוא מקובץ", doImport));
+    el.appendChild(g6);
+
+    el.appendChild(h(`<div style="text-align:center;color:var(--text-faint);font-size:12px;margin:22px 0 8px">Shifty · נתונים נשמרים במכשיר בלבד</div>`));
+
+    root.innerHTML = "";
+    root.appendChild(el);
+    state.live = { mode: "settings" };
+  }
+
+  function group() { return h(`<div class="settings-group"></div>`); }
+
+  function relTime(iso) {
+    const diff = Date.now() - new Date(iso).getTime();
+    if (diff < 45000) return "הרגע";
+    if (diff < 3600000) return "לפני " + Math.round(diff / 60000) + " דק׳";
+    if (diff < 86400000) return "לפני " + Math.round(diff / 3600000) + " שע׳";
+    return fmt.dayMonth(iso);
+  }
+
+  /* ---------- cloud sync section (settings) ---------- */
+  function appendCloudSection(el) {
+    const cloud = Shifty.cloud;
+    el.appendChild(h(`<div class="section-title">סנכרון וגיבוי בענן</div>`));
+
+    if (!cloud || !cloud.available()) {
+      el.appendChild(h(`<div class="group-note">הסנכרון אינו זמין כרגע (אין חיבור לרשת). כל הנתונים נשמרים במכשיר ועובדים אופליין.</div>`));
+      return;
+    }
+
+    if (cloud.isSignedIn()) {
+      const email = cloud.userEmail() || "";
+      const last = cloud.lastSync();
+      const statusText = cloud.status === "syncing" ? "מסנכרן…"
+        : cloud.status === "error" ? "שגיאה בסנכרון"
+        : (last ? "סונכרן " + relTime(last) : "מחובר");
+      const card = h(`
+        <div class="cloud-card">
+          <div class="cloud-status">
+            <div>
+              <div class="cloud-email">${email}</div>
+              <div class="cloud-sub ${cloud.status === "error" ? "err" : ""}">${statusText}</div>
+            </div>
+            <span class="cloud-dot ${cloud.status}"></span>
+          </div>
+          <div class="cloud-row">
+            <button class="btn btn-ghost" id="cloud-out">התנתקות</button>
+            <button class="btn btn-soft" id="cloud-sync">סנכרן עכשיו</button>
+          </div>
+        </div>`);
+      $("#cloud-sync", card).onclick = () => { cloud.syncNow(); haptic(); };
+      $("#cloud-out", card).onclick = async () => { await cloud.signOut(); state.cloudStage = "email"; toast("התנתקת"); renderSettings(); };
+      el.appendChild(card);
+      return;
+    }
+
+    // signed out — one-tap Google
+    const card = h(`
+      <div class="cloud-card">
+        <div class="group-note" style="margin:0 0 12px">היכנס כדי לגבות את הנתונים בענן ולסנכרן בין המכשירים שלך. בלי סיסמה.</div>
+        <button class="btn cloud-google" id="cloud-google">
+          <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.71-1.57 2.68-3.89 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 9 0 9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+          המשך עם Google
+        </button>
+      </div>`);
+    $("#cloud-google", card).onclick = async () => {
+      try { haptic(); await cloud.signInWithGoogle(); } catch (e) { toast("לא הצלחנו להתחבר"); }
+    };
+    el.appendChild(card);
+  }
+
+  // update the sync status text/dot in place (no re-render) — only when the signed-in card is on screen
+  function updateCloudStatus() {
+    const cloud = Shifty.cloud;
+    const sub = document.querySelector(".cloud-card .cloud-sub");
+    const dot = document.querySelector(".cloud-card .cloud-dot");
+    if (!cloud || !sub || !dot) return;
+    const last = cloud.lastSync();
+    sub.textContent = cloud.status === "syncing" ? "מסנכרן…"
+      : cloud.status === "error" ? "שגיאה בסנכרון"
+      : (last ? "סונכרן " + relTime(last) : "מחובר");
+    sub.classList.toggle("err", cloud.status === "error");
+    dot.className = "cloud-dot" + (cloud.status === "syncing" ? " syncing" : cloud.status === "error" ? " error" : "");
+  }
+
+  // per-weekday standard-hours row: day name + HH:MM inputs + working/off toggle
+  const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+  function setStandardDay(dow, value) {
+    const arr = (store.getSettings().standardByDay || []).slice();
+    arr[dow] = value;
+    store.setSettings({ standardByDay: arr });
+  }
+  function dayHoursRow(dow, s) {
+    const val = s.standardByDay ? s.standardByDay[dow] : null;
+    const off = val == null;
+    const hh = off ? "" : Math.floor(val);
+    const mm = off ? "" : Math.round((val - Math.floor(val)) * 60);
+    const row = h(`
+      <div class="row day-row ${off ? "off" : ""}">
+        <div class="dname">${DAY_NAMES[dow]}</div>
+        <div class="hm">
+          <input class="hm-in hm-h" type="number" inputmode="numeric" min="0" max="23" placeholder="00" value="${hh}"/>
+          <span class="colon">:</span>
+          <input class="hm-in hm-m" type="number" inputmode="numeric" min="0" max="59" placeholder="00" value="${off ? "" : fmt.pad(mm)}"/>
+          <span class="off-tag">חופש</span>
+        </div>
+        <label class="switch"><input type="checkbox" ${off ? "" : "checked"}/><span class="slider"></span></label>
+      </div>`);
+    const hIn = row.querySelector(".hm-h");
+    const mIn = row.querySelector(".hm-m");
+    const toggle = row.querySelector('input[type="checkbox"]');
+
+    function commit() {
+      let H = parseInt(hIn.value, 10); if (isNaN(H) || H < 0) H = 0; if (H > 23) H = 23;
+      let M = parseInt(mIn.value, 10); if (isNaN(M) || M < 0) M = 0; if (M > 59) M = 59;
+      setStandardDay(dow, H + M / 60);
+      mIn.value = fmt.pad(M);
+      haptic(5);
+    }
+    hIn.onchange = commit;
+    mIn.onchange = commit;
+    toggle.onchange = () => {
+      if (toggle.checked) {
+        row.classList.remove("off");
+        if (!hIn.value && !mIn.value) {
+          const base = s.regularDailyHours || 8.6;
+          hIn.value = Math.floor(base);
+          mIn.value = fmt.pad(Math.round((base - Math.floor(base)) * 60));
+        }
+        commit();
+      } else {
+        row.classList.add("off");
+        setStandardDay(dow, null);
+        haptic(5);
+      }
+    };
+    return row;
+  }
+
+  function numRow(label, key, s, opts) {
+    opts = opts || {};
+    const display = opts.percent ? Math.round(s[key] * 100) : s[key];
+    const row = h(`
+      <div class="row">
+        <div class="row-label">${label}${opts.hint ? `<span class="row-hint">${opts.hint}</span>` : ""}</div>
+        <div class="row-control">
+          <input class="row-input" type="number" inputmode="decimal" value="${display}" step="${opts.step || 1}"${opts.min != null ? ` min="${opts.min}"` : ""}${opts.max != null ? ` max="${opts.max}"` : ""}/>
+          ${opts.unit ? `<span class="row-unit">${opts.unit}</span>` : ""}
+        </div>
+      </div>`);
+    const input = $("input", row);
+    input.onchange = () => {
+      let v = parseFloat(input.value);
+      if (isNaN(v)) v = 0;
+      if (opts.min != null) v = Math.max(opts.min, v);
+      if (opts.max != null) v = Math.min(opts.max, v);
+      if (opts.percent) v = v / 100;
+      store.setSettings({ [key]: v });
+      haptic(5);
+    };
+    return row;
+  }
+
+  function textRow(label, key, s) {
+    const row = h(`
+      <div class="row">
+        <div class="row-label">${label}</div>
+        <input class="row-input wide" type="text" value="${(s[key] || "").replace(/"/g, "&quot;")}"/>
+      </div>`);
+    const input = $("input", row);
+    input.onchange = () => {
+      store.setSettings({ [key]: input.value.trim() || store.DEFAULT_SETTINGS[key] });
+      if (key === "appName") $("#header-title").textContent = input.value.trim() || "Shifty";
+    };
+    return row;
+  }
+
+  function toggleRow(label, key, s) {
+    const row = h(`
+      <div class="row">
+        <div class="row-label">${label}</div>
+        <label class="switch"><input type="checkbox" ${s[key] ? "checked" : ""}/><span class="slider"></span></label>
+      </div>`);
+    $("input", row).onchange = (e) => { store.setSettings({ [key]: e.target.checked }); haptic(5); };
+    return row;
+  }
+
+  function themeRow(s) {
+    const row = h(`
+      <div class="row">
+        <div class="row-label">ערכת נושא</div>
+        <div class="segment" style="width:160px">
+          <button data-t="light" class="${s.theme === "light" ? "on" : ""}">בהיר</button>
+          <button data-t="dark" class="${s.theme === "dark" ? "on" : ""}">כהה</button>
+        </div>
+      </div>`);
+    row.querySelectorAll("button").forEach((b) => {
+      b.onclick = () => {
+        const t = b.dataset.t;
+        store.setSettings({ theme: t });
+        applyTheme(t);
+        row.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+        haptic(5);
+      };
+    });
+    return row;
+  }
+
+  function actionRow(label, value, onClick) {
+    const row = h(`
+      <div class="row" role="button">
+        <div class="row-label">${label}</div>
+        <div class="row-control"><span class="row-unit" style="color:var(--accent);font-weight:600">${value}</span></div>
+      </div>`);
+    row.onclick = onClick;
+    return row;
+  }
+
+  /* ============================================================
+     SHIFT EDITOR (sheet)
+     ============================================================ */
+  function openShiftEditor(id, presetDate) {
+    const s = store.getSettings();
+    const isNew = !id;
+    const now = new Date();
+    let shift = id ? store.getShift(id) : null;
+    if (!shift) {
+      const day = presetDate ? new Date(presetDate) : now;
+      const start = new Date(day); start.setHours(9, 0, 0, 0);
+      const end = new Date(day); end.setHours(17, 0, 0, 0);
+      shift = { id: store.uid(), start: start.toISOString(), end: end.toISOString(), breaks: [], isHoliday: false, note: "" };
+    }
+    const ongoing = !shift.end;
+    const breakMin = Math.round((shift.breaks || []).reduce((a, b) => {
+      const be = b.end ? new Date(b.end).getTime() : Date.now();
+      return a + Math.max(0, be - new Date(b.start).getTime());
+    }, 0) / 60000);
+    const sStart = new Date(shift.start), sEnd = ongoing ? null : new Date(shift.end);
+    const startH = fmt.pad(sStart.getHours()), startM = fmt.pad(sStart.getMinutes());
+    const endH = sEnd ? fmt.pad(sEnd.getHours()) : "", endM = sEnd ? fmt.pad(sEnd.getMinutes()) : "";
+    const dDay = fmt.pad(sStart.getDate()), dMon = fmt.pad(sStart.getMonth() + 1), dYear = sStart.getFullYear();
+
+    const sheet = h(`
+      <div class="sheet">
+        <div class="sheet-grip"></div>
+        <h3 class="sheet-title">${isNew ? "משמרת חדשה" : "עריכת משמרת"}</h3>
+
+        <div class="field">
+          <label>תאריך</label>
+          <div class="datefield">
+            <input class="df-in df-d" id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${dDay}"/>
+            <span class="df-sep">/</span>
+            <input class="df-in df-m" id="f-mon" type="number" inputmode="numeric" min="1" max="12" value="${dMon}"/>
+            <span class="df-sep">/</span>
+            <input class="df-in df-y" id="f-year" type="number" inputmode="numeric" min="2000" max="2100" value="${dYear}"/>
+          </div>
+        </div>
+        <div class="field-2">
+          <div class="field"><label>שעת כניסה</label>
+            <div class="timefield">
+              <input class="tf-in" id="f-start-h" type="number" inputmode="numeric" min="0" max="23" placeholder="00" value="${startH}"/>
+              <span class="tf-colon">:</span>
+              <input class="tf-in" id="f-start-m" type="number" inputmode="numeric" min="0" max="59" placeholder="00" value="${startM}"/>
+            </div>
+          </div>
+          <div class="field"><label>שעת יציאה</label>
+            <div class="timefield">
+              <input class="tf-in" id="f-end-h" type="number" inputmode="numeric" min="0" max="23" placeholder="--" value="${endH}"/>
+              <span class="tf-colon">:</span>
+              <input class="tf-in" id="f-end-m" type="number" inputmode="numeric" min="0" max="59" placeholder="--" value="${endM}"/>
+            </div>
+          </div>
+        </div>
+        <div class="field-2">
+          <div class="field"><label>הפסקה (דקות)</label><input type="number" id="f-break" inputmode="numeric" value="${breakMin}" step="5" min="0"/></div>
+          <div class="field">
+            <label>שבת / חג</label>
+            <label class="switch" style="margin-top:8px"><input type="checkbox" id="f-holiday" ${shift.isHoliday ? "checked" : ""}/><span class="slider"></span></label>
+          </div>
+        </div>
+        <div class="field">
+          <label>הערה</label>
+          <textarea id="f-note" placeholder="לא חובה">${(shift.note || "").replace(/</g, "&lt;")}</textarea>
+        </div>
+
+        <div class="sheet-actions">
+          <button class="btn btn-ghost" id="f-cancel">ביטול</button>
+          <button class="btn btn-primary" id="f-save">שמירה</button>
+        </div>
+        ${isNew ? "" : `<div class="delete-link" id="f-delete">מחיקת משמרת</div>`}
+      </div>`);
+
+    openSheet(sheet);
+
+    $("#f-cancel", sheet).onclick = closeSheet;
+    function readTime(hId, mId) {
+      const hv = $(hId, sheet).value;
+      if (hv === "") return null;
+      let H = parseInt(hv, 10); if (isNaN(H)) H = 0; H = Math.max(0, Math.min(23, H));
+      let M = parseInt($(mId, sheet).value, 10); if (isNaN(M)) M = 0; M = Math.max(0, Math.min(59, M));
+      return { H, M };
+    }
+    function readDate() {
+      const dv = $("#f-day", sheet).value, mv = $("#f-mon", sheet).value, yv = $("#f-year", sheet).value;
+      if (dv === "" || mv === "" || yv === "") return null;
+      let d = Math.max(1, Math.min(31, parseInt(dv, 10) || 1));
+      let mo = Math.max(1, Math.min(12, parseInt(mv, 10) || 1));
+      let y = parseInt(yv, 10); if (isNaN(y) || y < 2000 || y > 2100) y = new Date().getFullYear();
+      return { y, mo, d };
+    }
+
+    $("#f-save", sheet).onclick = () => {
+      const D = readDate();
+      const st = readTime("#f-start-h", "#f-start-m");
+      if (!D || !st) { toast("חסר תאריך או שעת כניסה"); return; }
+
+      const start = new Date(D.y, D.mo - 1, D.d, st.H, st.M, 0, 0);
+      let end = null;
+      const et = readTime("#f-end-h", "#f-end-m");
+      if (et) {
+        end = new Date(D.y, D.mo - 1, D.d, et.H, et.M, 0, 0);
+        if (end.getTime() <= start.getTime()) end.setDate(end.getDate() + 1); // crosses midnight
+      }
+      const bMin = Math.max(0, parseInt($("#f-break", sheet).value, 10) || 0);
+
+      shift.start = start.toISOString();
+      shift.end = end ? end.toISOString() : null;
+      shift.isHoliday = $("#f-holiday", sheet).checked;
+      shift.note = $("#f-note", sheet).value.trim();
+      // represent break as a single synthetic interval
+      if (bMin > 0 && end) {
+        const bs = new Date(start.getTime() + 60000);
+        shift.breaks = [{ start: bs.toISOString(), end: new Date(bs.getTime() + bMin * 60000).toISOString() }];
+      } else if (bMin > 0 && !end) {
+        const bs = new Date(start.getTime() + 60000);
+        shift.breaks = [{ start: bs.toISOString(), end: new Date(bs.getTime() + bMin * 60000).toISOString() }];
+      } else {
+        shift.breaks = [];
+      }
+
+      store.upsertShift(shift);
+      haptic(10);
+      closeSheet();
+      toast(isNew ? "המשמרת נוספה ✓" : "נשמר ✓");
+      rerender();
+    };
+
+    if (!isNew) {
+      $("#f-delete", sheet).onclick = () => {
+        store.deleteShift(shift.id);
+        haptic(14);
+        closeSheet();
+        toast("המשמרת נמחקה");
+        rerender();
+      };
+    }
+  }
+
+  /* ---------- sheet host ---------- */
+  function openSheet(sheetEl) {
+    const host = $("#modal-host");
+    host.innerHTML = "";
+    host.hidden = false;
+    const scrim = h(`<div class="scrim"></div>`);
+    scrim.onclick = closeSheet;
+    host.appendChild(scrim);
+    host.appendChild(sheetEl);
+    requestAnimationFrame(() => host.classList.add("open"));
+  }
+  function closeSheet() {
+    const host = $("#modal-host");
+    host.classList.remove("open");
+    setTimeout(() => { host.hidden = true; host.innerHTML = ""; }, 300);
+  }
+
+  /* ============================================================
+     BACKUP / RESTORE
+     ============================================================ */
+  function doExport() {
+    const data = store.exportAll();
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = fmt.toDateInput(new Date());
+    a.href = url; a.download = `shifty-backup-${stamp}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast("הגיבוי הורד ✓");
+  }
+  function doImport() {
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "application/json,.json";
+    input.onchange = () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          store.importAll(reader.result);
+          applyTheme(store.getSettings().theme);
+          toast("הנתונים שוחזרו ✓");
+          rerender();
+        } catch (e) { toast("קובץ לא תקין"); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  /* ============================================================
+     ICONS / BUTTONS
+     ============================================================ */
+  function btn(cls, inner, onClick) {
+    const b = h(`<button class="btn ${cls}">${inner}</button>`);
+    b.onclick = onClick;
+    return b;
+  }
+  function icoPlay() { return `<svg class="ico" viewBox="0 0 24 24" width="20" height="20"><path d="M7 5l12 7-12 7z" fill="currentColor" stroke="none"/></svg>`; }
+  function icoStop() { return `<svg class="ico" viewBox="0 0 24 24" width="18" height="18"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" stroke="none"/></svg>`; }
+  function icoChevron(dir) {
+    const d = dir === "left" ? "M14.5 6l-6 6 6 6" : "M9.5 6l6 6-6 6";
+    return `<svg class="ico" viewBox="0 0 24 24" width="24" height="24"><path d="${d}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  }
+  function icoPlus() { return `<svg class="ico" viewBox="0 0 24 24" width="26" height="26"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>`; }
+
+  /* ============================================================
+     ROUTER + HEADER + TICKER
+     ============================================================ */
+  function setView(view) {
+    state.view = view;
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === view));
+    updateHeader();
+    if (view === "now") renderNow();
+    else if (view === "shifts") renderShifts();
+    else if (view === "calendar") renderCalendar();
+    else renderSettings();
+  }
+
+  function updateHeader() {
+    const action = $("#header-action");
+    if (state.view === "shifts" || state.view === "calendar") {
+      action.innerHTML = icoPlus();
+      action.style.color = "var(--accent)";
+      action.onclick = () => openShiftEditor(null);
+    } else {
+      action.innerHTML = "";
+      action.onclick = null;
+    }
+  }
+
+  function rerender() {
+    if (state.view === "now") renderNow();
+    else if (state.view === "shifts") renderShifts();
+    else if (state.view === "calendar") renderCalendar();
+    else renderSettings();
+  }
+
+  function startTicker() {
+    if (state.tick) clearInterval(state.tick);
+    state.tick = setInterval(() => {
+      if (state.live.mode === "now") updateNow();
+      else if (state.live.mode === "shifts") updateShiftsLive();
+    }, 1000);
+  }
+
+  /* ---------- boot ---------- */
+  function init() {
+    const s = store.getSettings();
+    applyTheme(s.theme);
+    $("#header-title").textContent = s.appName || "Shifty";
+    $("#theme-toggle").onclick = toggleTheme;
+
+    document.querySelectorAll(".tab").forEach((t) => {
+      t.onclick = () => { haptic(); setView(t.dataset.view); };
+    });
+
+    setView("now");
+    startTicker();
+
+    // re-sync on resume (e.g. returning to PWA)
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) rerender();
+    });
+
+    // optional cloud sync. Status flips update only the small card in place (never
+    // the data views); auth transitions re-render settings; applied remote data
+    // refreshes the relevant list view. The Now screen is never re-rendered here —
+    // its 1s ticker already reflects any local change.
+    if (Shifty.cloud) {
+      Shifty.cloud.onStatus = updateCloudStatus;
+      Shifty.cloud.onAuth = () => { if (state.view === "settings") renderSettings(); };
+      Shifty.cloud.onData = () => {
+        if (state.view === "shifts" || state.view === "calendar") rerender();
+        else if (state.view === "settings") renderSettings();
+      };
+      Shifty.cloud.init();
+    }
+
+    // service worker (PWA / offline)
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    }
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
