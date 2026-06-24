@@ -6,6 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
+  const APP_VERSION = "1.0.0"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -604,7 +605,7 @@
     g6.appendChild(actionRow("שחזור מגיבוי", "ייבוא מקובץ", doImport));
     el.appendChild(g6);
 
-    el.appendChild(h(`<div style="text-align:center;color:var(--text-faint);font-size:12px;margin:22px 0 8px">Shifty · נתונים נשמרים במכשיר בלבד</div>`));
+    el.appendChild(h(`<div style="text-align:center;color:var(--text-faint);font-size:12px;line-height:1.7;margin:22px 0 8px">נשמר במכשיר · סנכרון ענן אופציונלי<br>Shifty · גרסה ${APP_VERSION}</div>`));
 
     root.innerHTML = "";
     root.appendChild(el);
