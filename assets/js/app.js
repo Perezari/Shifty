@@ -102,7 +102,7 @@
             <div class="stat-v" id="stat1-v">0:00</div>
           </div>
           <div class="stat money">
-            <div class="stat-head"><div class="stat-k" id="stat2-k">שכר היום</div><span class="stat-ico"><svg class="ico" width="15" height="15" viewBox="0 0 24 24"><path d="M7 4v10a4 4 0 0 0 4 4h3M7 9h9M17 20V10a4 4 0 0 0-4-4h-3"/></svg></span></div>
+            <div class="stat-head"><div class="stat-k" id="stat2-k">שכר היום</div><span class="stat-ico stat-ico-text">${s.currency}</span></div>
             <div class="stat-v money" id="stat2-v">${fmt.money(0, s.currency)}</div>
           </div>
         </div>
@@ -244,7 +244,19 @@
         L.goalRem.textContent = "הגעת ליעד ✓";
         L.goalRem.classList.add("done");
       } else {
-        L.goalRem.textContent = "נותרו " + fmt.hoursToHM(remH) + " ליעד";
+        let txt = "נותרו " + fmt.hoursToHM(remH) + " ליעד";
+        if (active) {
+          // clock time you reach the goal: start + goal hours + the break that applies
+          const startMs = new Date(active.start).getTime();
+          const loggedMs = (active.breaks || []).reduce((a, brk) => {
+            const be = brk.end ? new Date(brk.end).getTime() : now;
+            return a + Math.max(0, be - new Date(brk.start).getTime());
+          }, 0);
+          const autoMs = (s.autoBreakMinutes || 0) * 60000;
+          const finishMs = startMs + goalH * HOUR + Math.max(loggedMs, autoMs);
+          txt += " · סיום ב־" + fmt.clock(finishMs);
+        }
+        L.goalRem.textContent = txt;
         L.goalRem.classList.remove("done");
       }
 
@@ -284,7 +296,7 @@
     const agg = calc.aggregate(all, s, range, now);
     const root = $("#view-root");
 
-    const label = fmt.dayMonth(range.start) + " – " + fmt.dayMonth(new Date(range.end.getTime() - 1));
+    const label = fmt.dayMonth(new Date(range.end.getTime() - 1)) + " – " + fmt.dayMonth(range.start);
 
     const el = h(`
       <section class="fade-in">
@@ -396,30 +408,33 @@
   function renderCalendar() {
     const s = store.getSettings();
     const now = new Date();
-    const base = new Date(now.getFullYear(), now.getMonth() + state.calOffset, 1);
-    const year = base.getFullYear(), month = base.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDow = new Date(year, month, 1).getDay(); // 0=Sun
+    // follow the user's billing cycle (same period as the Shifts screen), not the calendar month
+    const range = calc.shiftPeriod(now, s.monthStartDay, state.calOffset);
+    const cycleStart = range.start;                          // e.g. 25/5 00:00
+    const cycleLast = new Date(range.end.getTime() - 1);     // e.g. 24/6
     const root = $("#view-root");
+    const dayKey = (d) => d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
 
-    // group this month's shifts by day-of-month
+    // group this cycle's shifts by date
     const byDay = {};
     for (const sh of store.getShifts()) {
       const d = new Date(sh.start);
-      if (d.getFullYear() === year && d.getMonth() === month) {
+      if (d >= range.start && d < range.end) {
         const b = calc.shiftBreakdown(sh, s, Date.now());
-        const k = d.getDate();
+        const k = dayKey(d);
         (byDay[k] || (byDay[k] = { net: 0, pay: 0, n: 0 }));
         byDay[k].net += b.netHours; byDay[k].pay += b.pay; byDay[k].n++;
       }
     }
-    const agg = calc.aggregate(store.getShifts(), s, { start: new Date(year, month, 1), end: new Date(year, month + 1, 1) }, Date.now());
+    const agg = calc.aggregate(store.getShifts(), s, range, Date.now());
+    // match the Shifts screen label order exactly (end – start)
+    const label = fmt.dayMonth(cycleLast) + " – " + fmt.dayMonth(cycleStart);
 
     const el = h(`
       <section class="fade-in">
         <div class="period-bar">
           <button id="cal-prev" aria-label="הקודם">${icoChevron("right")}</button>
-          <div class="period-label">${fmt.monthName(month)} ${year}</div>
+          <div class="period-label">${label}</div>
           <button id="cal-next" aria-label="הבא">${icoChevron("left")}</button>
         </div>
 
@@ -436,15 +451,17 @@
     root.innerHTML = "";
     root.appendChild(el);
 
+    // grid spans the cycle, padded to whole weeks (Sun-first); out-of-cycle days are faint
     const grid = $("#cal-grid");
-    const cells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
-    const gridStart = new Date(year, month, 1 - firstDow);
+    const gridStart = new Date(cycleStart.getFullYear(), cycleStart.getMonth(), cycleStart.getDate() - cycleStart.getDay());
+    const gridEnd = new Date(cycleLast.getFullYear(), cycleLast.getMonth(), cycleLast.getDate() + (6 - cycleLast.getDay()));
+    const cells = Math.round((gridEnd - gridStart) / 86400000) + 1;
     for (let i = 0; i < cells; i++) {
       const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
-      const inMonth = date.getMonth() === month;
+      const inCycle = date >= range.start && date < range.end;
       const isToday = sameDay(date, now);
-      const data = inMonth ? byDay[date.getDate()] : null;
-      const cell = h(`<button class="cal-day${inMonth ? "" : " out"}${isToday ? " today" : ""}${data ? " worked" : ""}">
+      const data = inCycle ? byDay[dayKey(date)] : null;
+      const cell = h(`<button class="cal-day${inCycle ? "" : " out"}${isToday ? " today" : ""}${data ? " worked" : ""}">
         <span class="num">${date.getDate()}</span>
         ${data ? `<span class="hrs">${fmt.hoursToHM(data.net)}</span>` : ""}
       </button>`);
@@ -453,7 +470,7 @@
         const prog = Math.max(0, Math.min(1, std > 0 ? data.net / std : 0));
         cell.style.background = `color-mix(in srgb, var(--accent) ${(9 + prog * 17).toFixed(0)}%, transparent)`;
       }
-      if (inMonth) cell.onclick = () => openDayDetail(date);
+      if (inCycle) cell.onclick = () => openDayDetail(date);
       grid.appendChild(cell);
     }
 
@@ -655,48 +672,77 @@
   function dayHoursRow(dow, s) {
     const val = s.standardByDay ? s.standardByDay[dow] : null;
     const off = val == null;
-    const hh = off ? "" : Math.floor(val);
-    const mm = off ? "" : Math.round((val - Math.floor(val)) * 60);
     const row = h(`
       <div class="row day-row ${off ? "off" : ""}">
         <div class="dname">${DAY_NAMES[dow]}</div>
-        <div class="hm">
-          <input class="hm-in hm-h" type="number" inputmode="numeric" min="0" max="23" placeholder="00" value="${hh}"/>
-          <span class="colon">:</span>
-          <input class="hm-in hm-m" type="number" inputmode="numeric" min="0" max="59" placeholder="00" value="${off ? "" : fmt.pad(mm)}"/>
-          <span class="off-tag">חופש</span>
-        </div>
+        <button class="day-val" type="button">${off ? "חופש" : fmt.hoursToHM(val)}</button>
         <label class="switch"><input type="checkbox" ${off ? "" : "checked"}/><span class="slider"></span></label>
       </div>`);
-    const hIn = row.querySelector(".hm-h");
-    const mIn = row.querySelector(".hm-m");
+    const valBtn = row.querySelector(".day-val");
     const toggle = row.querySelector('input[type="checkbox"]');
 
-    function commit() {
-      let H = parseInt(hIn.value, 10); if (isNaN(H) || H < 0) H = 0; if (H > 23) H = 23;
-      let M = parseInt(mIn.value, 10); if (isNaN(M) || M < 0) M = 0; if (M > 59) M = 59;
-      setStandardDay(dow, H + M / 60);
-      mIn.value = fmt.pad(M);
-      haptic(5);
-    }
-    hIn.onchange = commit;
-    mIn.onchange = commit;
+    valBtn.onclick = () => {
+      if (row.classList.contains("off")) return; // toggle the day on first
+      const cur = store.getSettings().standardByDay[dow] || (s.regularDailyHours || 8.6);
+      const H = Math.floor(cur), M = Math.round((cur - H) * 60);
+      openTimeWheel(DAY_NAMES[dow], H, M, (nh, nm) => {
+        const dec = nh + nm / 60;
+        setStandardDay(dow, dec);
+        valBtn.textContent = fmt.hoursToHM(dec);
+      });
+    };
     toggle.onchange = () => {
       if (toggle.checked) {
         row.classList.remove("off");
-        if (!hIn.value && !mIn.value) {
-          const base = s.regularDailyHours || 8.6;
-          hIn.value = Math.floor(base);
-          mIn.value = fmt.pad(Math.round((base - Math.floor(base)) * 60));
-        }
-        commit();
+        let cur = store.getSettings().standardByDay[dow];
+        if (cur == null) { cur = s.regularDailyHours || 8.6; setStandardDay(dow, cur); }
+        valBtn.textContent = fmt.hoursToHM(cur);
       } else {
         row.classList.add("off");
         setStandardDay(dow, null);
-        haptic(5);
+        valBtn.textContent = "חופש";
       }
+      haptic(5);
     };
     return row;
+  }
+
+  // iOS-alarm-style HH:MM wheel picker (scroll-snap). onSave(hours, minutes).
+  function openTimeWheel(title, h0, m0, onSave) {
+    const ITEM = 40;
+    const col = (n, fmtFn) => Array.from({ length: n }, (_, i) => `<div class="wheel-item">${fmtFn(i)}</div>`).join("");
+    const sheet = h(`
+      <div class="sheet">
+        <div class="sheet-grip"></div>
+        <h3 class="sheet-title">${title}</h3>
+        <div class="wheel-labels"><span>שעות</span><span class="wcsp">:</span><span>דקות</span></div>
+        <div class="wheel-wrap">
+          <div class="wheel-center"></div>
+          <div class="wheel" id="wheel-h">${col(24, (i) => i)}</div>
+          <div class="wheel-colon">:</div>
+          <div class="wheel" id="wheel-m">${col(60, (i) => fmt.pad(i))}</div>
+        </div>
+        <div class="sheet-actions">
+          <button class="btn btn-ghost" id="wheel-cancel">ביטול</button>
+          <button class="btn btn-primary" id="wheel-done">שמירה</button>
+        </div>
+      </div>`);
+    openSheet(sheet);
+    const wh = $("#wheel-h", sheet), wm = $("#wheel-m", sheet);
+    // snap to the initial values — force layout, then retry across the open animation so it sticks
+    const setInitial = () => { wh.scrollTop = h0 * ITEM; wm.scrollTop = m0 * ITEM; };
+    void wh.offsetHeight; // flush layout
+    setInitial();
+    requestAnimationFrame(setInitial);
+    setTimeout(setInitial, 60);
+    $("#wheel-cancel", sheet).onclick = closeSheet;
+    $("#wheel-done", sheet).onclick = () => {
+      const H = Math.max(0, Math.min(23, Math.round(wh.scrollTop / ITEM)));
+      const M = Math.max(0, Math.min(59, Math.round(wm.scrollTop / ITEM)));
+      haptic(10);
+      closeSheet();
+      onSave(H, M);
+    };
   }
 
   function numRow(label, key, s, opts) {
