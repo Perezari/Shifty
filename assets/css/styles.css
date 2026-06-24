@@ -40,6 +40,7 @@
   --danger-soft: #fdecec;
   --success: #2fa84f;
   --warn: #e0922f;
+  --holiday: #b07d2a;
   --ring-track: #e9ebf0;
   --shadow-sm: 0 1px 2px rgba(20, 24, 33, .05);
   --shadow: 0 1px 3px rgba(20, 24, 33, .06), 0 10px 28px rgba(20, 24, 33, .05);
@@ -77,6 +78,7 @@
   --danger: #f0565b;
   --danger-soft: rgba(240, 86, 91, .14);
   --success: #46c46a;
+  --holiday: #d8a64e;
   --ring-track: #2b2f38;
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, .3);
   --shadow: 0 2px 8px rgba(0, 0, 0, .35);
@@ -521,12 +523,32 @@ input, select, textarea { font-family: inherit; }
   display: flex; align-items: center; justify-content: space-between;
   padding: 6px 2px 14px;
 }
-.period-bar button {
+.period-bar > button:not(.period-label) {
   width: 38px; height: 38px; border-radius: var(--r-pill);
   display: grid; place-items: center; color: var(--accent);
 }
-.period-bar button:active { background: var(--surface-2); }
-.period-label { font-size: 16px; font-weight: 700; }
+.period-bar > button:not(.period-label):active { background: var(--surface-2); }
+.period-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 16px; font-weight: 700; color: var(--text);
+  padding: 6px 12px; border-radius: var(--r-pill);
+}
+.period-label:active { background: var(--surface-2); }
+.period-label .caret { color: var(--text-dim); stroke-width: 2.4; }
+
+/* period jump picker (month grid + year stepper) */
+.yr-nav { display: flex; align-items: center; justify-content: center; gap: 20px; margin: 2px 0 8px; }
+.yr-nav button { width: 40px; height: 40px; border-radius: var(--r-pill); display: grid; place-items: center; color: var(--accent); }
+.yr-nav button:active { background: var(--surface-2); }
+.yr-label { font-size: 20px; font-weight: 800; min-width: 76px; text-align: center; font-variant-numeric: tabular-nums; }
+.mon-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 14px; }
+.mon-btn {
+  padding: 14px 6px; border-radius: 12px;
+  background: var(--surface-2); color: var(--text);
+  font-size: 15px; font-weight: 600; transition: transform .08s;
+}
+.mon-btn:active { transform: scale(.95); }
+.mon-btn.on { background: var(--accent); color: var(--on-accent); }
 
 .summary-card {
   display: grid;
@@ -620,6 +642,25 @@ input, select, textarea { font-family: inherit; }
 .cal-day.today { box-shadow: inset 0 0 0 1.6px var(--accent); border-color: transparent; }
 .cal-day.today .num { color: var(--accent); font-weight: 800; }
 .cal-day:not(.out):active { transform: scale(.93); }
+
+/* holiday days — amber marker dot + soft tint + name when not worked */
+.cal-day.hol::after {
+  content: ""; position: absolute; top: 5px; inset-inline-start: 6px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--holiday);
+}
+.cal-day.hol-chag:not(.worked) { background: color-mix(in srgb, var(--holiday) 14%, transparent); border-color: transparent; }
+.cal-day.hol-short:not(.worked) { background: color-mix(in srgb, var(--holiday) 7%, transparent); border-color: transparent; }
+.cal-day.hol:not(.worked) .num { color: var(--holiday); }
+.cal-day.worked.hol .num { color: var(--accent-strong); }
+.cal-day .hol-name {
+  font-size: 9px; font-weight: 700; color: var(--holiday); line-height: 1.05;
+  max-width: 94%; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.day-hol {
+  text-align: center; font-size: 13.5px; font-weight: 700;
+  color: var(--holiday); margin: -8px 0 12px;
+}
 
 .cal-summary {
   display: grid; grid-template-columns: 1fr 1fr 1fr;
@@ -899,8 +940,8 @@ input, select, textarea { font-family: inherit; }
 .toast.show { opacity: 1; transform: translateY(0); }
 
 /* ---------- misc ---------- */
-.fade-in { animation: fade .35s ease both; }
-@keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.fade-in { animation: fade .22s ease both; }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } } /* opacity only — no vertical shift on view switch */
 @media (min-width: 481px) {
   .app { border-inline: 1px solid var(--border); }
 }

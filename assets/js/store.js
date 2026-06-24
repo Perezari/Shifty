@@ -30,6 +30,9 @@
 
     holidayMult: 1.5,               // whole-shift multiplier when marked holiday
 
+    holidaysEnabled: true,          // auto-detect Israeli holidays
+    holidayEveHours: 4.1,           // standard hours on a shortened day (erev chag / Yom HaZikaron) = 4:06
+
     autoBreakMinutes: 0,            // auto-deducted break per shift
     autoBreakAfterHours: 6,         // only if gross shift >= this
 

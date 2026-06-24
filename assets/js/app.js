@@ -302,7 +302,7 @@
       <section class="fade-in">
         <div class="period-bar">
           <button id="per-prev" aria-label="הקודם">${icoChevron("right")}</button>
-          <div class="period-label">${label}</div>
+          <button class="period-label" id="per-jump">${label}${icoCaret()}</button>
           <button id="per-next" aria-label="הבא">${icoChevron("left")}</button>
         </div>
 
@@ -332,6 +332,10 @@
 
     $("#per-prev").onclick = () => { state.periodOffset--; renderShifts(); }; // earlier (RTL: right = back)
     $("#per-next").onclick = () => { state.periodOffset++; renderShifts(); }; // later
+    $("#per-jump").onclick = () => {
+      const mid = new Date((range.start.getTime() + range.end.getTime()) / 2);
+      openPeriodPicker(mid, (year, m) => { state.periodOffset = periodOffsetFor(year, m, s.monthStartDay); renderShifts(); });
+    };
 
     // capture refs for live (per-second) updates — only the ongoing shift in view
     const active = store.getActive();
@@ -434,7 +438,7 @@
       <section class="fade-in">
         <div class="period-bar">
           <button id="cal-prev" aria-label="הקודם">${icoChevron("right")}</button>
-          <div class="period-label">${label}</div>
+          <button class="period-label" id="cal-jump">${label}${icoCaret()}</button>
           <button id="cal-next" aria-label="הבא">${icoChevron("left")}</button>
         </div>
 
@@ -456,14 +460,18 @@
     const gridStart = new Date(cycleStart.getFullYear(), cycleStart.getMonth(), cycleStart.getDate() - cycleStart.getDay());
     const gridEnd = new Date(cycleLast.getFullYear(), cycleLast.getMonth(), cycleLast.getDate() + (6 - cycleLast.getDay()));
     const cells = Math.round((gridEnd - gridStart) / 86400000) + 1;
+    const holsOn = s.holidaysEnabled !== false && Shifty.holidays;
     for (let i = 0; i < cells; i++) {
       const date = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
       const inCycle = date >= range.start && date < range.end;
       const isToday = sameDay(date, now);
       const data = inCycle ? byDay[dayKey(date)] : null;
-      const cell = h(`<button class="cal-day${inCycle ? "" : " out"}${isToday ? " today" : ""}${data ? " worked" : ""}">
+      const hol = inCycle && holsOn ? Shifty.holidays.info(date) : null;
+      const holCls = hol && hol.type ? " hol hol-" + hol.type : "";
+      const cell = h(`<button class="cal-day${inCycle ? "" : " out"}${isToday ? " today" : ""}${data ? " worked" : ""}${holCls}">
         <span class="num">${date.getDate()}</span>
-        ${data ? `<span class="hrs">${fmt.hoursToHM(data.net)}</span>` : ""}
+        ${data ? `<span class="hrs">${fmt.hoursToHM(data.net)}</span>`
+          : (hol && hol.type ? `<span class="hol-name">${hol.name}</span>` : "")}
       </button>`);
       if (data) {
         const std = calc.standardHoursFor(date, s);
@@ -476,6 +484,10 @@
 
     $("#cal-prev").onclick = () => { state.calOffset--; renderCalendar(); }; // ‹ earlier (RTL: right = back)
     $("#cal-next").onclick = () => { state.calOffset++; renderCalendar(); }; // later
+    $("#cal-jump").onclick = () => {
+      const mid = new Date((range.start.getTime() + range.end.getTime()) / 2);
+      openPeriodPicker(mid, (year, m) => { state.calOffset = periodOffsetFor(year, m, s.monthStartDay); renderCalendar(); });
+    };
     state.live = { mode: "calendar" };
   }
 
@@ -484,11 +496,16 @@
     const dayShifts = store.getShifts()
       .filter((sh) => sameDay(new Date(sh.start), date))
       .sort((a, b) => new Date(a.start) - new Date(b.start));
+    const hol = s.holidaysEnabled !== false && Shifty.holidays ? Shifty.holidays.info(date) : null;
+    const holLine = hol && hol.type
+      ? `<div class="day-hol hol-${hol.type}">${hol.name}${hol.type === "short" ? " · יום מקוצר" : ""}</div>`
+      : "";
 
     const sheet = h(`
       <div class="sheet">
         <div class="sheet-grip"></div>
         <h3 class="sheet-title">${fmt.dateFull(date)}</h3>
+        ${holLine}
         <div id="day-list"></div>
         <div class="sheet-actions" style="margin-top:14px">
           <button class="btn btn-primary" id="day-add">${icoPlus()}הוספת משמרת ליום זה</button>
@@ -543,6 +560,13 @@
     const gDays = group();
     for (let d = 0; d < 7; d++) gDays.appendChild(dayHoursRow(d, s));
     el.appendChild(gDays);
+
+    el.appendChild(h(`<div class="section-title">חגי ישראל</div>`));
+    el.appendChild(h(`<div class="group-note">זיהוי אוטומטי של חגים, ערבי חג ויום הזיכרון — לכל שנה, אופליין. בערב חג ובימים מקוצרים התקן היומי הוא הערך שתגדיר כאן.</div>`));
+    const gHol = group();
+    gHol.appendChild(toggleRow("זיהוי חגים אוטומטי", "holidaysEnabled", s));
+    gHol.appendChild(wheelRow("שעות עבודה בערב חג", "holidayEveHours", s));
+    el.appendChild(gHol);
 
     el.appendChild(h(`<div class="section-title">שעות נוספות</div>`));
     const g2 = group();
@@ -767,6 +791,51 @@
     return row;
   }
 
+  // months between the current (offset 0) cycle and the cycle around (year, monthIdx)
+  function periodOffsetFor(year, monthIdx, msd) {
+    const base = calc.shiftPeriod(Date.now(), msd, 0).start;
+    const tgt = calc.shiftPeriod(new Date(year, monthIdx, 15), msd, 0).start;
+    return (tgt.getFullYear() * 12 + tgt.getMonth()) - (base.getFullYear() * 12 + base.getMonth());
+  }
+
+  // tap the period label -> jump to any month/year quickly
+  function openPeriodPicker(midDate, onPick) {
+    const now = new Date();
+    let yr = midDate.getFullYear();
+    const curY = midDate.getFullYear(), curM = midDate.getMonth();
+    const sheet = h(`
+      <div class="sheet">
+        <div class="sheet-grip"></div>
+        <h3 class="sheet-title">מעבר לתקופה</h3>
+        <div class="yr-nav">
+          <button id="yr-prev" aria-label="שנה קודמת">${icoChevron("right")}</button>
+          <div class="yr-label" id="yr-label">${yr}</div>
+          <button id="yr-next" aria-label="שנה הבאה">${icoChevron("left")}</button>
+        </div>
+        <div class="mon-grid" id="mon-grid"></div>
+        <div class="sheet-actions">
+          <button class="btn btn-ghost" id="pp-cancel">סגירה</button>
+          <button class="btn btn-soft" id="pp-today">היום</button>
+        </div>
+      </div>`);
+    openSheet(sheet);
+    const grid = $("#mon-grid", sheet), yrLabel = $("#yr-label", sheet);
+    function paint() {
+      yrLabel.textContent = yr;
+      grid.innerHTML = "";
+      for (let m = 0; m < 12; m++) {
+        const b = h(`<button class="mon-btn${yr === curY && m === curM ? " on" : ""}">${fmt.monthName(m)}</button>`);
+        b.onclick = () => { closeSheet(); onPick(yr, m); };
+        grid.appendChild(b);
+      }
+    }
+    paint();
+    $("#yr-prev", sheet).onclick = () => { yr--; paint(); };
+    $("#yr-next", sheet).onclick = () => { yr++; paint(); };
+    $("#pp-cancel", sheet).onclick = closeSheet;
+    $("#pp-today", sheet).onclick = () => { closeSheet(); onPick(now.getFullYear(), now.getMonth()); };
+  }
+
   function numRow(label, key, s, opts) {
     opts = opts || {};
     const display = opts.percent ? Math.round(s[key] * 100) : s[key];
@@ -987,8 +1056,10 @@
   }
 
   /* ---------- sheet host ---------- */
+  let sheetCloseTimer = null;
   function openSheet(sheetEl) {
     const host = $("#modal-host");
+    clearTimeout(sheetCloseTimer); // cancel a pending close so reopening fast doesn't wipe the new sheet
     host.innerHTML = "";
     host.hidden = false;
     const scrim = h(`<div class="scrim"></div>`);
@@ -1000,7 +1071,8 @@
   function closeSheet() {
     const host = $("#modal-host");
     host.classList.remove("open");
-    setTimeout(() => { host.hidden = true; host.innerHTML = ""; }, 300);
+    clearTimeout(sheetCloseTimer);
+    sheetCloseTimer = setTimeout(() => { host.hidden = true; host.innerHTML = ""; }, 300);
   }
 
   /* ============================================================
@@ -1052,6 +1124,7 @@
     return `<svg class="ico" viewBox="0 0 24 24" width="24" height="24"><path d="${d}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   }
   function icoPlus() { return `<svg class="ico" viewBox="0 0 24 24" width="26" height="26"><path d="M12 5v14M5 12h14" stroke-linecap="round"/></svg>`; }
+  function icoCaret() { return `<svg class="ico caret" viewBox="0 0 24 24" width="15" height="15"><path d="M7 10l5 5 5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>`; }
 
   /* ============================================================
      ROUTER + HEADER + TICKER

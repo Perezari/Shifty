@@ -11,6 +11,12 @@
   // Per-day value if set, else the global regularDailyHours fallback.
   // Also the daily ring goal on the Now screen.
   function standardHoursFor(date, s) {
+    // shortened days (erev chag / Yom HaZikaron) override the weekday standard.
+    // chag days are intentionally ignored here (treated as a regular day for calc).
+    if (s.holidaysEnabled !== false && Shifty.holidays && (s.holidayEveHours || 0) > 0) {
+      const hi = Shifty.holidays.info(date);
+      if (hi.type === "short") return s.holidayEveHours;
+    }
     const dow = new Date(date).getDay();
     const v = s.standardByDay && s.standardByDay[dow];
     return (v != null && v > 0) ? v : (s.regularDailyHours || 8.6);
