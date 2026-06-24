@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.0.0"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.0.1"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -165,8 +165,10 @@
     const onBreak = active && store.activeBreak(active);
 
     if (!active) {
-      wrap.appendChild(btn("btn-primary", icoPlay() + "התחל משמרת", () => doStart()));
-      wrap.appendChild(btn("btn-secondary", "הוספת משמרת ידנית", () => openShiftEditor(null)));
+      const row = h(`<div class="btn-row"></div>`);
+      row.appendChild(btn("btn-primary", icoPlay() + "התחל משמרת", () => doStart()));
+      row.appendChild(btn("btn-secondary", "הוספה ידנית", () => openShiftEditor(null)));
+      wrap.appendChild(row);
     } else if (onBreak) {
       const banner = h(`<div class="break-banner">בהפסקה <span id="brk-timer" style="direction:ltr;font-variant-numeric:tabular-nums">0:00</span></div>`);
       wrap.appendChild(banner);
@@ -1048,22 +1050,14 @@
     }
   }
 
-  /* ---------- sheet host ---------- */
+  /* ---------- sheet host (full-screen sheets) ---------- */
   const sheetCloseTimers = {};
-  function setBarColor(c) { const m = $("#theme-color-meta"); if (m) m.setAttribute("content", c); }
-  // the color seen behind the iOS status bar / notch while a sheet's scrim is up
-  function scrimBarColor() {
-    const m = (getComputedStyle(document.body).backgroundColor.match(/\d+/g) || [21, 23, 28]).map(Number);
-    const a = 0.42, s = [10, 12, 18]; // matches .scrim rgba(10,12,18,.42)
-    return "rgb(" + m.slice(0, 3).map((v, i) => Math.round(v * (1 - a) + s[i] * a)).join(", ") + ")";
-  }
   function openSheet(sheetEl, hostSel) {
     hostSel = hostSel || "#modal-host";
     const host = $(hostSel);
     clearTimeout(sheetCloseTimers[hostSel]); // cancel a pending close so reopening fast doesn't wipe the new sheet
     host.innerHTML = "";
     host.hidden = false;
-    setBarColor(scrimBarColor()); // sync the notch/status bar with the dimmed background immediately
     const scrim = h(`<div class="scrim"></div>`);
     scrim.onclick = () => closeSheet(hostSel);
     host.appendChild(scrim);
@@ -1074,9 +1068,6 @@
     hostSel = hostSel || "#modal-host";
     const host = $(hostSel);
     host.classList.remove("open");
-    // restore the bar only when no sheet remains open (a picker may sit above another)
-    const other = hostSel === "#modal-host-2" ? "#modal-host" : "#modal-host-2";
-    if (!$(other).classList.contains("open")) setBarColor(getComputedStyle(document.body).backgroundColor);
     clearTimeout(sheetCloseTimers[hostSel]);
     sheetCloseTimers[hostSel] = setTimeout(() => { host.hidden = true; host.innerHTML = ""; }, 300);
   }

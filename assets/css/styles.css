@@ -389,13 +389,12 @@ input, select, textarea { font-family: inherit; }
 }
 /* idle secondary "add manual shift": a real button, but clearly secondary to
    the filled teal primary — soft tinted surface, accent text, lighter weight. */
-.now-actions > .btn-secondary {
+.now-actions .btn-secondary {
   background: var(--accent-soft);
   color: var(--accent-strong);
   font-weight: 600;
-  padding-block: 15px;
 }
-.now-actions > .btn-secondary:active { filter: brightness(.97); }
+.now-actions .btn-secondary:active { filter: brightness(.97); }
 
 /* short phones (iPhone SE height): reclaim room so the full stack settles before scroll */
 @media (max-height: 700px) {
@@ -833,29 +832,30 @@ input, select, textarea { font-family: inherit; }
    ============================================================ */
 .modal-host {
   position: fixed; inset: 0; z-index: 100;
-  display: flex; align-items: flex-end; justify-content: center;
+  display: flex; align-items: stretch; justify-content: center;
 }
 .modal-host-top { z-index: 110; } /* stacked picker sits above an open sheet */
 .modal-host[hidden] { display: none; }
-.scrim {
-  position: absolute; inset: 0;
-  background: rgba(10, 12, 18, .42);
-  opacity: 0; transition: opacity .25s;
-}
-.modal-host.open .scrim { opacity: 1; }
+/* full-screen sheet: an opaque page that also covers the notch in the same
+   color, so iOS never has to re-adapt the status bar (no notch lag). */
+.scrim { position: absolute; inset: 0; background: transparent; }
 .sheet {
   position: relative;
   width: 100%; max-width: var(--maxw);
+  height: 100dvh; max-height: none;
   background: var(--bg);
-  border-radius: 22px 22px 0 0;
-  padding: 8px 18px calc(20px + var(--safe-bottom));
-  max-height: 92dvh; overflow-y: auto;
+  border-radius: 0;
+  padding: calc(10px + var(--safe-top)) 18px calc(20px + var(--safe-bottom));
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
   transform: translateY(100%);
-  transition: transform .3s cubic-bezier(.32,.72,0,1);
-  box-shadow: var(--shadow-lg);
+  transition: transform .3s cubic-bezier(.32, .72, 0, 1);
+  /* center content vertically when it fits; `safe` falls back to top-aligned
+     (and scrolls) when it doesn't, so tall sheets never clip on iOS. */
+  display: flex; flex-direction: column; justify-content: safe center;
 }
+.sheet > * { flex-shrink: 0; } /* keep natural height -> tall content scrolls, not squishes */
 .modal-host.open .sheet { transform: translateY(0); }
-.sheet-grip { width: 40px; height: 5px; border-radius: 3px; background: var(--surface-3); margin: 6px auto 14px; }
+.sheet-grip { display: none; } /* drag handle is a bottom-sheet affordance; full-screen has none */
 .sheet-title { font-size: 18px; font-weight: 800; text-align: center; margin: 0 0 16px; }
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-dim); margin: 0 2px 6px; }
