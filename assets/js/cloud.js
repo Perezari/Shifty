@@ -11,6 +11,7 @@
   const SUPABASE_URL = "https://btspqotfbejauwpfhayj.supabase.co";
   const SUPABASE_KEY = "sb_publishable_IVqM6u55E9ZqIaHCohyzlw_1ZW2ONRu";
   const K_LAST = "shifty.lastSync.v1";
+  const K_SETSYNC = "shifty.settingsSyncedAt.v1"; // updatedAt last confirmed in the cloud
 
   let client = null;
   let session = null;
@@ -30,6 +31,22 @@
   function userEmail() { return session && session.user ? session.user.email : null; }
   function lastSync() { try { return localStorage.getItem(K_LAST); } catch (e) { return null; } }
   function setLastSync(v) { try { localStorage.setItem(K_LAST, v); } catch (e) {} }
+  // watermark: the settings updatedAt we last confirmed against the cloud.
+  // local settings are "edited since sync" iff their updatedAt differs from this.
+  function settingsSyncedAt() { try { return localStorage.getItem(K_SETSYNC); } catch (e) { return null; } }
+  function markSettingsSynced(v) { try { if (v) localStorage.setItem(K_SETSYNC, v); } catch (e) {} }
+  function deepEq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  // cloud document is the base; this device's genuine (non-default) customizations win.
+  // prevents a mostly-default local object from wiping real values stored in the cloud.
+  function mergeSettings(cloudData, local) {
+    const D = store.DEFAULT_SETTINGS;
+    const out = Object.assign({}, D, cloudData || {});
+    Object.keys(local || {}).forEach((k) => {
+      if (k === "updatedAt") return;
+      if (!deepEq(local[k], D[k])) out[k] = local[k];
+    });
+    return out;
+  }
   // status changes (syncing/idle/error) update only the small status card, never a full re-render
   function fireStatus() { if (cloud.onStatus) { try { cloud.onStatus(); } catch (e) {} } }
   // auth changes (signed in/out) — settings card structure changes
@@ -89,18 +106,54 @@
         if (error) throw error;
       }
 
-      // ---- settings (single row per user) ----
+      // ---- settings (a single whole-document row per user) ----
       const ls = store.getSettings();
-      const lst = ls.updatedAt ? new Date(ls.updatedAt).getTime() : 0;
-      const rst = remoteSettings ? new Date(remoteSettings.updated_at).getTime() : -1;
-      if (remoteSettings && rst > lst) {
-        store.applyRemoteSettings(remoteSettings.data, remoteSettings.updated_at);
-        dataChanged = true;
-      } else {
+      const syncedAt = settingsSyncedAt();
+      const lst = ls.updatedAt ? Date.parse(ls.updatedAt) : 0;
+      const rst = remoteSettings ? Date.parse(remoteSettings.updated_at) : -1;
+      const localEdited = !!ls.updatedAt && ls.updatedAt !== syncedAt;
+      const pushSettings = async (obj, ts) => {
         const { error } = await client.from("settings").upsert({
-          user_id: uid, data: settingsForCloud(ls), updated_at: ls.updatedAt || nowISO(),
+          user_id: uid, data: settingsForCloud(obj), updated_at: ts,
         });
         if (error) throw error;
+        markSettingsSynced(ts);
+      };
+
+      if (!remoteSettings) {
+        // nothing saved in the cloud yet -> seed it from this device
+        await pushSettings(ls, ls.updatedAt || nowISO());
+      } else if (syncedAt == null) {
+        // first contact with the cloud on this install: never clobber the backup.
+        // start from the cloud document and layer this device's real customizations on top.
+        const merged = mergeSettings(remoteSettings.data, ls);
+        const cloudNorm = Object.assign({}, store.DEFAULT_SETTINGS, remoteSettings.data);
+        if (deepEq(merged, cloudNorm)) {
+          // this device added nothing new -> adopt the cloud as-is
+          store.applyRemoteSettings(remoteSettings.data, remoteSettings.updated_at);
+          markSettingsSynced(remoteSettings.updated_at);
+        } else {
+          // this device has customizations missing from the cloud -> back them up
+          const ts = nowISO();
+          await pushSettings(merged, ts);
+          store.applyRemoteSettings(merged, ts); // keep local in lockstep with the cloud
+        }
+        dataChanged = true;
+      } else if (!localEdited) {
+        // no unsynced local edits -> the cloud is authoritative
+        if (rst !== lst) {
+          store.applyRemoteSettings(remoteSettings.data, remoteSettings.updated_at);
+          dataChanged = true;
+        }
+        markSettingsSynced(remoteSettings.updated_at);
+      } else if (rst > lst) {
+        // a newer change exists in the cloud (another device) -> it wins
+        store.applyRemoteSettings(remoteSettings.data, remoteSettings.updated_at);
+        markSettingsSynced(remoteSettings.updated_at);
+        dataChanged = true;
+      } else {
+        // this device holds the newest edit -> push it
+        await pushSettings(ls, ls.updatedAt);
       }
 
       setLastSync(nowISO());
