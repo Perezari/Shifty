@@ -847,14 +847,27 @@ input, select, textarea { font-family: inherit; }
   border-radius: 0;
   padding: calc(10px + var(--safe-top)) 18px calc(20px + var(--safe-bottom));
   overflow-y: auto; -webkit-overflow-scrolling: touch;
-  transform: translateY(100%);
-  transition: transform .3s cubic-bezier(.32, .72, 0, 1);
   /* center content vertically when it fits; `safe` falls back to top-aligned
      (and scrolls) when it doesn't, so tall sheets never clip on iOS. */
   display: flex; flex-direction: column; justify-content: safe center;
+  /* premium present/dismiss. enter (the .open rule below) glides up + fades
+     with a soft decelerated settle; exit (this base) is quicker and
+     accelerates away — asymmetry is what reads as "professional". */
+  opacity: 0;
+  transform: translateY(26px) scale(.985);
+  transform-origin: 50% 100%;
+  transition: opacity .19s ease, transform .25s cubic-bezier(.4, 0, 1, 1);
+  will-change: opacity, transform;
 }
 .sheet > * { flex-shrink: 0; } /* keep natural height -> tall content scrolls, not squishes */
-.modal-host.open .sheet { transform: translateY(0); }
+.modal-host.open .sheet {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity .3s ease, transform .46s cubic-bezier(.22, .8, .24, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .modal-host.open .sheet { transform: none; transition-duration: .14s; }
+}
 .sheet-grip { display: none; } /* drag handle is a bottom-sheet affordance; full-screen has none */
 .sheet-title { font-size: 18px; font-weight: 800; text-align: center; margin: 0 0 16px; }
 .field { margin-bottom: 14px; }
