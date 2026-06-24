@@ -835,6 +835,7 @@ input, select, textarea { font-family: inherit; }
   position: fixed; inset: 0; z-index: 100;
   display: flex; align-items: flex-end; justify-content: center;
 }
+.modal-host-top { z-index: 110; } /* stacked picker sits above an open sheet */
 .modal-host[hidden] { display: none; }
 .scrim {
   position: absolute; inset: 0;
@@ -874,6 +875,17 @@ input, select, textarea { font-family: inherit; }
 
 /* 24-hour time field (HH:MM) — replaces native type=time so it never shows AM/PM.
    direction:ltr so hours sit on the LEFT and minutes on the RIGHT (09 : 00). */
+/* tappable time chip in the shift editor — opens the HH:MM wheel picker */
+.timechip {
+  width: 100%; text-align: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 13px 14px; font-size: 19px; font-weight: 700; color: var(--text);
+  direction: ltr; font-variant-numeric: tabular-nums;
+  transition: border-color .15s, transform .08s;
+}
+.timechip:active { transform: scale(.98); border-color: var(--accent); }
+.timechip.empty { color: var(--text-faint); font-weight: 500; }
+
 .timefield {
   display: flex; align-items: center; gap: 6px;
   direction: ltr;

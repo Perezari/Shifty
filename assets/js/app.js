@@ -751,7 +751,7 @@
           <button class="btn btn-primary" id="wheel-done">שמירה</button>
         </div>
       </div>`);
-    openSheet(sheet);
+    openSheet(sheet, "#modal-host-2"); // stacks above any open sheet (e.g. the shift editor)
     const wh = $("#wheel-h", sheet), wm = $("#wheel-m", sheet);
     // snap to the initial values — force layout, then retry across the open animation so it sticks
     const setInitial = () => { wh.scrollTop = h0 * ITEM; wm.scrollTop = m0 * ITEM; };
@@ -759,12 +759,12 @@
     setInitial();
     requestAnimationFrame(setInitial);
     setTimeout(setInitial, 60);
-    $("#wheel-cancel", sheet).onclick = closeSheet;
+    $("#wheel-cancel", sheet).onclick = () => closeSheet("#modal-host-2");
     $("#wheel-done", sheet).onclick = () => {
       const H = Math.max(0, Math.min(23, Math.round(wh.scrollTop / ITEM)));
       const M = Math.max(0, Math.min(59, Math.round(wm.scrollTop / ITEM)));
       haptic(10);
-      closeSheet();
+      closeSheet("#modal-host-2");
       onSave(H, M);
     };
   }
@@ -832,7 +832,7 @@
     paint();
     $("#yr-prev", sheet).onclick = () => { yr--; paint(); };
     $("#yr-next", sheet).onclick = () => { yr++; paint(); };
-    $("#pp-cancel", sheet).onclick = closeSheet;
+    $("#pp-cancel", sheet).onclick = () => closeSheet();
     $("#pp-today", sheet).onclick = () => { closeSheet(); onPick(now.getFullYear(), now.getMonth()); };
   }
 
@@ -935,8 +935,10 @@
       return a + Math.max(0, be - new Date(b.start).getTime());
     }, 0) / 60000);
     const sStart = new Date(shift.start), sEnd = ongoing ? null : new Date(shift.end);
-    const startH = fmt.pad(sStart.getHours()), startM = fmt.pad(sStart.getMinutes());
-    const endH = sEnd ? fmt.pad(sEnd.getHours()) : "", endM = sEnd ? fmt.pad(sEnd.getMinutes()) : "";
+    // mutable time state — edited via the wheel picker (chips below)
+    let sH = sStart.getHours(), sM = sStart.getMinutes();
+    let eH = sEnd ? sEnd.getHours() : 17, eM = sEnd ? sEnd.getMinutes() : 0;
+    let hasEnd = !!sEnd;
     const dDay = fmt.pad(sStart.getDate()), dMon = fmt.pad(sStart.getMonth() + 1), dYear = sStart.getFullYear();
 
     const sheet = h(`
@@ -956,18 +958,10 @@
         </div>
         <div class="field-2">
           <div class="field"><label>שעת כניסה</label>
-            <div class="timefield">
-              <input class="tf-in" id="f-start-h" type="number" inputmode="numeric" min="0" max="23" placeholder="00" value="${startH}"/>
-              <span class="tf-colon">:</span>
-              <input class="tf-in" id="f-start-m" type="number" inputmode="numeric" min="0" max="59" placeholder="00" value="${startM}"/>
-            </div>
+            <button class="timechip" id="f-start" type="button">${fmt.pad(sH)}:${fmt.pad(sM)}</button>
           </div>
           <div class="field"><label>שעת יציאה</label>
-            <div class="timefield">
-              <input class="tf-in" id="f-end-h" type="number" inputmode="numeric" min="0" max="23" placeholder="--" value="${endH}"/>
-              <span class="tf-colon">:</span>
-              <input class="tf-in" id="f-end-m" type="number" inputmode="numeric" min="0" max="59" placeholder="--" value="${endM}"/>
-            </div>
+            <button class="timechip${hasEnd ? "" : " empty"}" id="f-end" type="button">${hasEnd ? fmt.pad(eH) + ":" + fmt.pad(eM) : "—"}</button>
           </div>
         </div>
         <div class="field-2">
@@ -991,14 +985,14 @@
 
     openSheet(sheet);
 
-    $("#f-cancel", sheet).onclick = closeSheet;
-    function readTime(hId, mId) {
-      const hv = $(hId, sheet).value;
-      if (hv === "") return null;
-      let H = parseInt(hv, 10); if (isNaN(H)) H = 0; H = Math.max(0, Math.min(23, H));
-      let M = parseInt($(mId, sheet).value, 10); if (isNaN(M)) M = 0; M = Math.max(0, Math.min(59, M));
-      return { H, M };
-    }
+    $("#f-cancel", sheet).onclick = () => closeSheet();
+    $("#f-start", sheet).onclick = () => openTimeWheel("שעת כניסה", sH, sM, (h, m) => {
+      sH = h; sM = m; $("#f-start", sheet).textContent = fmt.pad(h) + ":" + fmt.pad(m);
+    });
+    $("#f-end", sheet).onclick = () => openTimeWheel("שעת יציאה", eH, eM, (h, m) => {
+      eH = h; eM = m; hasEnd = true;
+      const b = $("#f-end", sheet); b.textContent = fmt.pad(h) + ":" + fmt.pad(m); b.classList.remove("empty");
+    });
     function readDate() {
       const dv = $("#f-day", sheet).value, mv = $("#f-mon", sheet).value, yv = $("#f-year", sheet).value;
       if (dv === "" || mv === "" || yv === "") return null;
@@ -1010,14 +1004,12 @@
 
     $("#f-save", sheet).onclick = () => {
       const D = readDate();
-      const st = readTime("#f-start-h", "#f-start-m");
-      if (!D || !st) { toast("חסר תאריך או שעת כניסה"); return; }
+      if (!D) { toast("חסר תאריך"); return; }
 
-      const start = new Date(D.y, D.mo - 1, D.d, st.H, st.M, 0, 0);
+      const start = new Date(D.y, D.mo - 1, D.d, sH, sM, 0, 0);
       let end = null;
-      const et = readTime("#f-end-h", "#f-end-m");
-      if (et) {
-        end = new Date(D.y, D.mo - 1, D.d, et.H, et.M, 0, 0);
+      if (hasEnd) {
+        end = new Date(D.y, D.mo - 1, D.d, eH, eM, 0, 0);
         if (end.getTime() <= start.getTime()) end.setDate(end.getDate() + 1); // crosses midnight
       }
       const bMin = Math.max(0, parseInt($("#f-break", sheet).value, 10) || 0);
@@ -1056,23 +1048,25 @@
   }
 
   /* ---------- sheet host ---------- */
-  let sheetCloseTimer = null;
-  function openSheet(sheetEl) {
-    const host = $("#modal-host");
-    clearTimeout(sheetCloseTimer); // cancel a pending close so reopening fast doesn't wipe the new sheet
+  const sheetCloseTimers = {};
+  function openSheet(sheetEl, hostSel) {
+    hostSel = hostSel || "#modal-host";
+    const host = $(hostSel);
+    clearTimeout(sheetCloseTimers[hostSel]); // cancel a pending close so reopening fast doesn't wipe the new sheet
     host.innerHTML = "";
     host.hidden = false;
     const scrim = h(`<div class="scrim"></div>`);
-    scrim.onclick = closeSheet;
+    scrim.onclick = () => closeSheet(hostSel);
     host.appendChild(scrim);
     host.appendChild(sheetEl);
     requestAnimationFrame(() => host.classList.add("open"));
   }
-  function closeSheet() {
-    const host = $("#modal-host");
+  function closeSheet(hostSel) {
+    hostSel = hostSel || "#modal-host";
+    const host = $(hostSel);
     host.classList.remove("open");
-    clearTimeout(sheetCloseTimer);
-    sheetCloseTimer = setTimeout(() => { host.hidden = true; host.innerHTML = ""; }, 300);
+    clearTimeout(sheetCloseTimers[hostSel]);
+    sheetCloseTimers[hostSel] = setTimeout(() => { host.hidden = true; host.innerHTML = ""; }, 300);
   }
 
   /* ============================================================
