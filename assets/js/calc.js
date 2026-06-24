@@ -28,17 +28,18 @@
   }
 
   // overlap (ms) between [start,end] and the nightly window [nightStart .. nightEnd]
-  // window may cross midnight (e.g. 22 -> 6).
+  // window may cross midnight (e.g. 22 -> 6). nightStart/End are decimal hours (e.g. 22.5).
   function nightMs(startMs, endMs, nightStart, nightEnd) {
     if (endMs <= startMs) return 0;
+    const setHM = (d, v) => { const hh = Math.floor(v); d.setHours(hh, Math.round((v - hh) * 60), 0, 0); return d; };
     let total = 0;
     // walk each calendar day the shift touches (±1 for safety)
     const dayStart = new Date(startMs); dayStart.setHours(0, 0, 0, 0);
     for (let off = -1; off <= 2; off++) {
       const base = new Date(dayStart.getTime());
       base.setDate(base.getDate() + off);
-      const winStart = new Date(base); winStart.setHours(nightStart, 0, 0, 0);
-      let winEnd = new Date(base); winEnd.setHours(nightEnd, 0, 0, 0);
+      const winStart = setHM(new Date(base), nightStart);
+      const winEnd = setHM(new Date(base), nightEnd);
       if (nightEnd <= nightStart) winEnd.setDate(winEnd.getDate() + 1); // crosses midnight
       const a = Math.max(startMs, winStart.getTime());
       const b = Math.min(endMs, winEnd.getTime());

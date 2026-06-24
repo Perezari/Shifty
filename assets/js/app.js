@@ -556,8 +556,8 @@
     g3.appendChild(numRow("מעל כמה שעות", "autoBreakAfterHours", s, { unit: "שע׳", step: 0.5 }));
     g3.appendChild(numRow("תוספת שבת/חג", "holidayMult", s, { unit: "%", percent: true, step: 5, hint: "כשמשמרת מסומנת כשבת/חג" }));
     g3.appendChild(toggleRow("חישוב שעות לילה", "nightEnabled", s));
-    g3.appendChild(numRow("שעת התחלת לילה", "nightStart", s, { unit: ":00", step: 1, min: 0, max: 23 }));
-    g3.appendChild(numRow("שעת סיום לילה", "nightEnd", s, { unit: ":00", step: 1, min: 0, max: 23 }));
+    g3.appendChild(wheelRow("שעת התחלת לילה", "nightStart", s));
+    g3.appendChild(wheelRow("שעת סיום לילה", "nightEnd", s));
     g3.appendChild(numRow("תוספת לילה", "nightMult", s, { unit: "%", percent: true, step: 5 }));
     el.appendChild(g3);
 
@@ -743,6 +743,28 @@
       closeSheet();
       onSave(H, M);
     };
+  }
+
+  // settings row whose value (decimal hours) is edited with the HH:MM wheel picker
+  function wheelRow(label, key, s, opts) {
+    opts = opts || {};
+    const cur0 = s[key] != null ? s[key] : 0;
+    const row = h(`
+      <div class="row">
+        <div class="row-label">${label}${opts.hint ? `<span class="row-hint">${opts.hint}</span>` : ""}</div>
+        <button class="day-val" type="button">${fmt.hoursToHM(cur0)}</button>
+      </div>`);
+    const chip = row.querySelector(".day-val");
+    chip.onclick = () => {
+      const cur = store.getSettings()[key] || 0;
+      const H = Math.floor(cur), M = Math.round((cur - H) * 60);
+      openTimeWheel(label, H, M, (nh, nm) => {
+        const dec = nh + nm / 60;
+        store.setSettings({ [key]: dec });
+        chip.textContent = fmt.hoursToHM(dec);
+      });
+    };
+    return row;
   }
 
   function numRow(label, key, s, opts) {
