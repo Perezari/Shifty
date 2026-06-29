@@ -93,7 +93,7 @@
       const projected = b.netHours > 0.001 ? b.pay * (goal / b.netHours) : null;
       set("w-proj", projected == null ? "" : "צפי " + fmt.money(projected, settings.currency));
       $("#w-fill").style.width = (Math.min(1, goal > 0 ? b.netHours / goal : 0) * 100).toFixed(1) + "%";
-      set("w-foot-a", fmt.hoursToHM(b.netHours) + " ש׳");
+      set("w-foot-a", "התחלה " + fmt.clock(active.start));
       const startMs = new Date(active.start).getTime();
       const loggedMs = (active.breaks || []).reduce((acc, brk) =>
         acc + Math.max(0, (brk.end ? new Date(brk.end).getTime() : now) - new Date(brk.start).getTime()), 0);
