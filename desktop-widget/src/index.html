@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="he" dir="rtl" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="styles.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shifty</title>
+  </head>
+
+  <body>
+    <div class="card">
+      <button class="w-close" id="w-close" aria-label="סגור">✕</button>
+
+      <!-- shown until signed in -->
+      <div class="w-signin" id="w-signin" style="display:none">
+        <button class="btn" id="w-signin-btn">התחבר עם Google</button>
+      </div>
+
+      <!-- the live widget bar (whole bar drags the borderless window) -->
+      <div class="pip-bar" id="w-bar" data-tauri-drag-region style="display:none">
+        <div class="pip-cap working" id="w-cap"><span class="pip-dot"></span><span id="w-status">טוען…</span></div>
+        <div class="pip-main">
+          <div class="pip-time" id="w-time">00:00:00</div>
+          <div class="pip-money">
+            <div class="pip-pay" id="w-pay"></div>
+            <div class="pip-proj" id="w-proj"></div>
+          </div>
+        </div>
+        <div class="pip-track"><div class="pip-fill" id="w-fill"></div></div>
+        <div class="pip-foot"><span id="w-foot-a"></span><span id="w-foot-b"></span></div>
+      </div>
+    </div>
+
+    <script src="lib/format.js"></script>
+    <script src="lib/holidays.js"></script>
+    <script src="lib/calc.js"></script>
+    <script src="lib/store.js"></script>
+    <script src="lib/supabase.js"></script>
+    <script src="main.js"></script>
+  </body>
+</html>

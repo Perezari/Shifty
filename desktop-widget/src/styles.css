@@ -1,0 +1,60 @@
+:root {
+  --bg: #15171c;
+  --surface: #1e2026;
+  --surface-2: #262931;
+  --border: #2c3039;
+  --text: #f0f1f4;
+  --text-dim: #9aa0ad;
+  --text-faint: #6b7280;
+  --accent: #1bb3a3;
+  --accent-strong: #19a294;
+  --on-accent: #06231f;
+  --ring-track: #2b2f38;
+  --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --num: "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+/* body MUST stay transparent so the rounded corners show through the window */
+html, body { height: 100%; margin: 0; background: transparent; }
+body { color: var(--text); font-family: var(--font); -webkit-font-smoothing: antialiased; user-select: none; }
+
+/* the only painted surface — the app's card gray, rounded so the transparent window shows clean corners */
+.card {
+  width: 100vw; height: 100vh; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 14px; overflow: hidden; position: relative;
+}
+
+.w-close {
+  position: absolute; top: 6px; left: 6px; width: 18px; height: 18px;
+  border: none; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; line-height: 1; color: var(--text-faint); background: transparent;
+  cursor: pointer; z-index: 5; opacity: 0; transition: opacity .15s, background .15s, color .15s;
+}
+.card:hover .w-close { opacity: 1; }
+.w-close:hover { background: var(--surface-2); color: var(--text); }
+
+/* sign-in overlay */
+.w-signin { height: 100%; display: flex; align-items: center; justify-content: center; padding: 12px; }
+.btn {
+  border: none; border-radius: 10px; background: var(--accent); color: var(--on-accent);
+  font-family: var(--font); font-weight: 700; font-size: 14px; padding: 11px 18px; cursor: pointer;
+  transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.05); }
+.btn:active { filter: brightness(.95); }
+.btn[disabled] { opacity: .65; cursor: default; }
+
+.pip-bar { height: 100%; padding: 11px 15px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.pip-cap { font-size: 12px; font-weight: 600; line-height: 1.5; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pip-cap.working { color: var(--accent-strong); }
+.pip-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); display: inline-block; vertical-align: middle; margin-left: 7px; }
+.pip-cap.working .pip-dot { background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.pip-main { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; }
+.pip-time { font-family: var(--num); font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; direction: ltr; }
+.pip-money { text-align: left; }
+.pip-pay { font-family: var(--num); font-size: 17px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.15; }
+.pip-proj { font-size: 11px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
+.pip-track { height: 5px; border-radius: 3px; background: var(--ring-track); overflow: hidden; }
+.pip-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .9s cubic-bezier(.4, 0, .2, 1); }
+.pip-foot { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--text-faint); }
