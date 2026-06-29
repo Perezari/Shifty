@@ -205,10 +205,21 @@
       const hp = new URLSearchParams(location.hash.slice(1));
       const wat = hp.get("wat"), wrt = hp.get("wrt");
       if (wat && wrt) {
-        await client.auth.setSession({ access_token: wat, refresh_token: wrt });
-        history.replaceState(null, "", location.pathname + location.search);
+        const r = await client.auth.setSession({ access_token: wat, refresh_token: wrt });
+        if (r.error) {
+          const msg = (r.error && r.error.message) || JSON.stringify(r.error);
+          console.error("[Shifty handover] FAILED:", msg, "| at.len=" + wat.length + " rt.len=" + wrt.length);
+          alert("[Shifty handover] " + msg + "\n(at=" + wat.length + " rt=" + wrt.length + ")");
+        } else {
+          console.log("[Shifty handover] OK as", r.data && r.data.session && r.data.session.user && r.data.session.user.email);
+          history.replaceState(null, "", location.pathname + location.search);
+        }
+      } else {
+        console.warn("[Shifty handover] missing tokens; hash starts with:", location.hash.slice(0, 24));
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("[Shifty handover] threw:", e && e.message);
+    }
 
     const { data } = await client.auth.getSession();
     session = data ? data.session : null;
