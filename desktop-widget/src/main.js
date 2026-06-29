@@ -2,8 +2,8 @@
    Shifty desktop widget — controller (live cloud data)
    Auth = system-browser + localhost loopback (see lib.rs begin_login).
    The cloud is the source of truth; the widget computes the live
-   timer/earnings locally with the real Shifty engine, and fires a
-   native notification when the daily goal is reached.
+   timer/earnings locally with the real Shifty engine, fires a native
+   notification on goal, and has its own (local) light/dark toggle.
    ============================================================ */
 (function () {
   const { fmt, calc, store } = window.Shifty;
@@ -26,6 +26,21 @@
     return { id: r.id, start: r.start_at, end: r.end_at, breaks: r.breaks || [], isHoliday: !!r.is_holiday, note: r.note || "" };
   }
 
+  /* ---------- theme (local to the widget, persisted) ---------- */
+  function widgetTheme() { try { return localStorage.getItem("shifty.widget.theme") || "dark"; } catch (e) { return "dark"; } }
+  function applyTheme(t) { document.documentElement.setAttribute("data-theme", t); }
+  function toggleTheme() {
+    const next = widgetTheme() === "dark" ? "light" : "dark";
+    try { localStorage.setItem("shifty.widget.theme", next); } catch (e) {}
+    applyTheme(next);
+  }
+
+  /* ---------- native window helpers ---------- */
+  function curWin() {
+    const w = window.__TAURI__ && window.__TAURI__.window;
+    return w && (w.getCurrentWindow ? w.getCurrentWindow() : null);
+  }
+
   function reflectAuth() {
     $("#w-signin").style.display = session ? "none" : "flex";
     $("#w-bar").style.display = session ? "flex" : "none";
@@ -44,17 +59,14 @@
       active = (a.data && a.data.length) ? remoteToLocal(a.data[0]) : null;
       todayShifts = (t.data || []).map(remoteToLocal);
       settings = Object.assign({}, store.DEFAULT_SETTINGS, (st.data && st.data.data) || {});
-      if (settings.theme) document.documentElement.setAttribute("data-theme", settings.theme);
     } catch (e) { /* keep last good state */ }
     render();
   }
 
   function goalReached(b, goal) {
-    // initialise on a new shift (suppress notifying for a shift already past goal
-    // when the widget first opens); then fire once when it actually crosses.
     if (active.id !== notifGoalShiftId) {
       notifGoalShiftId = active.id;
-      notifGoalDone = b.netHours >= goal;
+      notifGoalDone = b.netHours >= goal; // suppress notifying for a shift already past goal on open
       return;
     }
     if (!notifGoalDone && b.netHours >= goal) {
@@ -124,21 +136,23 @@
     }
   }
 
-  function wireClose() {
-    const btn = $("#w-close");
-    if (!btn) return;
-    btn.addEventListener("click", async () => {
-      try {
-        const w = window.__TAURI__ && window.__TAURI__.window;
-        const cur = w && (w.getCurrentWindow ? w.getCurrentWindow() : null);
-        if (cur) { await cur.close(); return; }
-      } catch (e) {}
+  function wireControls() {
+    const close = $("#w-close");
+    if (close) close.addEventListener("click", async () => {
+      try { const c = curWin(); if (c) { await c.close(); return; } } catch (e) {}
       window.close();
+    });
+    const theme = $("#w-theme");
+    if (theme) theme.addEventListener("click", toggleTheme);
+    const min = $("#w-min");
+    if (min) min.addEventListener("click", async () => {
+      try { const c = curWin(); if (c) await c.hide(); } catch (e) {}
     });
   }
 
   async function init() {
-    wireClose();
+    applyTheme(widgetTheme());
+    wireControls();
     $("#w-signin-btn").addEventListener("click", signIn);
     const { data } = await client.auth.getSession();
     session = data ? data.session : null;

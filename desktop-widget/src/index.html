@@ -9,7 +9,19 @@
 
   <body>
     <div class="card">
-      <button class="w-close" id="w-close" aria-label="סגור">✕</button>
+      <!-- hover controls: close · theme · minimize-to-tray -->
+      <div class="w-controls">
+        <button class="w-btn" id="w-close" aria-label="סגור" title="סגור">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17" stroke-linecap="round"/></svg>
+        </button>
+        <button class="w-btn" id="w-min" aria-label="מזער למגש" title="מזער למגש">
+          <svg class="ico" viewBox="0 0 24 24"><path d="M6 13.5h12" stroke-linecap="round"/></svg>
+        </button>
+        <button class="w-btn" id="w-theme" aria-label="ערכת נושא" title="ערכת נושא">
+          <svg class="ico ico-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.6" fill="currentColor" stroke="none"/><g stroke-linecap="round"><path d="M12 2.6v2.3M12 19.1v2.3M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.6 12h2.3M19.1 12h2.3M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></g></svg>
+          <svg class="ico ico-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+        </button>
+      </div>
 
       <!-- shown until signed in -->
       <div class="w-signin" id="w-signin" style="display:none">

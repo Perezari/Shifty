@@ -13,6 +13,19 @@
   --font: "Segoe UI", system-ui, -apple-system, sans-serif;
   --num: "Segoe UI", system-ui, sans-serif;
 }
+[data-theme="light"] {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #eef0f3;
+  --border: #e6e8ee;
+  --text: #15181f;
+  --text-dim: #79808d;
+  --text-faint: #aab0bb;
+  --accent: #0f9d8f;
+  --accent-strong: #0b7d72;
+  --on-accent: #ffffff;
+  --ring-track: #e9ebf0;
+}
 * { box-sizing: border-box; }
 /* body MUST stay transparent so the rounded corners show through the window */
 html, body { height: 100%; margin: 0; background: transparent; }
@@ -24,14 +37,21 @@ body { color: var(--text); font-family: var(--font); -webkit-font-smoothing: ant
   border: 1px solid var(--border); border-radius: 14px; overflow: hidden; position: relative;
 }
 
-.w-close {
-  position: absolute; top: 6px; left: 6px; width: 18px; height: 18px;
-  border: none; border-radius: 50%; display: grid; place-items: center;
-  font-size: 12px; line-height: 1; color: var(--text-faint); background: transparent;
-  cursor: pointer; z-index: 5; opacity: 0; transition: opacity .15s, background .15s, color .15s;
+/* hover controls cluster */
+.w-controls {
+  position: absolute; top: 6px; left: 6px; z-index: 5;
+  display: flex; direction: ltr; gap: 3px; opacity: 0; transition: opacity .15s;
 }
-.card:hover .w-close { opacity: 1; }
-.w-close:hover { background: var(--surface-2); color: var(--text); }
+.card:hover .w-controls { opacity: 1; }
+.w-btn {
+  width: 19px; height: 19px; border: none; border-radius: 6px;
+  display: grid; place-items: center; background: transparent; color: var(--text-faint);
+  cursor: pointer; transition: background .15s, color .15s; padding: 0;
+}
+.w-btn:hover { background: var(--surface-2); color: var(--text); }
+.w-btn .ico { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.9; }
+[data-theme="dark"] .ico-moon { display: none; }
+[data-theme="light"] .ico-sun { display: none; }
 
 /* sign-in overlay */
 .w-signin { height: 100%; display: flex; align-items: center; justify-content: center; padding: 12px; }
