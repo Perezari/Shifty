@@ -170,6 +170,26 @@
     pushTimer = setTimeout(syncNow, 1800); // coalesce rapid local edits
   }
 
+  // live remote updates: a Supabase Realtime websocket so a change on another
+  // device (phone / widget) pulls in immediately — the app otherwise only syncs
+  // on focus or local edit (no periodic poll), so a remote change could sit unseen.
+  let rtChannel = null, remotePullTimer = null;
+  function scheduleRemotePull() {
+    clearTimeout(remotePullTimer);
+    remotePullTimer = setTimeout(syncNow, 400);
+  }
+  function subscribeRealtime() {
+    if (!client || !session || rtChannel) return;
+    const uid = session.user.id;
+    rtChannel = client.channel("app-" + uid)
+      .on("postgres_changes", { event: "*", schema: "public", table: "shifts", filter: "user_id=eq." + uid }, scheduleRemotePull)
+      .on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: "user_id=eq." + uid }, scheduleRemotePull)
+      .subscribe();
+  }
+  function unsubscribeRealtime() {
+    if (rtChannel) { try { client.removeChannel(rtChannel); } catch (e) {} rtChannel = null; }
+  }
+
   /* ---------- auth (Google OAuth, PKCE) ---------- */
   function appUrl() { return window.location.origin + window.location.pathname; }
   async function signInWithGoogle() {
@@ -219,7 +239,8 @@
       session = sess;
       // only refresh the settings card on real sign-in/out transitions, not on token refresh
       if (wasSignedIn !== !!sess || event === "SIGNED_IN" || event === "SIGNED_OUT") fireAuth();
-      if (event === "SIGNED_IN") syncNow();
+      if (event === "SIGNED_IN") { syncNow(); subscribeRealtime(); }
+      else if (event === "SIGNED_OUT") unsubscribeRealtime();
     });
 
     // re-sync when returning to the app (cheap multi-device freshness)
@@ -227,7 +248,7 @@
       if (!document.hidden && session) syncNow();
     });
 
-    if (session) syncNow();
+    if (session) { syncNow(); subscribeRealtime(); }
     fireAuth();
   }
 

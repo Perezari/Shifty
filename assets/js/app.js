@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.0.7"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.0.8"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",

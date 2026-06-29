@@ -1,5 +1,5 @@
 /* Shifty service worker — offline app shell */
-const CACHE = "shifty-v12";
+const CACHE = "shifty-v13";
 const ASSETS = [
   "./",
   "./index.html",

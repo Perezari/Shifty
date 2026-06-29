@@ -24,6 +24,7 @@
   let session = null, active = null, settings = null, todayShifts = [];
   let notifGoalShiftId = null, notifGoalDone = false; // notify once per shift on goal crossing
   let lastTip = "";
+  let rtChannel = null;
 
   function remoteToLocal(r) {
     return { id: r.id, start: r.start_at, end: r.end_at, breaks: r.breaks || [], isHoliday: !!r.is_holiday, note: r.note || "" };
@@ -47,6 +48,22 @@
     if (text === lastTip) return; // only push when it actually changes
     lastTip = text;
     if (invoke) invoke("set_tray_tooltip", { text }).catch(() => {});
+  }
+
+  // live updates: a Supabase Realtime websocket so changes made on the phone
+  // (e.g. ending a shift) reflect instantly — the 20s poll alone lags, and
+  // browser timers throttle hard when the window isn't focused.
+  function subscribeRealtime() {
+    if (!session || rtChannel) return;
+    const uid = session.user.id;
+    rtChannel = client
+      .channel("widget-" + uid)
+      .on("postgres_changes", { event: "*", schema: "public", table: "shifts", filter: "user_id=eq." + uid }, () => pull())
+      .on("postgres_changes", { event: "*", schema: "public", table: "settings", filter: "user_id=eq." + uid }, () => pull())
+      .subscribe();
+  }
+  function unsubscribeRealtime() {
+    if (rtChannel) { try { client.removeChannel(rtChannel); } catch (e) {} rtChannel = null; }
   }
 
   function reflectAuth() {
@@ -154,6 +171,7 @@
       session = sess ? sess.session : null;
       reflectAuth();
       await pull();
+      subscribeRealtime();
     } catch (e) {
       btn.disabled = false; btn.textContent = "נכשל — נסה שוב";
     }
@@ -195,6 +213,7 @@
     // tray "sign out" → drop the session and show the sign-in button (for a clean re-auth)
     if (window.__TAURI__ && window.__TAURI__.event) {
       window.__TAURI__.event.listen("signout", async () => {
+        unsubscribeRealtime();
         try { await client.auth.signOut(); } catch (e) {}
         session = null; active = null;
         reflectAuth();
@@ -203,9 +222,12 @@
     const { data } = await client.auth.getSession();
     session = data ? data.session : null;
     reflectAuth();
-    if (session) await pull();
+    if (session) { await pull(); subscribeRealtime(); }
+    // browser timers throttle when unfocused, so also refresh on focus/visibility
+    window.addEventListener("focus", () => { if (session) pull(); });
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && session) pull(); });
     setInterval(() => { if (session) render(); }, 1000);        // live timer (no network)
-    setInterval(() => { if (session) pull(); }, 20000);          // refresh from cloud
+    setInterval(() => { if (session) pull(); }, 20000);          // fallback poll
   }
 
   init();
