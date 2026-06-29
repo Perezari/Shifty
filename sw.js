@@ -1,5 +1,5 @@
 /* Shifty service worker — offline app shell */
-const CACHE = "shifty-v11";
+const CACHE = "shifty-v12";
 const ASSETS = [
   "./",
   "./index.html",
@@ -30,7 +30,8 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   const req = e.request;
-  if (req.method !== "GET") return;
+  // only handle our own http(s) GETs — skip chrome-extension:, etc.
+  if (req.method !== "GET" || !req.url.startsWith("http")) return;
   // network-first: always fresh when online, fall back to cache when offline.
   // (no build hashing here, so cache-first would serve stale app code.)
   e.respondWith(

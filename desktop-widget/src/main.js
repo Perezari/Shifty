@@ -192,6 +192,14 @@
     applyTheme(widgetTheme());
     wireControls();
     $("#w-signin-btn").addEventListener("click", signIn);
+    // tray "sign out" → drop the session and show the sign-in button (for a clean re-auth)
+    if (window.__TAURI__ && window.__TAURI__.event) {
+      window.__TAURI__.event.listen("signout", async () => {
+        try { await client.auth.signOut(); } catch (e) {}
+        session = null; active = null;
+        reflectAuth();
+      });
+    }
     const { data } = await client.auth.getSession();
     session = data ? data.session : null;
     reflectAuth();
