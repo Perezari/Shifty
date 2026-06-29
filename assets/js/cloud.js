@@ -199,27 +199,17 @@
     // local edits → debounced push
     store.setOnChange(schedulePush);
 
-    // session handed over from the desktop widget (#wat=...&wrt=...) — sign in
-    // here so opening the web app from the widget lands already authenticated.
+    // session handed over from the desktop widget (#wrt=<refresh token>). Only the
+    // short refresh token is passed — the access-token JWT is ~1.4k chars and was
+    // being truncated in the URL — and we mint a fresh session from it here.
     try {
-      const hp = new URLSearchParams(location.hash.slice(1));
-      const wat = hp.get("wat"), wrt = hp.get("wrt");
-      if (wat && wrt) {
-        const r = await client.auth.setSession({ access_token: wat, refresh_token: wrt });
-        if (r.error) {
-          const msg = (r.error && r.error.message) || JSON.stringify(r.error);
-          console.error("[Shifty handover] FAILED:", msg, "| at.len=" + wat.length + " rt.len=" + wrt.length);
-          alert("[Shifty handover] " + msg + "\n(at=" + wat.length + " rt=" + wrt.length + ")");
-        } else {
-          console.log("[Shifty handover] OK as", r.data && r.data.session && r.data.session.user && r.data.session.user.email);
-          history.replaceState(null, "", location.pathname + location.search);
-        }
-      } else {
-        console.warn("[Shifty handover] missing tokens; hash starts with:", location.hash.slice(0, 24));
+      const wrt = new URLSearchParams(location.hash.slice(1)).get("wrt");
+      if (wrt) {
+        const { error } = await client.auth.refreshSession({ refresh_token: wrt });
+        if (error) console.error("[Shifty] widget handover failed:", error.message || error);
+        else history.replaceState(null, "", location.pathname + location.search);
       }
-    } catch (e) {
-      console.error("[Shifty handover] threw:", e && e.message);
-    }
+    } catch (e) {}
 
     const { data } = await client.auth.getSession();
     session = data ? data.session : null;

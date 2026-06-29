@@ -166,10 +166,8 @@
     let url = WEB_APP_URL;
     try {
       const { data } = await client.auth.getSession();
-      const s = data && data.session;
-      if (s && s.access_token && s.refresh_token) {
-        url += "#wat=" + encodeURIComponent(s.access_token) + "&wrt=" + encodeURIComponent(s.refresh_token);
-      }
+      const rt = data && data.session && data.session.refresh_token;
+      if (rt) url += "#wrt=" + encodeURIComponent(rt); // only the (short) refresh token
     } catch (e) {}
     if (invoke) invoke("open_external", { url }).catch(() => {});
   }
