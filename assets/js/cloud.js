@@ -199,6 +199,17 @@
     // local edits → debounced push
     store.setOnChange(schedulePush);
 
+    // session handed over from the desktop widget (#wat=...&wrt=...) — sign in
+    // here so opening the web app from the widget lands already authenticated.
+    try {
+      const hp = new URLSearchParams(location.hash.slice(1));
+      const wat = hp.get("wat"), wrt = hp.get("wrt");
+      if (wat && wrt) {
+        await client.auth.setSession({ access_token: wat, refresh_token: wrt });
+        history.replaceState(null, "", location.pathname + location.search);
+      }
+    } catch (e) {}
+
     const { data } = await client.auth.getSession();
     session = data ? data.session : null;
 

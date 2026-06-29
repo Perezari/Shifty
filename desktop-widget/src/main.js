@@ -15,6 +15,7 @@
   const SUPABASE_URL = "https://btspqotfbejauwpfhayj.supabase.co";
   const SUPABASE_KEY = "sb_publishable_IVqM6u55E9ZqIaHCohyzlw_1ZW2ONRu";
   const REDIRECT = "http://localhost:14500";
+  const WEB_APP_URL = "https://perezari.github.io/Shifty/";
 
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, flowType: "pkce" },
@@ -158,6 +159,21 @@
     }
   }
 
+  // open the Shifty web app already signed in: carry the session in the URL
+  // hash (fragments never hit the server) so Supabase's detectSessionInUrl
+  // establishes the session on the web side.
+  async function openWeb() {
+    let url = WEB_APP_URL;
+    try {
+      const { data } = await client.auth.getSession();
+      const s = data && data.session;
+      if (s && s.access_token && s.refresh_token) {
+        url += "#wat=" + encodeURIComponent(s.access_token) + "&wrt=" + encodeURIComponent(s.refresh_token);
+      }
+    } catch (e) {}
+    if (invoke) invoke("open_external", { url }).catch(() => {});
+  }
+
   function wireControls() {
     const close = $("#w-close");
     if (close) close.addEventListener("click", async () => {
@@ -170,6 +186,8 @@
     if (min) min.addEventListener("click", async () => {
       try { const c = curWin(); if (c) await c.hide(); } catch (e) {}
     });
+    const web = $("#w-web");
+    if (web) web.addEventListener("click", openWeb);
   }
 
   async function init() {

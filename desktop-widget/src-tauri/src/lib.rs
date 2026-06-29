@@ -72,6 +72,12 @@ fn set_tray_tooltip(app: tauri::AppHandle, text: String) -> Result<(), String> {
     Ok(())
 }
 
+// Open an external URL (the Shifty web app) in the default browser.
+#[tauri::command]
+fn open_external(app: tauri::AppHandle, url: String) -> Result<(), String> {
+    app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
+}
+
 fn show_main(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
@@ -84,7 +90,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![begin_login, notify, set_tray_tooltip])
+        .invoke_handler(tauri::generate_handler![begin_login, notify, set_tray_tooltip, open_external])
         .setup(|app| {
             // system-tray icon: left-click restores the widget, right-click menu
             let show_i = MenuItem::with_id(app, "show", "הצג וידג'ט", true, None::<&str>)?;
