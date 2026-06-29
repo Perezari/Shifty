@@ -2,8 +2,9 @@
    Shifty desktop widget — controller (live cloud data)
    Auth = system-browser + localhost loopback (see lib.rs begin_login).
    The cloud is the source of truth; the widget computes the live
-   timer/earnings locally with the real Shifty engine, fires a native
-   notification on goal, and has its own (local) light/dark toggle.
+   timer/earnings locally with the real Shifty engine, shows overtime
+   once past the goal, pushes a live tray tooltip, fires a goal
+   notification, and has its own (local) light/dark toggle.
    ============================================================ */
 (function () {
   const { fmt, calc, store } = window.Shifty;
@@ -21,6 +22,7 @@
 
   let session = null, active = null, settings = null, todayShifts = [];
   let notifGoalShiftId = null, notifGoalDone = false; // notify once per shift on goal crossing
+  let lastTip = "";
 
   function remoteToLocal(r) {
     return { id: r.id, start: r.start_at, end: r.end_at, breaks: r.breaks || [], isHoliday: !!r.is_holiday, note: r.note || "" };
@@ -35,10 +37,15 @@
     applyTheme(next);
   }
 
-  /* ---------- native window helpers ---------- */
+  /* ---------- native window / tray helpers ---------- */
   function curWin() {
     const w = window.__TAURI__ && window.__TAURI__.window;
     return w && (w.getCurrentWindow ? w.getCurrentWindow() : null);
+  }
+  function setTrayTip(text) {
+    if (text === lastTip) return; // only push when it actually changes
+    lastTip = text;
+    if (invoke) invoke("set_tray_tooltip", { text }).catch(() => {});
   }
 
   function reflectAuth() {
@@ -73,7 +80,7 @@
       notifGoalDone = true;
       if (invoke) invoke("notify", {
         title: "🎯 הגעת ליעד היומי",
-        body: fmt.hoursToHM(b.netHours) + " שעות · " + fmt.money(b.pay, settings.currency),
+        body: fmt.hoursToHM(b.netHours) + " שעות · " + fmt.money(b.pay, settings.currency) + " · מעכשיו שעות נוספות",
       }).catch(() => {});
     }
   }
@@ -86,6 +93,7 @@
     if (active) {
       const b = calc.shiftBreakdown(active, settings, now);
       const onBreak = (active.breaks || []).some((x) => !x.end);
+      const inOt = b.netHours >= goal;
       $("#w-cap").classList.toggle("working", !onBreak);
       set("w-status", (onBreak ? "בהפסקה" : "במשמרת") + (settings.workplaceName ? " · " + settings.workplaceName : ""));
       set("w-time", fmt.hms(b.netMs));
@@ -93,18 +101,31 @@
       const projected = b.netHours > 0.001 ? b.pay * (goal / b.netHours) : null;
       set("w-proj", projected == null ? "" : "צפי " + fmt.money(projected, settings.currency));
       $("#w-fill").style.width = (Math.min(1, goal > 0 ? b.netHours / goal : 0) * 100).toFixed(1) + "%";
+      $("#w-fill").classList.toggle("overtime", inOt);
       set("w-foot-a", "התחלה " + fmt.clock(active.start));
       const startMs = new Date(active.start).getTime();
       const loggedMs = (active.breaks || []).reduce((acc, brk) =>
         acc + Math.max(0, (brk.end ? new Date(brk.end).getTime() : now) - new Date(brk.start).getTime()), 0);
       const autoMs = (settings.autoBreakMinutes || 0) * 60000;
       const finishMs = startMs + goal * HOUR + Math.max(loggedMs, autoMs);
-      set("w-foot-b", b.netHours >= goal ? "הגעת ליעד ✓" : "יעד " + fmt.hoursToHM(goal) + " · סיום " + fmt.clock(finishMs));
+      set("w-foot-b",
+        b.overtimeHours > 0.001 ? "שעות נוספות +" + fmt.hoursToHM(b.overtimeHours)
+          : inOt ? "הגעת ליעד ✓"
+            : "יעד " + fmt.hoursToHM(goal) + " · סיום " + fmt.clock(finishMs));
       goalReached(b, goal);
+      const remH = goal - b.netHours;
+      setTrayTip(
+        (onBreak ? "בהפסקה" : "במשמרת") + (settings.workplaceName ? " · " + settings.workplaceName : "") + "\n" +
+        fmt.hoursToHM(b.netHours) + " · " + fmt.money(b.pay, settings.currency) + "\n" +
+        (remH > 0.001
+          ? "נותרו " + fmt.hoursToHM(remH) + " · סיום " + fmt.clock(finishMs)
+          : "שעות נוספות +" + fmt.hoursToHM(b.overtimeHours))
+      );
     } else {
       notifGoalShiftId = null; // reset so the next shift can notify
       const today = calc.aggregate(todayShifts, settings, calc.dayRange(now), now);
       $("#w-cap").classList.remove("working");
+      $("#w-fill").classList.remove("overtime");
       set("w-status", "מוכן להתחיל");
       set("w-time", today.netHours > 0 ? fmt.hms(today.netHours * HOUR) : "00:00:00");
       set("w-pay", fmt.money(today.total, settings.currency));
@@ -112,6 +133,7 @@
       $("#w-fill").style.width = (Math.min(1, goal > 0 ? today.netHours / goal : 0) * 100).toFixed(1) + "%";
       set("w-foot-a", fmt.hoursToHM(today.netHours) + " ש׳");
       set("w-foot-b", "אין משמרת פעילה");
+      setTrayTip("Shifty · אין משמרת פעילה");
     }
   }
 

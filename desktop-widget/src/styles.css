@@ -10,6 +10,7 @@
   --accent-strong: #19a294;
   --on-accent: #06231f;
   --ring-track: #2b2f38;
+  --ot: #e7b24e;
   --font: "Segoe UI", system-ui, -apple-system, sans-serif;
   --num: "Segoe UI", system-ui, sans-serif;
 }
@@ -25,6 +26,7 @@
   --accent-strong: #0b7d72;
   --on-accent: #ffffff;
   --ring-track: #e9ebf0;
+  --ot: #bf8a1f;
 }
 * { box-sizing: border-box; }
 /* body MUST stay transparent so the rounded corners show through the window */
@@ -76,5 +78,6 @@ body { color: var(--text); font-family: var(--font); -webkit-font-smoothing: ant
 .pip-pay { font-family: var(--num); font-size: 17px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; line-height: 1.15; }
 .pip-proj { font-size: 11px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
 .pip-track { height: 5px; border-radius: 3px; background: var(--ring-track); overflow: hidden; }
-.pip-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .9s cubic-bezier(.4, 0, .2, 1); }
+.pip-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .9s cubic-bezier(.4, 0, .2, 1), background .3s ease; }
+.pip-fill.overtime { background: var(--ot); }
 .pip-foot { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--text-faint); }

@@ -63,6 +63,15 @@ fn notify(app: tauri::AppHandle, title: String, body: String) -> Result<(), Stri
         .map_err(|e| e.to_string())
 }
 
+// Live system-tray tooltip (the frontend pushes the current status here).
+#[tauri::command]
+fn set_tray_tooltip(app: tauri::AppHandle, text: String) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        tray.set_tooltip(Some(text)).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn show_main(app: &tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
@@ -75,13 +84,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![begin_login, notify])
+        .invoke_handler(tauri::generate_handler![begin_login, notify, set_tray_tooltip])
         .setup(|app| {
             // system-tray icon: left-click restores the widget, right-click menu
             let show_i = MenuItem::with_id(app, "show", "הצג וידג'ט", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "יציאה", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
-            TrayIconBuilder::new()
+            TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("Shifty")
                 .menu(&menu)
