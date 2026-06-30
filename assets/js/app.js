@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.0.10"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.0.11"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -463,11 +463,20 @@
       if (d >= range.start && d < range.end) {
         const b = calc.shiftBreakdown(sh, s, Date.now());
         const k = dayKey(d);
-        (byDay[k] || (byDay[k] = { net: 0, pay: 0, n: 0 }));
+        (byDay[k] || (byDay[k] = { net: 0, pay: 0, n: 0, date: d }));
         byDay[k].net += b.netHours; byDay[k].pay += b.pay; byDay[k].n++;
       }
     }
     const agg = calc.aggregate(store.getShifts(), s, range, Date.now());
+    // per-day shortfall vs the day's standard (same as the Shifts screen)
+    let totalShort = 0;
+    for (const k in byDay) {
+      const exp = expectedStandard(byDay[k].date, s);
+      if (exp != null) {
+        const miss = Math.max(0, exp - byDay[k].net);
+        if (miss > 0.001) { byDay[k].short = true; totalShort += miss; }
+      }
+    }
     // match the Shifts screen label order exactly (end – start)
     const label = fmt.dayMonth(cycleLast) + " – " + fmt.dayMonth(cycleStart);
 
@@ -482,9 +491,10 @@
         <div class="cal-weekdays">${fmt.DOW.map((d) => `<span>${d.replace("׳", "")}</span>`).join("")}</div>
         <div class="cal-grid" id="cal-grid"></div>
 
-        <div class="cal-summary">
+        <div class="cal-summary s4">
           <div class="cell"><div class="k">ימי עבודה</div><div class="v">${agg.workedDays}</div></div>
           <div class="cell"><div class="k">שעות</div><div class="v">${fmt.hoursToHM(agg.netHours)}</div></div>
+          <div class="cell"><div class="k">שעות חוסר</div><div class="v">${fmt.hoursToHM(totalShort)}</div></div>
           <div class="cell"><div class="k">סה״כ</div><div class="v">${fmt.moneyShort(agg.total, s.currency)}</div></div>
         </div>
       </section>
@@ -511,9 +521,13 @@
           : (hol && hol.type ? `<span class="hol-name">${hol.name}</span>` : "")}
       </button>`);
       if (data) {
-        const std = calc.standardHoursFor(date, s);
-        const prog = Math.max(0, Math.min(1, std > 0 ? data.net / std : 0));
-        cell.style.background = `color-mix(in srgb, var(--accent) ${(9 + prog * 17).toFixed(0)}%, transparent)`;
+        if (data.short) {
+          cell.classList.add("short"); // red — fell short of the day's standard
+        } else {
+          const std = calc.standardHoursFor(date, s);
+          const prog = Math.max(0, Math.min(1, std > 0 ? data.net / std : 0));
+          cell.style.background = `color-mix(in srgb, var(--accent) ${(9 + prog * 17).toFixed(0)}%, transparent)`;
+        }
       }
       if (inCycle) cell.onclick = () => openDayDetail(date);
       grid.appendChild(cell);
@@ -544,8 +558,9 @@
         <h3 class="sheet-title">${fmt.dateFull(date)}</h3>
         ${holLine}
         <div id="day-list"></div>
-        <div class="sheet-actions" style="margin-top:14px">
+        <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px">
           <button class="btn btn-primary" id="day-add">${icoPlus()}הוספת משמרת ליום זה</button>
+          <button class="btn btn-ghost" id="day-cancel">סגור</button>
         </div>
       </div>`);
     openSheet(sheet);
@@ -574,6 +589,7 @@
       }
     }
     $("#day-add", sheet).onclick = () => openShiftEditor(null, date);
+    $("#day-cancel", sheet).onclick = () => closeSheet();
   }
 
   /* ============================================================
@@ -955,6 +971,47 @@
   /* ============================================================
      SHIFT EDITOR (sheet)
      ============================================================ */
+  // month-grid date picker — stacks over the editor (modal-host-2), reuses the calendar styles
+  function openDatePicker(initial, onPick) {
+    const host = "#modal-host-2";
+    let viewY = initial.getFullYear(), viewM = initial.getMonth();
+    const sheet = h(`
+      <div class="sheet">
+        <div class="sheet-grip"></div>
+        <h3 class="sheet-title">בחר תאריך</h3>
+        <div class="period-bar">
+          <button id="dp-prev" aria-label="הקודם">${icoChevron("right")}</button>
+          <div class="period-label" id="dp-label"></div>
+          <button id="dp-next" aria-label="הבא">${icoChevron("left")}</button>
+        </div>
+        <div class="cal-weekdays">${fmt.DOW.map((d) => `<span>${d.replace("׳", "")}</span>`).join("")}</div>
+        <div class="cal-grid" id="dp-grid"></div>
+        <div class="sheet-actions" style="margin-top:14px">
+          <button class="btn btn-ghost" id="dp-cancel">ביטול</button>
+        </div>
+      </div>`);
+    openSheet(sheet, host);
+
+    function draw() {
+      $("#dp-label", sheet).textContent =
+        new Date(viewY, viewM, 1).toLocaleDateString("he-IL", { month: "long", year: "numeric" });
+      const grid = $("#dp-grid", sheet);
+      grid.innerHTML = "";
+      const gridStart = new Date(viewY, viewM, 1 - new Date(viewY, viewM, 1).getDay());
+      for (let i = 0; i < 42; i++) {
+        const dd = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + i);
+        const cls = (dd.getMonth() === viewM ? "" : " out") + (sameDay(dd, initial) ? " today" : "");
+        const cell = h(`<button class="cal-day${cls}"><span class="num">${dd.getDate()}</span></button>`);
+        cell.onclick = () => { haptic(); onPick(dd); closeSheet(host); };
+        grid.appendChild(cell);
+      }
+    }
+    $("#dp-prev", sheet).onclick = () => { if (--viewM < 0) { viewM = 11; viewY--; } draw(); };
+    $("#dp-next", sheet).onclick = () => { if (++viewM > 11) { viewM = 0; viewY++; } draw(); };
+    $("#dp-cancel", sheet).onclick = () => closeSheet(host);
+    draw();
+  }
+
   function openShiftEditor(id, presetDate) {
     const s = store.getSettings();
     const isNew = !id;
@@ -976,7 +1033,7 @@
     let sH = sStart.getHours(), sM = sStart.getMinutes();
     let eH = sEnd ? sEnd.getHours() : 17, eM = sEnd ? sEnd.getMinutes() : 0;
     let hasEnd = !!sEnd;
-    const dDay = fmt.pad(sStart.getDate()), dMon = fmt.pad(sStart.getMonth() + 1), dYear = sStart.getFullYear();
+    let curDate = new Date(sStart); // edited via the calendar date picker
 
     const sheet = h(`
       <div class="sheet">
@@ -985,13 +1042,7 @@
 
         <div class="field">
           <label>תאריך</label>
-          <div class="datefield">
-            <input class="df-in df-d" id="f-day" type="number" inputmode="numeric" min="1" max="31" value="${dDay}"/>
-            <span class="df-sep">/</span>
-            <input class="df-in df-m" id="f-mon" type="number" inputmode="numeric" min="1" max="12" value="${dMon}"/>
-            <span class="df-sep">/</span>
-            <input class="df-in df-y" id="f-year" type="number" inputmode="numeric" min="2000" max="2100" value="${dYear}"/>
-          </div>
+          <button class="timechip" id="f-date" type="button">${fmt.dateFull(sStart)}</button>
         </div>
         <div class="field-2">
           <div class="field"><label>שעת כניסה</label>
@@ -1023,6 +1074,10 @@
     openSheet(sheet);
 
     $("#f-cancel", sheet).onclick = () => closeSheet();
+    $("#f-date", sheet).onclick = () => openDatePicker(curDate, (picked) => {
+      curDate = picked;
+      $("#f-date", sheet).textContent = fmt.dateFull(picked);
+    });
     $("#f-start", sheet).onclick = () => openTimeWheel("שעת כניסה", sH, sM, (h, m) => {
       sH = h; sM = m; $("#f-start", sheet).textContent = fmt.pad(h) + ":" + fmt.pad(m);
     });
@@ -1030,23 +1085,12 @@
       eH = h; eM = m; hasEnd = true;
       const b = $("#f-end", sheet); b.textContent = fmt.pad(h) + ":" + fmt.pad(m); b.classList.remove("empty");
     });
-    function readDate() {
-      const dv = $("#f-day", sheet).value, mv = $("#f-mon", sheet).value, yv = $("#f-year", sheet).value;
-      if (dv === "" || mv === "" || yv === "") return null;
-      let d = Math.max(1, Math.min(31, parseInt(dv, 10) || 1));
-      let mo = Math.max(1, Math.min(12, parseInt(mv, 10) || 1));
-      let y = parseInt(yv, 10); if (isNaN(y) || y < 2000 || y > 2100) y = new Date().getFullYear();
-      return { y, mo, d };
-    }
-
     $("#f-save", sheet).onclick = () => {
-      const D = readDate();
-      if (!D) { toast("חסר תאריך"); return; }
-
-      const start = new Date(D.y, D.mo - 1, D.d, sH, sM, 0, 0);
+      const dY = curDate.getFullYear(), dMo = curDate.getMonth(), dD = curDate.getDate();
+      const start = new Date(dY, dMo, dD, sH, sM, 0, 0);
       let end = null;
       if (hasEnd) {
-        end = new Date(D.y, D.mo - 1, D.d, eH, eM, 0, 0);
+        end = new Date(dY, dMo, dD, eH, eM, 0, 0);
         if (end.getTime() <= start.getTime()) end.setDate(end.getDate() + 1); // crosses midnight
       }
       const bMin = Math.max(0, parseInt($("#f-break", sheet).value, 10) || 0);

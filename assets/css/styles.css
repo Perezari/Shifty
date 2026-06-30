@@ -567,7 +567,6 @@ input, select, textarea { font-family: inherit; }
 .summary-card.s4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
 .summary-card.s4 .summary-k { font-size: 10px; white-space: nowrap; }
 .summary-card.s4 .summary-v { font-size: 17px; }
-.summary-card .summary-v.short { color: #ffd7cf; } /* shortfall stands out on the teal card */
 
 .shift-row {
   display: flex; align-items: center; gap: 14px;
@@ -679,6 +678,11 @@ input, select, textarea { font-family: inherit; }
 .cal-summary .cell + .cell { border-inline-start: 1px solid var(--border); }
 .cal-summary .k { font-size: 11px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
 .cal-summary .v { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; direction: ltr; }
+.cal-summary.s4 { grid-template-columns: repeat(4, 1fr); }
+.cal-summary.s4 .v { font-size: 17px; }
+.cal-summary.s4 .k { font-size: 10px; white-space: nowrap; }
+.cal-day.short { background: color-mix(in srgb, var(--danger) 13%, transparent); color: var(--danger); } /* day fell short */
+.cal-day.short .hrs { color: var(--danger); }
 .cal-summary .v:not(:empty) { color: var(--text); }
 
 /* ============================================================
