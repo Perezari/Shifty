@@ -563,6 +563,14 @@ input, select, textarea { font-family: inherit; }
 .summary-card .cell + .cell { border-inline-start: 1px solid rgba(255,255,255,.18); }
 .summary-k { font-size: 11px; opacity: .85; font-weight: 600; margin-bottom: 4px; }
 .summary-v { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; direction: ltr; }
+.summary-short {
+  margin-top: 8px; padding: 9px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, transparent);
+  color: var(--danger); font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.summary-short span { font-weight: 800; font-variant-numeric: tabular-nums; direction: ltr; }
 
 .shift-row {
   display: flex; align-items: center; gap: 14px;
@@ -587,6 +595,7 @@ input, select, textarea { font-family: inherit; }
 }
 .shift-date .d { font-size: 17px; font-weight: 800; }
 .shift-date .dow { font-size: 10px; font-weight: 600; margin-top: 2px; }
+.shift-date.short { border-color: var(--danger); color: var(--danger); } /* day fell short of its standard */
 .shift-main { flex: 1 1 auto; min-width: 0; }
 /* top line: time and money share one baseline so they read as aligned */
 .shift-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }

@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.0.8"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.0.9"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -290,6 +290,17 @@
   /* ============================================================
      SHIFTS VIEW
      ============================================================ */
+  // the expected daily standard ("תקן") for shortfall purposes, or null on an
+  // off-day (no requirement → no shortfall even if you work less).
+  function expectedStandard(date, s) {
+    if (s.holidaysEnabled !== false && S.holidays && (s.holidayEveHours || 0) > 0) {
+      const hi = S.holidays.info(date);
+      if (hi.type === "short") return s.holidayEveHours;
+    }
+    const wd = s.standardByDay && s.standardByDay[new Date(date).getDay()];
+    return (wd != null && wd > 0) ? wd : null;
+  }
+
   function renderShifts() {
     const s = store.getSettings();
     const now = Date.now();
@@ -297,6 +308,26 @@
     const all = store.getShifts();
     const list = all.filter((sh) => calc.inRange(sh, range));
     const agg = calc.aggregate(all, s, range, now);
+
+    // per-day shortfall: sum each day's net hours vs that day's standard. Grouping
+    // by day means a second shift the same day tops up the missing hours.
+    const dayNet = {}, dayDate = {};
+    for (const sh of list) {
+      const d = new Date(sh.start);
+      const key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+      dayNet[key] = (dayNet[key] || 0) + calc.shiftBreakdown(sh, s, now).netHours;
+      dayDate[key] = d;
+    }
+    const dayShort = {};
+    let totalShort = 0;
+    for (const key in dayNet) {
+      const exp = expectedStandard(dayDate[key], s);
+      if (exp != null) {
+        const miss = Math.max(0, exp - dayNet[key]);
+        if (miss > 0.001) { dayShort[key] = miss; totalShort += miss; }
+      }
+    }
+
     const root = $("#view-root");
 
     const label = fmt.dayMonth(new Date(range.end.getTime() - 1)) + " – " + fmt.dayMonth(range.start);
@@ -315,6 +346,8 @@
           <div class="cell"><div class="summary-k">סה״כ</div><div class="summary-v" id="sum-total">${fmt.moneyShort(agg.total, s.currency)}</div></div>
         </div>
 
+        ${totalShort > 0.001 ? `<div class="summary-short">שעות חוסר <span>${fmt.hoursToHM(totalShort)}</span></div>` : ""}
+
         <div id="shift-list"></div>
       </section>
     `);
@@ -330,7 +363,7 @@
           <div class="s">לחץ על ＋ למעלה כדי להוסיף משמרת</div>
         </div>`));
     } else {
-      for (const sh of list) listHost.appendChild(shiftRow(sh, s, now));
+      for (const sh of list) listHost.appendChild(shiftRow(sh, s, now, dayShort));
     }
 
     $("#per-prev").onclick = () => { state.periodOffset--; renderShifts(); }; // earlier (RTL: right = back)
@@ -364,16 +397,18 @@
     return parts.join('<span class="sep">·</span>');
   }
 
-  function shiftRow(sh, s, now) {
+  function shiftRow(sh, s, now, dayShort) {
     const b = calc.shiftBreakdown(sh, s, now);
     const d = new Date(sh.start);
+    const key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+    const short = !!(dayShort && dayShort[key] > 0.001); // the day fell short of its standard
     const timeStr = b.ongoing
       ? `${fmt.clock(sh.start)} – <span class="live">עכשיו</span>`
       : `${fmt.clock(sh.start)} – ${fmt.clock(sh.end)}`;
 
     const row = h(`
       <div class="shift-row" role="button" data-id="${sh.id}">
-        <div class="shift-date">
+        <div class="shift-date${short ? " short" : ""}">
           <div class="d">${d.getDate()}</div>
           <div class="dow">${fmt.dowShort(d)}</div>
         </div>
