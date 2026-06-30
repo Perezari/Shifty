@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.0.9"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.0.10"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -340,13 +340,12 @@
           <button id="per-next" aria-label="הבא">${icoChevron("left")}</button>
         </div>
 
-        <div class="summary-card">
+        <div class="summary-card s4">
           <div class="cell"><div class="summary-k">שעות</div><div class="summary-v" id="sum-hours">${fmt.hoursToHM(agg.netHours)}</div></div>
+          <div class="cell"><div class="summary-k">שעות חוסר</div><div class="summary-v ${totalShort > 0.001 ? "short" : ""}" id="sum-short">${fmt.hoursToHM(totalShort)}</div></div>
           <div class="cell"><div class="summary-k">משמרות</div><div class="summary-v">${agg.count}</div></div>
           <div class="cell"><div class="summary-k">סה״כ</div><div class="summary-v" id="sum-total">${fmt.moneyShort(agg.total, s.currency)}</div></div>
         </div>
-
-        ${totalShort > 0.001 ? `<div class="summary-short">שעות חוסר <span>${fmt.hoursToHM(totalShort)}</span></div>` : ""}
 
         <div id="shift-list"></div>
       </section>

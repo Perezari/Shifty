@@ -563,14 +563,11 @@ input, select, textarea { font-family: inherit; }
 .summary-card .cell + .cell { border-inline-start: 1px solid rgba(255,255,255,.18); }
 .summary-k { font-size: 11px; opacity: .85; font-weight: 600; margin-bottom: 4px; }
 .summary-v { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; direction: ltr; }
-.summary-short {
-  margin-top: 8px; padding: 9px 14px; border-radius: 12px;
-  background: color-mix(in srgb, var(--danger) 9%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 22%, transparent);
-  color: var(--danger); font-size: 13px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-}
-.summary-short span { font-weight: 800; font-variant-numeric: tabular-nums; direction: ltr; }
+/* 4-column variant (adds a "שעות חוסר" cell) — tighten so it fits on a phone */
+.summary-card.s4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.summary-card.s4 .summary-k { font-size: 10px; white-space: nowrap; }
+.summary-card.s4 .summary-v { font-size: 17px; }
+.summary-card .summary-v.short { color: #ffd7cf; } /* shortfall stands out on the teal card */
 
 .shift-row {
   display: flex; align-items: center; gap: 14px;
