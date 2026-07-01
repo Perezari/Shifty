@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.1.0"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.1.1"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -564,6 +564,13 @@
     const dayShifts = store.getShifts()
       .filter((sh) => sameDay(new Date(sh.start), date))
       .sort((a, b) => new Date(a.start) - new Date(b.start));
+    // a day is either work shift(s) OR one paid vacation/sick day — never a mix.
+    const hasSpecial = dayShifts.some((sh) => sh.type === "vacation" || sh.type === "sick");
+    const hasWork = dayShifts.some((sh) => !sh.type || sh.type === "work");
+    const addButtons = hasSpecial ? "" : (
+      `<button class="btn btn-primary" id="day-add">${icoPlus()}הוספת משמרת ליום זה</button>` +
+      (hasWork ? "" : `<div class="btn-row"><button class="btn btn-soft" id="day-vac">יום חופש</button><button class="btn btn-soft" id="day-sick">יום מחלה</button></div>`)
+    );
     const hol = s.holidaysEnabled !== false && Shifty.holidays ? Shifty.holidays.info(date) : null;
     const holLine = hol && hol.type
       ? `<div class="day-hol hol-${hol.type}">${hol.name}${hol.type === "short" ? " · יום מקוצר" : ""}</div>`
@@ -576,11 +583,7 @@
         ${holLine}
         <div id="day-list"></div>
         <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px">
-          <button class="btn btn-primary" id="day-add">${icoPlus()}הוספת משמרת ליום זה</button>
-          <div class="btn-row">
-            <button class="btn btn-soft" id="day-vac">יום חופש</button>
-            <button class="btn btn-soft" id="day-sick">יום מחלה</button>
-          </div>
+          ${addButtons}
           <button class="btn btn-ghost" id="day-cancel">סגור</button>
         </div>
       </div>`);
@@ -607,10 +610,10 @@
         list.appendChild(row);
       }
     }
-    $("#day-add", sheet).onclick = () => openShiftEditor(null, date);
     $("#day-cancel", sheet).onclick = () => closeSheet();
-    $("#day-vac", sheet).onclick = () => { store.addSpecialDay(date, "vacation"); haptic(10); closeSheet(); toast("יום חופש נוסף ✓"); rerender(); };
-    $("#day-sick", sheet).onclick = () => { store.addSpecialDay(date, "sick"); haptic(10); closeSheet(); toast("יום מחלה נוסף ✓"); rerender(); };
+    const addBtn = $("#day-add", sheet); if (addBtn) addBtn.onclick = () => openShiftEditor(null, date);
+    const vacBtn = $("#day-vac", sheet); if (vacBtn) vacBtn.onclick = () => { store.addSpecialDay(date, "vacation"); haptic(10); closeSheet(); toast("יום חופש נוסף ✓"); rerender(); };
+    const sickBtn = $("#day-sick", sheet); if (sickBtn) sickBtn.onclick = () => { store.addSpecialDay(date, "sick"); haptic(10); closeSheet(); toast("יום מחלה נוסף ✓"); rerender(); };
   }
 
   /* ============================================================
