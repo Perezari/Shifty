@@ -33,6 +33,10 @@
     holidaysEnabled: true,          // auto-detect Israeli holidays
     holidayEveHours: 4.1,           // standard hours on a shortened day (erev chag / Yom HaZikaron) = 4:06
 
+    vacationHours: 8.6,             // paid hours for a "paid vacation" day (decimal → 8:36)
+    // sick-day pay % by consecutive sick day (1st / 2nd / 3rd / 4th+) — Israeli default
+    sickDay1Pct: 0, sickDay2Pct: 50, sickDay3Pct: 50, sickDay4Pct: 100,
+
     autoBreakMinutes: 0,            // auto-deducted break per shift
     autoBreakAfterHours: 6,         // only if gross shift >= this
 
@@ -102,7 +106,16 @@
 
   // the open shift (end === null), if any
   function getActive() {
-    return getShifts().find((s) => !s.end) || null;
+    // only a real work shift can be "ongoing"; vacation/sick days are never active
+    return getShifts().find((s) => !s.end && (!s.type || s.type === "work")) || null;
+  }
+
+  // a paid non-work day (type "vacation" | "sick"), anchored at noon so it sits in the day
+  function addSpecialDay(date, type) {
+    const d = new Date(date); d.setHours(12, 0, 0, 0);
+    const rec = { id: uid(), start: d.toISOString(), end: d.toISOString(), breaks: [], isHoliday: false, note: "", type };
+    upsertShift(rec);
+    return rec;
   }
 
   function upsertShift(shift) {
@@ -194,7 +207,7 @@
     DEFAULT_SETTINGS,
     getSettings, setSettings, applyRemoteSettings,
     getShifts, getAllRaw, getShift, getActive, upsertShift, deleteShift, applyRemoteShifts, uid,
-    startShift, endShift, startBreak, endBreak, activeBreak,
+    startShift, endShift, startBreak, endBreak, activeBreak, addSpecialDay,
     exportAll, importAll, clearAll, setOnChange,
   };
 })();

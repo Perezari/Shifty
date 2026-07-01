@@ -54,11 +54,60 @@
     return total;
   }
 
+  function dayKeyOf(dateOrMs) { const d = new Date(dateOrMs); return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate(); }
+  function sickDatesOf(shifts) {
+    const set = new Set();
+    for (const x of shifts) if (x.type === "sick" && !x.deleted) set.add(dayKeyOf(x.start));
+    return set;
+  }
+  function sickPctFor(s, tier) {
+    const idx = Math.min(Math.max(tier, 1), 4) - 1;
+    const v = [s.sickDay1Pct, s.sickDay2Pct, s.sickDay3Pct, s.sickDay4Pct][idx];
+    return v != null ? v : [0, 50, 50, 100][idx];
+  }
+  // consecutive sick days ending at dateMs (inclusive); off-days (no standard) don't break the
+  // streak, a worked non-sick day does. Capped at 4 (= "day 4+").
+  function sickTier(dateMs, sickDates, s) {
+    let n = 1;
+    const cur = new Date(dateMs); cur.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 120 && n < 4; i++) {
+      cur.setDate(cur.getDate() - 1);
+      if (sickDates.has(dayKeyOf(cur))) { n++; continue; }
+      const wd = s.standardByDay && s.standardByDay[cur.getDay()];
+      if (wd == null || wd <= 0) continue; // off-day: neither counts nor breaks
+      break;
+    }
+    return n;
+  }
+
   // Full breakdown for a single shift.
-  // `asOf` lets the live (ongoing) shift be computed up to "now".
-  function shiftBreakdown(shift, settings, asOf) {
+  // `asOf` lets the live (ongoing) shift be computed up to "now". `ctx.sickDates` enables sick tiering.
+  function shiftBreakdown(shift, settings, asOf, ctx) {
     const s = settings;
+    const wage = s.hourlyWage;
+    const type = shift.type || "work";
     const startMs = new Date(shift.start).getTime();
+
+    // paid non-work days: a flat paid amount, no overtime / night / break
+    if (type === "vacation" || type === "sick") {
+      let hrs, extra = {};
+      if (type === "vacation") {
+        hrs = (s.vacationHours != null ? s.vacationHours : 8.6);
+      } else {
+        const tier = (ctx && ctx.sickDates) ? sickTier(startMs, ctx.sickDates, s) : 1;
+        const pct = sickPctFor(s, tier);
+        hrs = standardHoursFor(startMs, s) * pct / 100;
+        extra = { sickTier: tier, sickPct: pct };
+      }
+      const pay = hrs * wage;
+      return Object.assign({
+        id: shift.id, type, startMs, endMs: startMs, ongoing: false,
+        grossMs: 0, breakMs: 0, netMs: hrs * HOUR, netHours: hrs,
+        regularHours: hrs, ot1Hours: 0, ot2Hours: 0, overtimeHours: 0, nightHours: 0,
+        isHoliday: false, basePay: pay, otPay: 0, nightPremium: 0, pay,
+      }, extra);
+    }
+
     const ongoing = !shift.end;
     const endMs = ongoing ? (asOf || Date.now()) : new Date(shift.end).getTime();
 
@@ -158,16 +207,18 @@
 
   // Aggregate a list of shifts (already filtered or not) over a range.
   function aggregate(shifts, settings, range, asOf) {
+    const ctx = { sickDates: sickDatesOf(shifts) };
     const list = range ? shifts.filter((s) => inRange(s, range)) : shifts;
     const days = new Set();
     let netHours = 0, overtimeHours = 0, nightHours = 0, pay = 0, count = 0, holidayHours = 0;
     for (const sh of list) {
-      const b = shiftBreakdown(sh, settings, asOf);
+      const b = shiftBreakdown(sh, settings, asOf, ctx);
+      pay += b.pay;                                              // vacation/sick are paid…
+      if (b.type === "vacation" || b.type === "sick") continue; // …but not "worked" hours/days
       netHours += b.netHours;
       overtimeHours += b.overtimeHours;
       nightHours += b.nightHours;
       if (b.isHoliday) holidayHours += b.netHours;
-      pay += b.pay;
       count++;
       const d = new Date(sh.start);
       days.add(d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate());
@@ -191,5 +242,6 @@
   Shifty.calc = {
     HOUR, shiftBreakdown, aggregate, standardHoursFor,
     periodRange, shiftPeriod, dayRange, weekRange, inRange, nightMs,
+    dayKeyOf, sickDatesOf, sickTier, sickPctFor,
   };
 })();

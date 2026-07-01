@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.0.11"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.1.0"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -311,11 +311,13 @@
 
     // per-day shortfall: sum each day's net hours vs that day's standard. Grouping
     // by day means a second shift the same day tops up the missing hours.
+    const ctx = { sickDates: calc.sickDatesOf(all) };
     const dayNet = {}, dayDate = {};
     for (const sh of list) {
+      if (sh.type === "vacation" || sh.type === "sick") continue; // paid days aren't a shortfall
       const d = new Date(sh.start);
-      const key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
-      dayNet[key] = (dayNet[key] || 0) + calc.shiftBreakdown(sh, s, now).netHours;
+      const key = calc.dayKeyOf(d);
+      dayNet[key] = (dayNet[key] || 0) + calc.shiftBreakdown(sh, s, now, ctx).netHours;
       dayDate[key] = d;
     }
     const dayShort = {};
@@ -362,7 +364,7 @@
           <div class="s">לחץ על ＋ למעלה כדי להוסיף משמרת</div>
         </div>`));
     } else {
-      for (const sh of list) listHost.appendChild(shiftRow(sh, s, now, dayShort));
+      for (const sh of list) listHost.appendChild(shiftRow(sh, s, now, dayShort, ctx));
     }
 
     $("#per-prev").onclick = () => { state.periodOffset--; renderShifts(); }; // earlier (RTL: right = back)
@@ -396,27 +398,34 @@
     return parts.join('<span class="sep">·</span>');
   }
 
-  function shiftRow(sh, s, now, dayShort) {
-    const b = calc.shiftBreakdown(sh, s, now);
+  // time + meta text for a list row, handling paid vacation / sick days
+  function entryLabel(sh, b) {
+    if (b.type === "vacation") return { time: "חופשה בתשלום", meta: `${fmt.hoursToHM(b.netHours)} שע׳ בתשלום` };
+    if (b.type === "sick") return { time: "יום מחלה", meta: `יום ${b.sickTier}${b.sickTier >= 4 ? "+" : ""} · ${b.sickPct}% מהתקן` };
+    const t = b.ongoing ? `${fmt.clock(sh.start)} – <span class="live">עכשיו</span>` : `${fmt.clock(sh.start)} – ${fmt.clock(sh.end)}`;
+    return { time: t, meta: shiftMetaHtml(b) };
+  }
+
+  function shiftRow(sh, s, now, dayShort, ctx) {
+    const b = calc.shiftBreakdown(sh, s, now, ctx);
     const d = new Date(sh.start);
-    const key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
-    const short = !!(dayShort && dayShort[key] > 0.001); // the day fell short of its standard
-    const timeStr = b.ongoing
-      ? `${fmt.clock(sh.start)} – <span class="live">עכשיו</span>`
-      : `${fmt.clock(sh.start)} – ${fmt.clock(sh.end)}`;
+    const key = calc.dayKeyOf(d);
+    const special = b.type === "vacation" || b.type === "sick";
+    const short = !special && !!(dayShort && dayShort[key] > 0.001); // the day fell short of its standard
+    const lbl = entryLabel(sh, b);
 
     const row = h(`
       <div class="shift-row" role="button" data-id="${sh.id}">
-        <div class="shift-date${short ? " short" : ""}">
+        <div class="shift-date${short ? " short" : ""}${special ? " special" : ""}">
           <div class="d">${d.getDate()}</div>
           <div class="dow">${fmt.dowShort(d)}</div>
         </div>
         <div class="shift-main">
           <div class="shift-line">
-            <div class="shift-time">${timeStr}</div>
+            <div class="shift-time">${lbl.time}</div>
             <div class="shift-money">${fmt.money(b.pay, s.currency)}</div>
           </div>
-          <div class="shift-meta">${shiftMetaHtml(b)}</div>
+          <div class="shift-meta">${lbl.meta}</div>
         </div>
       </div>`);
     row.onclick = () => openShiftEditor(sh.id);
@@ -457,20 +466,24 @@
     const dayKey = (d) => d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
 
     // group this cycle's shifts by date
+    const ctx = { sickDates: calc.sickDatesOf(store.getShifts()) };
     const byDay = {};
     for (const sh of store.getShifts()) {
       const d = new Date(sh.start);
       if (d >= range.start && d < range.end) {
-        const b = calc.shiftBreakdown(sh, s, Date.now());
+        const b = calc.shiftBreakdown(sh, s, Date.now(), ctx);
         const k = dayKey(d);
-        (byDay[k] || (byDay[k] = { net: 0, pay: 0, n: 0, date: d }));
-        byDay[k].net += b.netHours; byDay[k].pay += b.pay; byDay[k].n++;
+        (byDay[k] || (byDay[k] = { net: 0, pay: 0, n: 0, date: d, special: null }));
+        byDay[k].pay += b.pay;
+        if (b.type === "vacation" || b.type === "sick") byDay[k].special = b.type;
+        else { byDay[k].net += b.netHours; byDay[k].n++; }
       }
     }
     const agg = calc.aggregate(store.getShifts(), s, range, Date.now());
-    // per-day shortfall vs the day's standard (same as the Shifts screen)
+    // per-day shortfall vs the day's standard — only days that actually have a work shift
     let totalShort = 0;
     for (const k in byDay) {
+      if (byDay[k].n === 0) continue;
       const exp = expectedStandard(byDay[k].date, s);
       if (exp != null) {
         const miss = Math.max(0, exp - byDay[k].net);
@@ -513,14 +526,17 @@
       const inCycle = date >= range.start && date < range.end;
       const isToday = sameDay(date, now);
       const data = inCycle ? byDay[dayKey(date)] : null;
+      const worked = data && data.n > 0;
+      const special = data && data.special && !worked; // vacation/sick-only day
       const hol = inCycle && holsOn ? Shifty.holidays.info(date) : null;
       const holCls = hol && hol.type ? " hol hol-" + hol.type : "";
-      const cell = h(`<button class="cal-day${inCycle ? "" : " out"}${isToday ? " today" : ""}${data ? " worked" : ""}${holCls}">
+      const cell = h(`<button class="cal-day${inCycle ? "" : " out"}${isToday ? " today" : ""}${worked ? " worked" : ""}${special ? " special" : ""}${holCls}">
         <span class="num">${date.getDate()}</span>
-        ${data ? `<span class="hrs">${fmt.hoursToHM(data.net)}</span>`
+        ${worked ? `<span class="hrs">${fmt.hoursToHM(data.net)}</span>`
+          : special ? `<span class="hrs sp">${data.special === "vacation" ? "חופש" : "מחלה"}</span>`
           : (hol && hol.type ? `<span class="hol-name">${hol.name}</span>` : "")}
       </button>`);
-      if (data) {
+      if (worked) {
         if (data.short) {
           cell.classList.add("short"); // red — fell short of the day's standard
         } else {
@@ -544,6 +560,7 @@
 
   function openDayDetail(date) {
     const s = store.getSettings();
+    const ctx = { sickDates: calc.sickDatesOf(store.getShifts()) };
     const dayShifts = store.getShifts()
       .filter((sh) => sameDay(new Date(sh.start), date))
       .sort((a, b) => new Date(a.start) - new Date(b.start));
@@ -560,6 +577,10 @@
         <div id="day-list"></div>
         <div style="margin-top:14px; display:flex; flex-direction:column; gap:10px">
           <button class="btn btn-primary" id="day-add">${icoPlus()}הוספת משמרת ליום זה</button>
+          <div class="btn-row">
+            <button class="btn btn-soft" id="day-vac">יום חופש</button>
+            <button class="btn btn-soft" id="day-sick">יום מחלה</button>
+          </div>
           <button class="btn btn-ghost" id="day-cancel">סגור</button>
         </div>
       </div>`);
@@ -570,18 +591,16 @@
       list.appendChild(h(`<div class="empty" style="padding:30px 10px"><div class="t">אין משמרת ביום זה</div></div>`));
     } else {
       for (const sh of dayShifts) {
-        const b = calc.shiftBreakdown(sh, s, Date.now());
-        const meta = [`${fmt.hoursToHM(b.netHours)} שע׳`];
-        if (b.breakMs > 0) meta.push(`הפסקה ${Math.round(b.breakMs / 60000)}׳`);
-        if (b.isHoliday) meta.push("שבת/חג");
+        const b = calc.shiftBreakdown(sh, s, Date.now(), ctx);
+        const lbl = entryLabel(sh, b);
         const row = h(`
           <div class="shift-row" role="button" style="margin-bottom:10px">
             <div class="shift-main">
               <div class="shift-line">
-                <div class="shift-time">${b.ongoing ? `${fmt.clock(sh.start)} – <span class="live">עכשיו</span>` : `${fmt.clock(sh.start)} – ${fmt.clock(sh.end)}`}</div>
+                <div class="shift-time">${lbl.time}</div>
                 <div class="shift-money">${fmt.money(b.pay, s.currency)}</div>
               </div>
-              <div class="shift-meta">${meta.join('<span class="sep">·</span>')}</div>
+              <div class="shift-meta">${lbl.meta}</div>
             </div>
           </div>`);
         row.onclick = () => openShiftEditor(sh.id);
@@ -590,6 +609,8 @@
     }
     $("#day-add", sheet).onclick = () => openShiftEditor(null, date);
     $("#day-cancel", sheet).onclick = () => closeSheet();
+    $("#day-vac", sheet).onclick = () => { store.addSpecialDay(date, "vacation"); haptic(10); closeSheet(); toast("יום חופש נוסף ✓"); rerender(); };
+    $("#day-sick", sheet).onclick = () => { store.addSpecialDay(date, "sick"); haptic(10); closeSheet(); toast("יום מחלה נוסף ✓"); rerender(); };
   }
 
   /* ============================================================
@@ -620,6 +641,16 @@
     gHol.appendChild(toggleRow("זיהוי חגים אוטומטי", "holidaysEnabled", s));
     gHol.appendChild(wheelRow("שעות עבודה בערב חג", "holidayEveHours", s));
     el.appendChild(gHol);
+
+    el.appendChild(h(`<div class="section-title">חופשה ומחלה</div>`));
+    el.appendChild(h(`<div class="group-note">יום חופש בתשלום משלם את מספר השעות שתגדיר. יום מחלה משלם אחוז מהתקן היומי לפי כמה ימי מחלה רצופים (ברירת מחדל 0%/50%/50%/100%).</div>`));
+    const gVS = group();
+    gVS.appendChild(wheelRow("שעות ליום חופש", "vacationHours", s));
+    gVS.appendChild(numRow("מחלה · יום 1", "sickDay1Pct", s, { unit: "%", step: 5, min: 0, max: 100 }));
+    gVS.appendChild(numRow("מחלה · יום 2", "sickDay2Pct", s, { unit: "%", step: 5, min: 0, max: 100 }));
+    gVS.appendChild(numRow("מחלה · יום 3", "sickDay3Pct", s, { unit: "%", step: 5, min: 0, max: 100 }));
+    gVS.appendChild(numRow("מחלה · יום 4+", "sickDay4Pct", s, { unit: "%", step: 5, min: 0, max: 100 }));
+    el.appendChild(gVS);
 
     el.appendChild(h(`<div class="section-title">שעות נוספות</div>`));
     const g2 = group();

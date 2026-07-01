@@ -59,14 +59,14 @@
   function remoteToLocal(r) {
     return {
       id: r.id, start: r.start_at, end: r.end_at,
-      breaks: r.breaks || [], isHoliday: !!r.is_holiday,
+      breaks: r.breaks || [], isHoliday: !!r.is_holiday, type: r.type || undefined,
       note: r.note || "", deleted: !!r.deleted, updatedAt: r.updated_at,
     };
   }
   function localToRemote(s, uid) {
     return {
       id: s.id, user_id: uid, start_at: s.start, end_at: s.end || null,
-      breaks: s.breaks || [], is_holiday: !!s.isHoliday, note: s.note || "",
+      breaks: s.breaks || [], is_holiday: !!s.isHoliday, type: s.type || null, note: s.note || "",
       deleted: !!s.deleted, updated_at: s.updatedAt || nowISO(),
     };
   }

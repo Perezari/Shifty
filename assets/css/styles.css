@@ -592,6 +592,7 @@ input, select, textarea { font-family: inherit; }
 .shift-date .d { font-size: 17px; font-weight: 800; }
 .shift-date .dow { font-size: 10px; font-weight: 600; margin-top: 2px; }
 .shift-date.short { border-color: var(--danger); color: var(--danger); } /* day fell short of its standard */
+.shift-date.special { border-color: var(--text-faint); color: var(--text-dim); } /* paid vacation / sick day */
 .shift-main { flex: 1 1 auto; min-width: 0; }
 /* top line: time and money share one baseline so they read as aligned */
 .shift-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
@@ -683,6 +684,8 @@ input, select, textarea { font-family: inherit; }
 .cal-summary.s4 .k { font-size: 10px; white-space: nowrap; }
 .cal-day.short { background: color-mix(in srgb, var(--danger) 13%, transparent); color: var(--danger); } /* day fell short */
 .cal-day.short .hrs { color: var(--danger); }
+.cal-day.special { background: color-mix(in srgb, var(--text-faint) 12%, transparent); }
+.cal-day .hrs.sp { color: var(--text-dim); }
 .cal-summary .v:not(:empty) { color: var(--text); }
 
 /* ============================================================

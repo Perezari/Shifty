@@ -27,7 +27,7 @@
   let rtChannel = null;
 
   function remoteToLocal(r) {
-    return { id: r.id, start: r.start_at, end: r.end_at, breaks: r.breaks || [], isHoliday: !!r.is_holiday, note: r.note || "" };
+    return { id: r.id, start: r.start_at, end: r.end_at, breaks: r.breaks || [], isHoliday: !!r.is_holiday, type: r.type || undefined, note: r.note || "" };
   }
 
   /* ---------- theme (local to the widget, persisted) ---------- */
