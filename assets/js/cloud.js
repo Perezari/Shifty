@@ -167,8 +167,22 @@
   function schedulePush() {
     if (!session) return;
     clearTimeout(pushTimer);
-    pushTimer = setTimeout(syncNow, 1800); // coalesce rapid local edits
+    pushTimer = setTimeout(() => { pushTimer = null; syncNow(); }, 1800); // coalesce rapid local edits
   }
+
+  // iOS suspends the page moments after it goes to background — a pending
+  // debounce would silently hold the last edit (e.g. ending a shift) on the
+  // device, so the cloud never sees it and the shift-ended push never fires.
+  // Flush immediately when the app is being hidden/closed; the client's
+  // keepalive fetch lets the request survive the page freeze.
+  function flushPush() {
+    if (!pushTimer) return;
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    syncNow();
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) flushPush(); });
+  window.addEventListener("pagehide", flushPush);
 
   // live remote updates: a Supabase Realtime websocket so a change on another
   // device (phone / widget) pulls in immediately — the app otherwise only syncs
@@ -213,6 +227,9 @@
     try {
       client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" },
+        // keepalive: requests fired while the app is being backgrounded
+        // (the flush in flushPush) survive the iOS page freeze
+        global: { fetch: (url, opts) => fetch(url, Object.assign({}, opts, { keepalive: true })) },
       });
     } catch (e) { client = null; return; }
 

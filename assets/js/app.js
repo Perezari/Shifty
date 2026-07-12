@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.2.1"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.2.2"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -282,6 +282,9 @@
     const sh = store.getActive();
     const b = calc.shiftBreakdown(sh, s, Date.now());
     store.endShift(); haptic(12); renderNow();
+    // סיום משמרת הוא האירוע הקריטי (מפעיל פוש בענן) — סנכרון מיידי,
+    // בלי לחכות ל-debounce שעלול להיקטע כשסוגרים את האפליקציה מיד
+    try { Shifty.cloud && Shifty.cloud.syncNow && Shifty.cloud.syncNow(); } catch (e) {}
     toast(`משמרת נסגרה · ${fmt.hoursToHM(b.netHours)} שע׳ · ${fmt.money(b.pay, s.currency)}`);
   }
   function doStartBreak() { store.startBreak(); haptic(); renderNow(); }
