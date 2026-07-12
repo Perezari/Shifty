@@ -54,7 +54,12 @@
 
   let bioOk = false;
   if (window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
-    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then((v) => { bioOk = !!v; }).catch(() => {});
+    PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().then((v) => {
+      bioOk = !!v;
+      // the lock screen may already be up (detection is async) — repaint so
+      // the Face ID key shows right away, not only after the first keypress
+      if (overlay && !overlay.hidden) paint();
+    }).catch(() => {});
   }
 
   async function enrollBio() {
