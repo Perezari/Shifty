@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.1.1"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.2.0"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -625,6 +625,7 @@
     const el = h(`<section class="fade-in"></section>`);
 
     appendCloudSection(el);
+    appendLockSection(el);
 
     el.appendChild(h(`<div class="section-title">שכר ומקום עבודה</div>`));
     const g1 = group();
@@ -757,6 +758,62 @@
       try { haptic(); await cloud.signInWithGoogle(); } catch (e) { toast("לא הצלחנו להתחבר"); }
     };
     el.appendChild(card);
+  }
+
+  /* ---------- app lock section (settings) ---------- */
+  function appendLockSection(el) {
+    const lock = Shifty.lock;
+    if (!lock) return;
+    el.appendChild(h(`<div class="section-title">נעילת אפליקציה</div>`));
+    el.appendChild(h(`<div class="group-note">קוד הנעילה נשמר במכשיר הזה בלבד — בכל מכשיר מגדירים נעילה בנפרד. האפליקציה ננעלת בפתיחה ואחרי דקה ברקע.</div>`));
+    const g = group();
+
+    const t = h(`
+      <div class="row">
+        <div class="row-label">נעילה עם קוד</div>
+        <label class="switch"><input type="checkbox" ${lock.isEnabled() ? "checked" : ""}/><span class="slider"></span></label>
+      </div>`);
+    $("input", t).onchange = async (e) => {
+      haptic(5);
+      if (e.target.checked) {
+        const ok = await lock.promptSetPin();
+        if (ok) toast("הנעילה הופעלה ✓");
+      } else {
+        const ok = await lock.promptConfirm("הזן קוד לביטול הנעילה");
+        if (ok) { lock.disable(); toast("הנעילה בוטלה"); }
+      }
+      renderSettings();
+    };
+    g.appendChild(t);
+
+    if (lock.isEnabled()) {
+      if (lock.bioSupported()) {
+        const b = h(`
+          <div class="row">
+            <div class="row-label">פתיחה עם Face ID</div>
+            <label class="switch"><input type="checkbox" ${lock.hasBio() ? "checked" : ""}/><span class="slider"></span></label>
+          </div>`);
+        $("input", b).onchange = async (e) => {
+          haptic(5);
+          if (e.target.checked) {
+            const ok = await lock.enrollBio();
+            toast(ok ? "Face ID הופעל ✓" : "לא הצלחנו להפעיל Face ID");
+          } else {
+            lock.removeBio();
+            toast("Face ID בוטל");
+          }
+          renderSettings();
+        };
+        g.appendChild(b);
+      }
+      g.appendChild(actionRow("שינוי קוד", "שנה", async () => {
+        const ok = await lock.promptConfirm("הזן את הקוד הנוכחי");
+        if (!ok) return;
+        const set = await lock.promptSetPin();
+        if (set) toast("הקוד עודכן ✓");
+      }));
+    }
+    el.appendChild(g);
   }
 
   // update the sync status text/dot in place (no re-render) — only when the signed-in card is on screen

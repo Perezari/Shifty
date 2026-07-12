@@ -1,10 +1,11 @@
 /* Shifty service worker — offline app shell */
-const CACHE = "shifty-v18";
+const CACHE = "shifty-v19";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./assets/css/styles.css",
+  "./assets/js/lock.js",
   "./assets/js/format.js",
   "./assets/js/store.js",
   "./assets/js/holidays.js",

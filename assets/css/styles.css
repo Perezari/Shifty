@@ -983,3 +983,59 @@ input, select, textarea { font-family: inherit; }
 @media (min-width: 481px) {
   .app { border-inline: 1px solid var(--border); }
 }
+
+/* ============================================================
+   App lock screen (PIN + Face ID)
+   ============================================================ */
+.lock-screen {
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(var(--safe-top) + 16px) 20px calc(var(--safe-bottom) + 20px);
+}
+.lock-screen[hidden] { display: none; }
+.lock-body { width: 100%; max-width: 320px; display: flex; flex-direction: column; align-items: center; }
+.lock-ico { color: var(--accent); margin-bottom: 8px; }
+.lock-app { font-size: 22px; font-weight: 800; color: var(--text); }
+.lock-sub { font-size: 14px; color: var(--text-dim); margin-top: 6px; min-height: 20px; }
+.lock-dots { display: flex; gap: 16px; margin: 20px 0 28px; }
+.lock-dots i {
+  width: 13px; height: 13px; border-radius: 50%;
+  border: 1.6px solid var(--text-faint);
+  transition: background .12s, border-color .12s;
+}
+.lock-dots i.on { background: var(--accent); border-color: var(--accent); }
+.lock-dots.shake { animation: lockShake .4s; }
+.lock-dots.shake i { border-color: var(--danger); }
+.lock-dots.shake i.on { background: var(--danger); border-color: var(--danger); }
+@keyframes lockShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-9px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(4px); }
+}
+/* ltr so 1-2-3 reads left-to-right inside the RTL page */
+.lock-pad { display: grid; grid-template-columns: repeat(3, 74px); gap: 13px 22px; justify-content: center; direction: ltr; }
+.lock-key {
+  width: 74px; height: 74px; border-radius: 50%;
+  background: var(--surface); border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  font: inherit; font-size: 27px; font-weight: 600; color: var(--text);
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.lock-key:active { background: var(--surface-2); transform: scale(.96); }
+.lock-key.fn { background: transparent; border: none; box-shadow: none; color: var(--text-dim); }
+.lock-key.fn:active { color: var(--text); transform: scale(.94); }
+.lock-key .ico { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 1.7; }
+.lock-cancel {
+  margin-top: 24px; background: none; border: none; font: inherit;
+  font-size: 15px; color: var(--text-dim); padding: 8px 16px;
+  -webkit-tap-highlight-color: transparent;
+}
+.lock-cancel[hidden] { display: none; }
+@media (max-height: 640px) {
+  .lock-pad { grid-template-columns: repeat(3, 64px); gap: 10px 18px; }
+  .lock-key { width: 64px; height: 64px; font-size: 24px; }
+}
