@@ -92,6 +92,9 @@ html, body {
   padding: 0;
   height: 100%;
   overscroll-behavior-y: none;
+  /* גם על html — אזור ה-notch וה-safe-areas ב-iOS נצבעים מה-html,
+     בלי זה הם נשארים לבנים כשהאפליקציה כהה */
+  background: var(--bg);
 }
 
 body {

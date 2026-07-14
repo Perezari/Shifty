@@ -4,6 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#f4f5f7" id="theme-color-meta" />
+  <script>
+    // pre-paint: הערכה השמורה מוחלת לפני הציור הראשון — אחרת iOS דוגם את
+    // צבע ה-notch מהערכה הבהירה הסטטית ולפעמים נשאר איתו (notch לבן)
+    (function () {
+      try {
+        var t = (JSON.parse(localStorage.getItem("shifty.settings.v1") || "{}").theme) || "light";
+        document.documentElement.setAttribute("data-theme", t);
+        document.getElementById("theme-color-meta")
+          .setAttribute("content", t === "dark" ? "#15171c" : "#f4f5f7");
+      } catch (e) {}
+    })();
+  </script>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
