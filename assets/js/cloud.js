@@ -269,9 +269,53 @@
     fireAuth();
   }
 
+  /* ---------- web push — התראות ישירות מהענן, בלי תלות במחשב ---------- */
+  const VAPID_PUBLIC = "BDDdeSNorbRL1dqRAFUIZp2eWoiipoUa6GEG5FUBeCdSGvTl647QoVdAekAhWX-C0XrArGG1w7lj6vMEGagjHYk";
+  function pushSupported() {
+    return "serviceWorker" in navigator && "PushManager" in window && isSecureContext;
+  }
+  function b64uToBuf(b) {
+    const pad = "=".repeat((4 - (b.length % 4)) % 4);
+    const raw = atob((b + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0)).buffer;
+  }
+  async function pushEnabled() {
+    if (!pushSupported()) return false;
+    const reg = await navigator.serviceWorker.getRegistration();
+    return !!(reg && (await reg.pushManager.getSubscription()));
+  }
+  async function enablePush() {
+    if (!client || !session) throw new Error("צריך להתחבר קודם");
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") throw new Error("לא ניתנה הרשאה להתראות");
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: b64uToBuf(VAPID_PUBLIC),
+    });
+    const j = sub.toJSON();
+    const { error } = await client.from("push_subscriptions").upsert({
+      endpoint: sub.endpoint,
+      user_id: session.user.id,
+      p256dh: j.keys.p256dh,
+      auth: j.keys.auth,
+    });
+    if (error) throw error;
+  }
+  async function disablePush() {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && (await reg.pushManager.getSubscription());
+    if (!sub) return;
+    if (client) {
+      try { await client.from("push_subscriptions").delete().eq("endpoint", sub.endpoint); } catch (e) {}
+    }
+    await sub.unsubscribe();
+  }
+
   Object.assign(cloud, {
     init, available, isSignedIn, userEmail, lastSync,
     signInWithGoogle, signOut, syncNow,
+    pushSupported, pushEnabled, enablePush, disablePush,
   });
   Shifty.cloud = cloud;
 })();

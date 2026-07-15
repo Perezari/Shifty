@@ -1,5 +1,5 @@
 /* Shifty service worker — offline app shell */
-const CACHE = "shifty-v19";
+const CACHE = "shifty-v20";
 const ASSETS = [
   "./",
   "./index.html",
@@ -27,6 +27,24 @@ self.addEventListener("activate", (e) => {
     caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+// התראות פוש — מגיעות ישירות מהענן (Supabase Edge Function), בלי תלות במחשב
+self.addEventListener("push", (e) => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) {}
+  e.waitUntil(self.registration.showNotification(d.title || "Shifty", {
+    body: d.message || "",
+    icon: "./assets/icons/icon.svg",
+    dir: "rtl",
+    lang: "he",
+  }));
+});
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((ws) =>
+    ws.length ? ws[0].focus() : clients.openWindow("./")
+  ));
 });
 
 self.addEventListener("fetch", (e) => {

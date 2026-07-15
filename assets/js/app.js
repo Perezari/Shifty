@@ -6,7 +6,7 @@
   const { fmt, store, calc } = S;
   const $ = (sel, root) => (root || document).querySelector(sel);
   const HOUR = calc.HOUR;
-  const APP_VERSION = "1.2.3"; // bump on every deploy to GitHub
+  const APP_VERSION = "1.3.0"; // bump on every deploy to GitHub
 
   const state = {
     view: "now",
@@ -745,6 +745,30 @@
       $("#cloud-sync", card).onclick = () => { cloud.syncNow(); haptic(); };
       $("#cloud-out", card).onclick = async () => { await cloud.signOut(); state.cloudStage = "email"; toast("התנתקת"); renderSettings(); };
       el.appendChild(card);
+
+      // התראות פוש — מהענן ישירות למכשיר (יעד, נוספות, סיום, תזכורות)
+      if (cloud.pushSupported && cloud.pushSupported()) {
+        const g = group();
+        const row = h(`
+          <div class="row">
+            <div class="row-label">התראות פוש למכשיר הזה</div>
+            <label class="switch"><input type="checkbox"/><span class="slider"></span></label>
+          </div>`);
+        const cb = $("input", row);
+        cloud.pushEnabled().then((v) => { cb.checked = v; });
+        cb.onchange = async () => {
+          haptic(5);
+          try {
+            if (cb.checked) { await cloud.enablePush(); toast("התראות הופעלו למכשיר הזה"); }
+            else { await cloud.disablePush(); toast("ההתראות כובו"); }
+          } catch (e) {
+            cb.checked = !cb.checked;
+            toast(e && e.message ? e.message : "לא הצלחנו לעדכן את ההתראות");
+          }
+        };
+        g.appendChild(row);
+        el.appendChild(g);
+      }
       return;
     }
 
