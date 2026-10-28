@@ -1,0 +1,63 @@
+# The native iPhone app (ios/README.md). The Xcode project and the Info.plist are generated on the
+# build Mac with XcodeGen (`xcodegen generate`) and not kept in git.
+name: Shifty
+options:
+  bundleIdPrefix: com.perezari
+  deploymentTarget:
+    iOS: "26.0"
+  developmentLanguage: he
+  createIntermediateGroups: true
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    TARGETED_DEVICE_FAMILY: "1"
+targets:
+  Shifty:
+    type: application
+    platform: iOS
+    sources:
+      - path: Shifty
+    info:
+      path: Shifty/Info.plist
+      properties:
+        CFBundleDisplayName: Shifty
+        # XcodeGen would write "1.0" and "1"; the TestFlight build sets the build number to its time.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleDevelopmentRegion: he
+        CFBundleLocalizations: [he]
+        ITSAppUsesNonExemptEncryption: false
+        LSApplicationCategoryType: public.app-category.productivity
+        UILaunchScreen:
+          UIColorName: Background
+        UIRequiresFullScreen: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        CFBundleURLTypes:
+          - CFBundleURLName: com.perezari.shifty
+            CFBundleURLSchemes: [shifty]
+    # The App Group the widgets and the Live Activity will share the shifts through; the App IDs
+    # com.perezari.shifty and com.perezari.shifty.widget have the App Groups capability with it.
+    entitlements:
+      path: Shifty/Shifty.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.perezari.shifty]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.perezari.shifty
+        # The iPhone alone. Set on each target: XcodeGen's preset for iOS targets ('1,2', iPhone and
+        # iPad) outweighs the project's setting, and App Store Connect then asks for iPad screenshots.
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        CODE_SIGN_STYLE: Automatic
+schemes:
+  Shifty:
+    build:
+      targets:
+        Shifty: all
+    run:
+      config: Debug
+    archive:
+      config: Release

@@ -1,0 +1,5 @@
+# Generated on the build Mac (ios/README.md).
+Shifty.xcodeproj/
+Shifty/Info.plist
+Shifty/Shifty.entitlements
+build/

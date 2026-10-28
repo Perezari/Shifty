@@ -1,0 +1,43 @@
+# The native iPhone app (ios/README.md) on Codemagic's Mac minis: a personal account has 500 free
+# minutes a month on them. Nothing starts on its own: a build runs when it is started in Codemagic
+# (Start new build).
+#
+# The TestFlight workflow reads the variable group "app_store", set in the app's Environment
+# variables, each variable Secret: APPLE_API_ISSUER, APPLE_API_KEY (the Key ID), APPLE_API_KEY_P8 (the
+# text of the .p8 file) and APPLE_DEVELOPMENT_TEAM.
+definitions:
+  scripts:
+    - &prepare
+      name: Xcode project
+      script: |
+        xcodebuild -version
+        brew install xcodegen
+        cd ios
+        xcodegen generate
+
+workflows:
+  testflight:
+    name: Shifty · TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      groups:
+        - app_store
+    scripts:
+      - *prepare
+      - name: App Store build, uploaded to TestFlight
+        script: bash ios/scripts/testflight.sh
+
+  screenshots:
+    name: Shifty · screenshots
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      xcode: latest
+    scripts:
+      - *prepare
+      - name: Simulator build and screenshots
+        script: bash ios/scripts/screenshots.sh
+    artifacts:
+      - ios/build/screenshots/*.png
