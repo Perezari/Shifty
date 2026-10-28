@@ -50,22 +50,28 @@ xcodebuild -project Shifty.xcodeproj -scheme Shifty -configuration Release \
   CODE_SIGNING_ALLOWED=NO -quiet archive
 
 # An unsigned archive carries no entitlements, and the export signs the app with those it finds in its
-# signature: sign it here for no one ("-") with the App Group that the app and its extensions share,
-# the extensions first. The export then signs it again for the App Store.
+# signature: sign it here for no one ("-") with them, the extensions first. They all share the App
+# Group; the app alone has iCloud's key-value store (ICloud.swift). The export then signs it again for
+# the App Store.
 app=build/Shifty.xcarchive/Products/Applications/Shifty.app
-cat > build/Shifty.entitlements <<EOF
+entitlements() {
+  cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>com.apple.security.application-groups</key>
   <array><string>group.com.perezari.shifty</string></array>
+$1
 </dict>
 </plist>
 EOF
+}
+entitlements "" > build/Extension.entitlements
+entitlements "  <key>com.apple.developer.ubiquity-kvstore-identifier</key><string>$APPLE_DEVELOPMENT_TEAM.com.perezari.shifty</string>" > build/Shifty.entitlements
 for extension in "$app"/PlugIns/*.appex; do
   [ -e "$extension" ] || continue
-  codesign --force --sign - --entitlements build/Shifty.entitlements "$extension"
+  codesign --force --sign - --entitlements build/Extension.entitlements "$extension"
 done
 codesign --force --sign - --entitlements build/Shifty.entitlements "$app"
 

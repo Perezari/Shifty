@@ -131,6 +131,29 @@ final class ShiftStore {
         return shift
     }
 
+    // MARK: From the cloud
+
+    /// Records from the cloud that win over these (store.applyRemoteShifts): kept as they came, without a
+    /// new stamp or a call to onChange.
+    func applyRemote(_ list: [Shift]) {
+        var index = Dictionary(records.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for record in list {
+            if let i = index[record.id] {
+                records[i] = record
+            } else {
+                index[record.id] = records.count
+                records.append(record)
+            }
+        }
+        saveShifts()
+    }
+
+    /// The cloud's settings, their time kept (store.applyRemoteSettings).
+    func applyRemote(settings: Settings) {
+        self.settings = settings
+        saveSettings()
+    }
+
     // MARK: Backup
 
     /// The web app's backup file (store.exportAll): the settings, the shifts on screen and the time.

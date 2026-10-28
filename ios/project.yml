@@ -37,12 +37,15 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.perezari.shifty
             CFBundleURLSchemes: [shifty]
-    # The App Group the widgets and the Live Activity will share the shifts through; the App IDs
-    # com.perezari.shifty and com.perezari.shifty.widget have the App Groups capability with it.
+    # The App Group the widgets and the Live Activity will share the shifts through, and iCloud's
+    # key-value store for the shifts on the user's other devices (ICloud.swift). The App IDs
+    # com.perezari.shifty and com.perezari.shifty.widget have the App Groups capability with the group;
+    # the app's also has iCloud (no CloudKit container).
     entitlements:
       path: Shifty/Shifty.entitlements
       properties:
         com.apple.security.application-groups: [group.com.perezari.shifty]
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)$(CFBundleIdentifier)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.perezari.shifty

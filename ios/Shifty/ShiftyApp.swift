@@ -32,7 +32,18 @@ enum AppTab: Hashable {
 /// The tabs: the running shift, the shifts by period, the period's calendar, and settings. Built with
 /// the iOS 26 SDK, the tab bar is Liquid Glass and floats over the content.
 struct RootView: View {
+    @Environment(ShiftStore.self) private var store
+    @Environment(\.scenePhase) private var phase
     @State private var tab: AppTab = .now
+
+    /// iCloud, but not for the screenshots' made-up shifts.
+    private var syncs: Bool {
+        #if DEBUG
+        return Screenshot.current == nil
+        #else
+        return true
+        #endif
+    }
 
     var body: some View {
         TabView(selection: $tab) {
@@ -60,6 +71,13 @@ struct RootView: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
+        .task {
+            if syncs { ICloud.start(store) }
+        }
+        .onChange(of: phase) { _, now in
+            // coming back may bring another device's changes; leaving sends this device's at once
+            if syncs && now != .inactive { ICloud.syncNow() }
+        }
         .onAppear {
             #if DEBUG
             if let screen = Screenshot.current { tab = screen.tab }

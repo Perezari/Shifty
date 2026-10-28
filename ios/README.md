@@ -12,6 +12,10 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   the screens' colors, and `Demo.swift` the made-up shifts the screenshots show (debug builds only).
 - `Shifty/Views/`: the screens. `NowView` (the running shift on the ring, the day's goal),
   `ShiftEditor` (a shift by hand).
+- `Shifty/ICloud.swift`: the shifts and the settings in iCloud's key-value store, on the user's other
+  devices and back after a reinstall. The merging is `Core/CloudMirror.swift`: each shift by its
+  `updatedAt`, the settings as the web app's cloud.js merges them. (The web app and the desktop widget
+  sync through Supabase instead, and do not see the iPhone's shifts.)
 - `Shifty/Core/`: everything without SwiftUI, ported line by line from the web app's `assets/js`:
   `Calc` (the wage engine, calc.js), `Holidays` (holidays.js, on Foundation's Hebrew calendar),
   `Format` (format.js), `Models` (a shift and the settings, in the web app's JSON) and `ShiftStore`
@@ -27,7 +31,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 ## Checking the Swift without a Mac
 
 WSL's Ubuntu has Swift: `check-swift.sh` parses every file, type-checks those that do not use
-SwiftUI and runs the store's checks. From PowerShell, at the root of the repository:
+SwiftUI and runs the store's checks and the cloud mirror's (two devices on a cloud in memory). From
+PowerShell, at the root of the repository:
 
 ```powershell
 wsl -d Ubuntu-24.04 -- bash -lc "cd /mnt/c/Users/ari/Documents/GitHub/Shifty && tr -d '\r' < ios/scripts/check-swift.sh | bash"
@@ -59,4 +64,5 @@ carries none), then `xcodebuild -exportArchive` signs it for the App Store with 
 key and uploads it. The build number is the time of the build.
 
 The bundle ID is `com.perezari.shifty`. Its App ID, and the widget's (`com.perezari.shifty.widget`),
-have the App Groups capability with `group.com.perezari.shifty`.
+have the App Groups capability with `group.com.perezari.shifty`; the app's has iCloud too, for the
+key-value store (no CloudKit container).
