@@ -10,6 +10,13 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   build Mac and not kept in git.
 - `Shifty/`: the app. `ShiftyApp.swift` holds the tabs, and `Theme.swift` the glass card and the
   screens' colors.
+- `Shifty/Core/`: everything without SwiftUI, ported line by line from the web app's `assets/js`:
+  `Calc` (the wage engine, calc.js), `Holidays` (holidays.js, on Foundation's Hebrew calendar),
+  `Format` (format.js), `Models` (a shift and the settings, in the web app's JSON) and `ShiftStore`
+  (store.js: two JSON files in the App Group's container). `LocalTime` makes dates the way
+  JavaScript's `Date` does, so the engine gives the web app's results to the last bit.
+- `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
+  `compare.mjs`) and the store's checks (`StoreCheck`).
 - `Shifty/Assets.xcassets`: the icon (`AppIcon.svg` at 1024 px), the accent color and the background,
   in light and dark.
 - `scripts/`: the builds (`testflight.sh`, `screenshots.sh`) and the check of the Swift without a Mac
@@ -17,11 +24,21 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 
 ## Checking the Swift without a Mac
 
-WSL's Ubuntu has Swift: `check-swift.sh` parses every file and type-checks those that do not use
-SwiftUI. From PowerShell, at the root of the repository:
+WSL's Ubuntu has Swift: `check-swift.sh` parses every file, type-checks those that do not use
+SwiftUI and runs the store's checks. From PowerShell, at the root of the repository:
 
 ```powershell
 wsl -d Ubuntu-24.04 -- bash -lc "cd /mnt/c/Users/ari/Documents/GitHub/Shifty && tr -d '\r' < ios/scripts/check-swift.sh | bash"
+```
+
+`check-calc.sh` proves the wage engine equal to the web app's: Node runs `calc.js`, `holidays.js` and
+`format.js` on some 31,000 generated cases (two years of random shifts, the edges, sick runs, the nights
+the clocks change, every day's holidays from 2019 to 2032, pay periods, night windows, formatting),
+WSL's Swift runs `Shifty/Core` on the same cases, both in Jerusalem time, and every result must be the
+same. Run it after any change to the engine, here or in `assets/js`. From Git Bash, at the root:
+
+```bash
+bash ios/scripts/check-calc.sh
 ```
 
 ## Building
