@@ -2,9 +2,22 @@ import SwiftUI
 
 @main
 struct ShiftyApp: App {
+    @State private var store: ShiftStore
+
+    init() {
+        #if DEBUG
+        if let screen = Screenshot.current {
+            _store = State(initialValue: ShiftStore.demo(screen))
+            return
+        }
+        #endif
+        _store = State(initialValue: ShiftStore())
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environment(store)
                 .environment(\.layoutDirection, .rightToLeft)
                 .environment(\.locale, Locale(identifier: "he_IL"))
         }
@@ -24,10 +37,7 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab("עכשיו", systemImage: "timer", value: AppTab.now) {
-                NavigationStack {
-                    Placeholder(title: "עכשיו", symbol: "timer",
-                                note: "כאן תהיה המשמרת שרצה עכשיו: הטבעת, הטיימר, ההפסקות והשכר המצטבר.")
-                }
+                NowView()
             }
             Tab("משמרות", systemImage: "list.bullet", value: AppTab.shifts) {
                 NavigationStack {

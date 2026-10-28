@@ -8,8 +8,10 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 
 - `project.yml`: the XcodeGen spec. The Xcode project and `Shifty/Info.plist` are generated on the
   build Mac and not kept in git.
-- `Shifty/`: the app. `ShiftyApp.swift` holds the tabs, and `Theme.swift` the glass card and the
-  screens' colors.
+- `Shifty/`: the app. `ShiftyApp.swift` holds the store and the tabs, `Theme.swift` the glass card and
+  the screens' colors, and `Demo.swift` the made-up shifts the screenshots show (debug builds only).
+- `Shifty/Views/`: the screens. `NowView` (the running shift on the ring, the day's goal),
+  `ShiftEditor` (a shift by hand).
 - `Shifty/Core/`: everything without SwiftUI, ported line by line from the web app's `assets/js`:
   `Calc` (the wage engine, calc.js), `Holidays` (holidays.js, on Foundation's Hebrew calendar),
   `Format` (format.js), `Models` (a shift and the settings, in the web app's JSON) and `ShiftStore`

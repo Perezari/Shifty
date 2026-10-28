@@ -37,7 +37,10 @@ shoot() {
   xcrun simctl io "$udid" screenshot "build/screenshots/$2.png" >/dev/null
   xcrun simctl terminate "$udid" com.perezari.shifty || true
 }
-for screen in now shifts calendar settings; do shoot "$screen" "$screen"; done
+for screen in now idle shifts calendar settings; do shoot "$screen" "$screen"; done
+# the sheet over the screen, once it is up
+shoot editor editor 9
 xcrun simctl ui "$udid" appearance dark
-for screen in now settings; do shoot "$screen" "$screen-dark"; done
+for screen in now idle; do shoot "$screen" "$screen-dark"; done
+shoot editor editor-dark 9
 ls -la build/screenshots

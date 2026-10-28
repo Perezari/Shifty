@@ -48,7 +48,7 @@ const settings = [
   { ...D },
   { ...D, hourlyWage: 57.3, standardByDay: [9.1, 9.1, 9.1, 9.1, 8.1, null, null], autoBreakMinutes: 30,
     autoBreakAfterHours: 6, nightEnabled: true, nightStart: 22, nightEnd: 6, nightMult: 1.25,
-    travelPerDay: 22.6, travelMonthlyCap: 300, monthStartDay: 25 },
+    travelPerDay: 22.6, travelMonthlyCap: 300, monthStartDay: 25, monthlyIncomeGoal: 12000 },
   { ...D, hourlyWage: 43.75, regularDailyHours: 0, standardByDay: [8, 0, 7.5, null, 8.25, 5, null],
     overtime1Hours: 1.5, overtime1Mult: 1.3, overtime2Mult: 1.75, nightEnabled: true, nightStart: 2.5,
     nightEnd: 7.75, nightMult: 1.5, holidaysEnabled: false, monthStartDay: 10, sickDay2Pct: 60, sickDay3Pct: 60,
@@ -194,6 +194,40 @@ function shortfall(all, s, range, now) {
   }
   return { total, days };
 }
+// the numbers of app.js updateNow, as they are there: the running shift (store.getActive), or today
+function nowStatus(all, s, now) {
+  const active = all.find((x) => !x.deleted && !x.end && (!x.type || x.type === "work")) || null;
+  const goal = calc.standardHoursFor(now, s);
+  let netH, netMs, overtime, pay;
+  if (active) {
+    const b = calc.shiftBreakdown(active, s, now);
+    netH = b.netHours; netMs = b.netMs; overtime = b.overtimeHours; pay = b.pay;
+  } else {
+    const today = calc.aggregate(all, s, calc.dayRange(now), now);
+    netH = today.netHours; netMs = today.netHours * HOUR; overtime = today.overtimeHours; pay = today.total;
+  }
+  const remaining = goal - netH;
+  let finishMs = null;
+  if (active && remaining > 0.001) {
+    const loggedMs = (active.breaks || []).reduce((a, brk) => {
+      const be = brk.end ? new Date(brk.end).getTime() : now;
+      return a + Math.max(0, be - new Date(brk.start).getTime());
+    }, 0);
+    const autoMs = (s.autoBreakMinutes || 0) * 60000;
+    finishMs = new Date(active.start).getTime() + goal * HOUR + Math.max(loggedMs, autoMs);
+  }
+  const periodTotal = s.monthlyIncomeGoal > 0
+    ? calc.aggregate(all, s, calc.shiftPeriod(now, s.monthStartDay, 0), now).total : null;
+  return {
+    active: active ? active.id : null, onBreak: !!(active && active.breaks.find((b) => !b.end)),
+    goal, netMs, netHours: netH, overtimeHours: overtime, pay,
+    progress: Math.max(0, Math.min(1, goal > 0 ? netH / goal : 0)), remaining, finishMs,
+    projected: netH > 0.001 ? pay * (goal / netH) : null, periodTotal,
+  };
+}
+// moments for the Now screen: around the running shift of B, and any day
+const nowMoments = [asOf, asOf - 3 * HOUR, asOf - 7 * HOUR, asOf + 2 * HOUR, asOf + 10 * HOUR];
+for (let j = 0; j < 12; j++) nowMoments.push(moment());
 
 settings.forEach((s, si) => {
   sets.forEach((set, k) => {
@@ -212,6 +246,7 @@ settings.forEach((s, si) => {
         add({ kind: "aggregate", s: si, set: k, asOf, ...span(r) }, totalsOut(calc.aggregate(set, s, r, asOf)));
       }
     }
+    for (const now of nowMoments) add({ kind: "now", s: si, set: k, asOf: now }, nowStatus(set, s, now));
     for (const shift of set) {
       if (shift.type !== "sick") continue;
       const t = new Date(shift.start).getTime();

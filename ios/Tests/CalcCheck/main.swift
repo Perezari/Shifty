@@ -78,6 +78,16 @@ func output(_ c: Check) -> [String: Value] {
     case "shortfall":
         let f = Calc.shortfall(cases.sets[c.set!], s, range: span!, asOf: c.asOf)
         return ["total": .number(f.total), "days": number(f.byDay.count)]
+    case "now":
+        let set = cases.sets[c.set!]
+        let active = set.first { !$0.deleted && $0.end == nil && $0.type == .work }
+        let n = Calc.nowStatus(set, s, active: active, at: c.asOf!)
+        return [
+            "active": text(n.active?.id), "onBreak": .flag(n.activeBreak != nil), "goal": .number(n.goal),
+            "netMs": .number(n.netMs), "netHours": .number(n.netHours), "overtimeHours": .number(n.overtimeHours),
+            "pay": .number(n.pay), "progress": .number(n.progress), "remaining": .number(n.remaining),
+            "finishMs": number(n.finishMs), "projected": number(n.projected), "periodTotal": number(n.periodTotal),
+        ]
     case "holiday":
         let h = Holidays.info(Date(ms: c.date!))
         return ["kind": text(h.kind?.rawValue), "name": text(h.name)]

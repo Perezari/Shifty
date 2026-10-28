@@ -16,8 +16,9 @@ extension View {
 
 #if DEBUG
 /// The screens the build photographs in the simulator (ios/scripts/screenshots.sh): `-screenshot shifts`.
+/// They show made-up shifts (Demo.swift). `now` is a shift running, `idle` none, `editor` a new shift.
 enum Screenshot: String {
-    case now, shifts, calendar, settings
+    case now, idle, editor, shifts, calendar, settings
 
     static let current: Screenshot? = {
         let arguments = ProcessInfo.processInfo.arguments
@@ -27,7 +28,7 @@ enum Screenshot: String {
 
     var tab: AppTab {
         switch self {
-        case .now: .now
+        case .now, .idle, .editor: .now
         case .shifts: .shifts
         case .calendar: .calendar
         case .settings: .settings
