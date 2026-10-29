@@ -98,9 +98,44 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
 /* ---- the Now screen: the shift on a clock's dial ---- */
 .now { position: absolute; inset: 0; }
-/* the date, the dial, the numbers and the buttons spread down the screen with even room between them */
-.now-body { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-  padding: 64px 20px 108px; }
+/* The screen scrolls: its first height holds the date, the dial, the numbers and the buttons with even room
+   between them, the buttons just over the tab bar; under them, more cards, the first peeking under the tab bar. */
+.now-scroll { position: absolute; inset: 0; overflow-y: auto; scrollbar-width: none; }
+.now-scroll::-webkit-scrollbar { display: none; }
+.hero { height: 790px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 64px 20px 24px; }
+.more { display: flex; flex-direction: column; gap: 14px; padding: 8px 20px 120px; }
+.card { border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.card-head .title { font-size: 16px; font-weight: 700; }
+.card-head .meta { font-size: 13px; color: var(--ink-2); }
+.leave { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.leave div { border-radius: 16px; padding: 11px 6px; text-align: center; background: var(--track); display: flex; flex-direction: column; gap: 3px; }
+.leave div.on { background: var(--accent-soft); }
+.leave b { font: 600 20px/1.1 var(--font-round); font-variant-numeric: tabular-nums; }
+.leave .pay { font: 600 15px/1.2 var(--font-round); color: var(--accent); font-variant-numeric: tabular-nums; }
+.leave span { font-size: 12px; color: var(--ink-2); }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.week .col { display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.week .hrs { font: 600 11px/1 var(--font-round); color: var(--ink-2); height: 11px; }
+.week .bar { width: 24px; height: 66px; border-radius: 8px; background: var(--track); position: relative; overflow: hidden; }
+.week .bar i { position: absolute; bottom: 0; left: 0; right: 0; border-radius: 8px; }
+.week .bar.off { background: transparent; box-shadow: inset 0 0 0 1px var(--track); }
+.week .day { font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.week .today .day { color: var(--accent); }
+.money-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.money-line > b { font: 700 30px/1 var(--font-round); font-variant-numeric: tabular-nums; }
+.money-line > span { font-size: 13px; color: var(--ink-2); }
+.money-line > span b { font: 600 15px/1 var(--font-round); }
+.mini { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; padding-top: 4px; }
+.mini div + div { border-inline-start: 1px solid var(--track); }
+.mini b { display: block; font: 600 17px/1.3 var(--font-round); font-variant-numeric: tabular-nums; }
+.mini span { font-size: 12px; color: var(--ink-2); }
+.banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 22px; }
+.banner .ico { width: 36px; height: 36px; flex: none; border-radius: 11px; background: color-mix(in srgb, var(--amber) 18%, transparent);
+  color: var(--amber); display: flex; align-items: center; justify-content: center; }
+.banner b { display: block; font-size: 15px; }
+.banner span { font-size: 13px; color: var(--ink-2); }
+.idea { font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 3px 8px; }
 .topline { font-size: 14px; color: var(--ink-2); font-weight: 500; padding: 9px 16px; border-radius: 999px; }
 
 /* 350 points: the track of 12 hours at a radius of 160, 22 wide; the ticks inside it; the hours at 120 */
@@ -372,17 +407,75 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       facts = fact(clock(new Date(s.start)), "התחלה")
         + (past ? fact("+" + hm(s.overtime), "שעות נוספות", "var(--amber)") : fact(clock(new Date(s.finish)), "יעד · עוד " + hm(s.remaining)))
         + fact(moneyShort(s.projected), "צפי ביעד");
+      // as on the iPhone now (a39a6cd): the icon and the word in the button's color, on glass
       actions = onBreak
         ? `<button class="capsule prominent" type="button">${icon.play}חזרה לעבודה</button>
-           <button class="capsule glass" type="button" style="color:var(--red)">${icon.stop}סיום</button>`
-        : `<button class="capsule glass" type="button"><span style="color:var(--orange);display:flex">${icon.pause}</span>הפסקה</button>
-           <button class="capsule glass" type="button"><span style="color:var(--red);display:flex">${icon.stop}</span>סיום משמרת</button>`;
+           <button class="capsule glass" type="button" style="color:var(--red)">${icon.stop}סיום משמרת</button>`
+        : `<button class="capsule glass" type="button" style="color:var(--orange)">${icon.pause}הפסקה</button>
+           <button class="capsule glass" type="button" style="color:var(--red)">${icon.stop}סיום משמרת</button>`;
     }
+    const more = (s.running ? leaveCard(s) : "") + weekCard(s) + monthCard() + holidayBanner();
     return `<div class="now">${statusBar(s.now)}
-      <div class="now-body">${top}${dial(s, center)}<div class="facts glass">${facts}</div><div class="actions">${actions}</div></div>
+      <div class="now-scroll">
+        <div class="hero">${top}${dial(s, center)}<div class="facts glass">${facts}</div><div class="actions">${actions}</div></div>
+        <div class="more">${more}</div>
+      </div>
       ${tabs}<div class="home-ind"></div></div>`;
   }
   const fact = (value, label, color) => `<div><b style="${color ? "color:" + color : ""}"><span class="ltr">${value}</span></b><span>${label}</span></div>`;
+
+  // ---- ideas under the first screen, for the user to choose from ----
+  /** The wage of a day of `net` hours: its standard at the wage, then 125% for two hours and 150% after. */
+  const payFor = (net) => (Math.min(net, GOAL_H) + Math.min(Math.max(0, net - GOAL_H), 2) * 1.25 + Math.max(0, net - GOAL_H - 2) * 1.5) * WAGE;
+
+  /** When to leave: at the goal, or an hour or two later, with the day's wage at each. */
+  function leaveCard(s) {
+    const past = s.remaining <= 0;
+    const base = past ? s.now : s.finish, baseNet = past ? s.net : GOAL_H;
+    const tiles = [0, 1, 2].map((extra) => {
+      const label = extra === 0 ? (past ? "עכשיו" : "ביעד") : extra === 1 ? "+שעה" : "+שעתיים";
+      return `<div class="${extra === 0 ? "on" : ""}"><b><span class="ltr">${clock(new Date(base + extra * 3600000))}</span></b>
+        <span class="pay"><span class="ltr">${money(payFor(baseNet + extra))}</span></span><span>${label}</span></div>`;
+    }).join("");
+    const hourly = payFor(baseNet + 1) - payFor(baseNet);
+    return `<section class="card glass"><div class="card-head"><span class="title">מתי לצאת</span>
+      <span class="meta">כל שעה נוספת <b class="ltr num">${money(hourly)}</b></span></div><div class="leave">${tiles}</div>
+      <span class="idea" style="align-self:flex-start">רעיון 1</span></section>`;
+  }
+
+  /** The week, Sunday on the right: each day's hours against its standard, today's as it grows. */
+  function weekCard(s) {
+    const std = [9.1, 9.1, 9.1, 9.1, 8.1, null, null], past = [9.33, 9.68, 8.92, 9.2];
+    const todayHours = s.running ? s.net : 7.5;
+    let total = 0, missing = 0;
+    const cols = std.map((goal, i) => {
+      const hours = i < 4 ? past[i] : i === 4 ? todayHours : null;
+      if (hours != null) { total += hours; if (goal && i < 4 && hours < goal) missing += goal - hours; }
+      const share = goal && hours != null ? Math.min(1, hours / goal) : 0;
+      const color = hours == null ? "transparent" : i === 4 ? "var(--accent)" : hours >= goal ? "var(--accent)" : "var(--red)";
+      return `<div class="col${i === 4 ? " today" : ""}"><span class="hrs num">${hours != null ? hm(hours) : ""}</span>
+        <span class="bar${goal ? "" : " off"}"><i style="height:${share * 100}%;background:${color};opacity:${i === 4 ? 0.85 : 1}"></i></span>
+        <span class="day">${days[i].replace("׳", "")}</span></div>`;
+    }).join("");
+    return `<section class="card glass"><div class="card-head"><span class="title">השבוע</span>
+      <span class="meta"><b class="ltr num">${hm(total)}</b> שעות${missing > 0.01 ? ` · חסרות <b class="ltr num" style="color:var(--red)">${hm(missing)}</b>` : ""}</span></div>
+      <div class="week">${cols}</div><span class="idea" style="align-self:flex-start">רעיון 2</span></section>`;
+  }
+
+  /** The pay period: the income so far, where it is heading, and its overtime and hours missing. */
+  function monthCard() {
+    return `<section class="card glass"><div class="card-head"><span class="title">אוקטובר</span><span class="meta">נסגר בעוד 2 ימים</span></div>
+      <div class="money-line"><b class="num"><span class="ltr">${moneyShort(6075.4)}</span></b><span>צפי לסוף החודש <b class="ltr num" style="color:var(--ink)">${moneyShort(8640)}</b></span></div>
+      <div class="mini"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num" style="color:var(--amber)">6:30</b><span>נוספות</span></div><div><b class="num" style="color:var(--red)">2:10</b><span>חוסר</span></div></div>
+      <span class="idea" style="align-self:flex-start">רעיון 3</span></section>`;
+  }
+
+  /** A shortened day or a holiday coming, from the Hebrew calendar (Holidays.swift): its standard. */
+  function holidayBanner() {
+    return `<section class="banner glass"><span class="ico">${sized(icon.calendar, 20)}</span>
+      <div style="flex:1"><b>יום מקוצר בקרוב</b><span>ערב חג ביום א׳ · תקן 4:06 במקום 9:06</span></div>
+      <span class="idea">רעיון 4</span></section>`;
+  }
 
   // ---- the Live Activity, as built (Widget/ShiftLiveActivity.swift) ----
   const roundIcon = (svg, tint, size) => `<span class="ri" style="--tint:${tint};width:${size}px;height:${size}px">${sized(svg, Math.round(size * 0.36))}</span>`;
@@ -472,7 +565,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- the page ----
   const notes = {
-    now: '<span class="tag">הצעה חדשה</span>עוד לא בבנייה. המשמרת על חוגה של שעון: הקשת מתחילה בשעת ההתחלה ונגמרת בדגל של היעד, הצבוע הוא מה שעבדת, ההפסקות בכתום, והנקודה הלבנה היא עכשיו. על הרקע הקלאסי.',
+    now: '<span class="tag">הצעה חדשה</span>עוד לא בבנייה. המשמרת על חוגה של שעון, והכפתורים כמו באייפון. גלול מתחת לכפתורים: ארבעה רעיונות להוספה, כל אחד מסומן במספר.',
     lock: '<span class="tag built">כמו שבבנייה</span>מסך הנעילה, עם הרקע שמתחלף לכהה יחד עם האייפון.',
     island: '<span class="tag built">אחרי התיקון</span>השעון ב-Dynamic Island ברוחב שמספיק לשעות, דקות ושניות.',
     widgets: '<span class="tag built">כמו שבבנייה</span>הווידג\'טים למסך הבית.',
@@ -480,8 +573,16 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const dark = () => state.theme === "dark" || (state.theme == null && matchMedia("(prefers-color-scheme: dark)").matches);
 
+  // the screen is drawn again each second: it keeps its scroll, and waits while a finger scrolls it
+  let touched = 0;
+  const touch = () => { touched = Date.now(); };
+  document.addEventListener("scroll", touch, true);
+  document.addEventListener("touchmove", touch, { passive: true });
   function render() {
+    const scroller = device.querySelector(".now-scroll"), kept = scroller ? scroller.scrollTop : 0;
     device.innerHTML = { now: nowScreen, lock: lockScreen, island: islandScreen, widgets: widgetsScreen }[state.screen]();
+    const again = device.querySelector(".now-scroll");
+    if (again) again.scrollTop = kept;
     document.getElementById("note").innerHTML = notes[state.screen];
     for (const b of document.querySelectorAll("[data-screen]")) b.setAttribute("aria-pressed", String(b.dataset.screen === state.screen));
     for (const b of document.querySelectorAll("[data-state]")) b.setAttribute("aria-pressed", String(b.dataset.state === state.state));
@@ -507,6 +608,6 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   document.documentElement.lang = "he";
   addEventListener("resize", fit);
   fit(); render();
-  setInterval(render, 1000);
+  setInterval(() => { if (Date.now() - touched > 1200) render(); }, 1000);
 })();
 </script>
