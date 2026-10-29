@@ -6,8 +6,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 
 ## Layout
 
-- `project.yml`: the XcodeGen spec. The Xcode project and `Shifty/Info.plist` are generated on the
-  build Mac and not kept in git.
+- `project.yml`: the XcodeGen spec. The Xcode project, the Info.plists and the entitlements are generated
+  on the build Mac and not kept in git.
 - `Shifty/`: the app. `ShiftyApp.swift` holds the store and the tabs, `Theme.swift` the glass card and
   the screens' colors, `Lock.swift` the lock (Face ID, or the iPhone's passcode, on launch and after a
   minute away: the web app's four digits the iPhone's way, this device's alone), and `Demo.swift` the
@@ -18,6 +18,15 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   of the web app, the look, the lock, and the backup to a file and back) and `ShiftEditor` (a shift by
   hand). `Components` holds what they share: the period's bar and picker, the summary card, a shift's
   row, the settings' cards and the wheel of hours and minutes.
+- `Shifty/Live/`: the shift outside the app. `ShiftIntents` holds what its buttons do (start, end, a
+  break, as App Intents that the system performs in the app, woken in the background if need be),
+  `Shortcuts` the sentences Siri knows ("התחל משמרת בShifty"), `ShiftActivity` the Live Activity's data,
+  and `LiveShift` keeps the Live Activity, the notifications (the goal reached, the overtime's 150%, a
+  shift open twelve hours) and the widgets in step with the store after each change.
+- `Widget/`: the widget extension (`com.perezari.shifty.widget`), with the app's engine and store to read
+  the shifts from the App Group: the shift's widget for the home screen and the lock screen, the Live
+  Activity on the Lock Screen and in the Dynamic Island, and the shift's switch for the Control Center
+  and the Action button.
 - `Shifty/ICloud.swift`: the shifts and the settings in iCloud's key-value store, on the user's other
   devices and back after a reinstall. The merging is `Core/CloudMirror.swift`: each shift by its
   `updatedAt`, the settings as the web app's cloud.js merges them. (The web app and the desktop widget

@@ -8,6 +8,7 @@ import UIKit
 struct SettingsView: View {
     @Environment(ShiftStore.self) private var store
     @AppStorage(AppLock.key) private var lockOn = false
+    @AppStorage(Alerts.key) private var alerts = true
     @State private var hoursEdit: HoursEdit?
     @State private var exporting = false
     @State private var backup = BackupFile(data: Data())
@@ -116,6 +117,12 @@ struct SettingsView: View {
                     .padding(.vertical, 12)
                 }
 
+                SettingsSection(title: "מסך הנעילה והתראות",
+                                note: "המשמרת שרצה מופיעה במסך הנעילה וב-Dynamic Island, עם כפתורים להפסקה ולסיום. ההתראות: כשמגיעים ליעד היומי, כשמתחילות השעות הנוספות של 150%, ואחרי 12 שעות של משמרת פתוחה.") {
+                    Toggle("התראות על המשמרת", isOn: $alerts)
+                        .settingsRow()
+                }
+
                 SettingsSection(title: "נעילה",
                                 note: "Shifty ננעלת בפתיחה ואחרי דקה ברקע, ונפתחת ב-\(AppLock.biometryName) או בקוד של האייפון. הנעילה היא של האייפון הזה בלבד.") {
                     Toggle("נעילה עם \(AppLock.biometryName)", isOn: $lockSwitch)
@@ -189,6 +196,9 @@ struct SettingsView: View {
             Button("אישור", role: .cancel) {}
         } message: {
             Text("כדי לנעול את Shifty צריך להגדיר קוד לאייפון, בהגדרות של האייפון.")
+        }
+        .onChange(of: alerts) { _, _ in
+            LiveShift.refresh(store)
         }
         .onAppear { lockSwitch = lockOn }
         .onChange(of: lockSwitch) { _, on in

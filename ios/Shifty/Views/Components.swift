@@ -201,6 +201,9 @@ struct ShiftRow: View {
                     time
                         .font(.body.weight(.semibold))
                         .monospacedDigit()
+                    if shift.type == .work && shift.end == nil {
+                        RunningTag(onBreak: shift.breaks.contains { $0.end == nil })
+                    }
                     Spacer(minLength: 0)
                     Text(Format.money(breakdown.pay, currency))
                         .font(.body.weight(.semibold))
@@ -222,8 +225,8 @@ struct ShiftRow: View {
         .contentShape(Rectangle())
     }
 
-    /// "07:12 – 16:40", "07:12 – עכשיו", or the kind of day off (app.js entryLabel). The mark makes the
-    /// line right to left, so that the start is on the right however the line begins.
+    /// "07:12 – 16:40", "התחלה 07:12" while it runs, or the kind of day off (app.js entryLabel). The mark
+    /// makes the line right to left, so that the start is on the right.
     private var time: Text {
         switch shift.type {
         case .vacation:
@@ -231,11 +234,10 @@ struct ShiftRow: View {
         case .sick:
             return Text("יום מחלה")
         case .work:
-            let start = "\u{200F}" + Format.clock(shift.start) + " – "
             guard let end = shift.end else {
-                return Text("\(start)\(Text("עכשיו").foregroundStyle(Color.accentColor))")
+                return Text("התחלה " + Format.clock(shift.start))
             }
-            return Text(start + Format.clock(end))
+            return Text("\u{200F}" + Format.clock(shift.start) + " – " + Format.clock(end))
         }
     }
 
@@ -257,6 +259,39 @@ struct ShiftRow: View {
             if b.isHoliday { parts.append("שבת/חג") }
             return parts.joined(separator: " · ")
         }
+    }
+}
+
+/// The running shift's mark beside its start: "פעילה", or "בהפסקה" during a break.
+private struct RunningTag: View {
+    let onBreak: Bool
+
+    var body: some View {
+        Text(label)
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 2)
+            .background {
+                Capsule().fill(color.opacity(0.14))
+            }
+    }
+
+    private var label: String {
+        onBreak ? "בהפסקה" : "פעילה"
+    }
+
+    private var color: Color {
+        onBreak ? .orange : .accentColor
+    }
+}
+
+extension View {
+    /// A card as a row of a list: no separator or background of the list's, the card's own spacing.
+    func cardRow() -> some View {
+        listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
     }
 }
 

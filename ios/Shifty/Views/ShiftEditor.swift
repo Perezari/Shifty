@@ -58,7 +58,11 @@ struct ShiftEditor: View {
                 }
                 if shift != nil {
                     Section {
+                        // the question rises from the button itself, as iOS 26 places it
                         Button(deleteTitle, role: .destructive) { deleting = true }
+                            .confirmationDialog(deleteQuestion, isPresented: $deleting, titleVisibility: .visible) {
+                                Button("מחיקה", role: .destructive, action: delete)
+                            }
                     }
                 }
             }
@@ -81,9 +85,6 @@ struct ShiftEditor: View {
                         .accessibilityLabel("שמירה")
                     }
                 }
-            }
-            .confirmationDialog(deleteQuestion, isPresented: $deleting, titleVisibility: .visible) {
-                Button("מחיקה", role: .destructive, action: delete)
             }
         }
         .environment(\.locale, Locale(identifier: "he_IL"))

@@ -6,7 +6,7 @@
 # check-calc.sh's.
 set -uo pipefail
 cd ios || exit 1
-mapfile -t files < <(find Shifty -name '*.swift')
+mapfile -t files < <(find Shifty Widget -name '*.swift')
 swiftc -parse "${files[@]}" && echo "Parsed: ${#files[@]} files"
 if compgen -G "Shifty/Core/*.swift" > /dev/null; then
   swiftc -typecheck Shifty/Core/*.swift && echo "Type-checked: Core"

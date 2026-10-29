@@ -11,7 +11,7 @@ struct ShiftyApp: App {
             return
         }
         #endif
-        _store = State(initialValue: ShiftStore())
+        _store = State(initialValue: ShiftStore.shared)
     }
 
     var body: some Scene {
@@ -45,7 +45,7 @@ struct RootView: View {
         }
     }
 
-    /// iCloud, but not for the screenshots' made-up shifts.
+    /// iCloud and the Live Activity, but not for the screenshots' made-up shifts.
     private var syncs: Bool {
         #if DEBUG
         return Screenshot.current == nil
@@ -79,11 +79,25 @@ struct RootView: View {
         .preferredColorScheme(scheme)
         .modifier(LockGate())
         .task {
-            if syncs { ICloud.start(store) }
+            guard syncs else { return }
+            ICloud.start(store)
+            LiveShift.refresh(store)
         }
         .onChange(of: phase) { _, now in
             // coming back may bring another device's changes; leaving sends this device's at once
             if syncs && now != .inactive { ICloud.syncNow() }
+        }
+        // each change, here, from iCloud or from a button outside the app, reaches the Lock Screen,
+        // the Dynamic Island, the notifications and the widgets
+        .onChange(of: store.records) { _, _ in
+            if syncs { LiveShift.refresh(store) }
+        }
+        .onChange(of: store.settings) { _, _ in
+            if syncs { LiveShift.refresh(store) }
+        }
+        // a widget or the Live Activity opens the app on the running shift
+        .onOpenURL { _ in
+            tab = .now
         }
         .onAppear {
             #if DEBUG

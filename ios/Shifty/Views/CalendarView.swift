@@ -195,30 +195,41 @@ struct DayDetail: View {
         let hasDayOff = shifts.contains { $0.type != .work }
         let hasWork = shifts.contains { $0.type == .work }
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 12) {
-                    if let line = holidayLine(settings) {
-                        Text(line)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Color("Holiday"))
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            // a list, for a shift to be swiped away as on the Shifts tab
+            List {
+                if let line = holidayLine(settings) {
+                    Text(line)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Color("Holiday"))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .cardRow()
+                }
+                if shifts.isEmpty {
+                    Text("אין משמרת ביום זה")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .cardRow()
+                }
+                ForEach(shifts) { shift in
+                    Button {
+                        editing = shift
+                    } label: {
+                        ShiftRow(shift: shift, breakdown: Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick),
+                                 currency: settings.currency, showsDate: false)
                     }
-                    if shifts.isEmpty {
-                        Text("אין משמרת ביום זה")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 24)
-                    }
-                    ForEach(shifts) { shift in
-                        Button {
-                            editing = shift
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            withAnimation { store.delete(shift.id) }
                         } label: {
-                            ShiftRow(shift: shift, breakdown: Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick),
-                                     currency: settings.currency, showsDate: false)
+                            Label("מחיקה", systemImage: "trash")
                         }
-                        .buttonStyle(.plain)
                     }
-                    if !hasDayOff {
+                    .cardRow()
+                }
+                if !hasDayOff {
+                    VStack(spacing: 10) {
                         Button {
                             adding = true
                         } label: {
@@ -226,8 +237,6 @@ struct DayDetail: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.glassProminent)
-                        .controlSize(.large)
-                        .padding(.top, 4)
                         if !hasWork {
                             HStack(spacing: 10) {
                                 Button {
@@ -244,12 +253,15 @@ struct DayDetail: View {
                                 }
                             }
                             .buttonStyle(.glass)
-                            .controlSize(.large)
                         }
                     }
+                    .controlSize(.large)
+                    .padding(.top, 6)
+                    .cardRow()
                 }
-                .padding(16)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
             .background(Color.appBackground.ignoresSafeArea())
             .navigationTitle(Format.dateFull(date))
             .navigationBarTitleDisplayMode(.inline)

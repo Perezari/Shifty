@@ -2,4 +2,6 @@
 Shifty.xcodeproj/
 Shifty/Info.plist
 Shifty/Shifty.entitlements
+Widget/Info.plist
+Widget/ShiftyWidget.entitlements
 build/

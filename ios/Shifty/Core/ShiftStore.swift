@@ -15,10 +15,22 @@ final class ShiftStore {
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private let folder: URL
 
+    /// The app's store: its screens', and the one that Siri, the widgets' buttons and the Live Activity's
+    /// change (Live/LiveShift.swift), so that a change from any of them is on screen at once.
+    static let shared = ShiftStore()
+
     init(folder: URL = ShiftStore.defaultFolder) {
         self.folder = folder
         settings = Self.read(Settings.self, from: folder.appendingPathComponent("settings.json")) ?? Settings()
         records = Self.read([Shift].self, from: folder.appendingPathComponent("shifts.json")) ?? []
+    }
+
+    /// The settings and the shifts on screen as the files hold them, without a store: for the widgets,
+    /// which run apart from the app and only read.
+    nonisolated static func snapshot(folder: URL = ShiftStore.defaultFolder) -> (settings: Settings, shifts: [Shift]) {
+        let settings = read(Settings.self, from: folder.appendingPathComponent("settings.json")) ?? Settings()
+        let records = read([Shift].self, from: folder.appendingPathComponent("shifts.json")) ?? []
+        return (settings, onScreen(records))
     }
 
     /// The App Group's container, shared with the widgets; Application Support where there is none
@@ -38,6 +50,10 @@ final class ShiftStore {
     /// The shifts on screen: those not deleted, the newest first (two at the same moment in the order
     /// they were added, as the web app's sort keeps them).
     var shifts: [Shift] {
+        Self.onScreen(records)
+    }
+
+    nonisolated static func onScreen(_ records: [Shift]) -> [Shift] {
         records.enumerated()
             .filter { !$0.element.deleted }
             .sorted { $0.element.start != $1.element.start ? $0.element.start > $1.element.start : $0.offset < $1.offset }
@@ -46,6 +62,10 @@ final class ShiftStore {
 
     /// The shift running now, if any: a work shift with no end. Vacation and sick days never run.
     var active: Shift? {
+        Self.running(in: shifts)
+    }
+
+    nonisolated static func running(in shifts: [Shift]) -> Shift? {
         shifts.first { $0.end == nil && $0.type == .work }
     }
 
@@ -221,7 +241,7 @@ final class ShiftStore {
         Self.write(records, to: folder.appendingPathComponent("shifts.json"))
     }
 
-    private static func read<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
+    nonisolated private static func read<T: Decodable>(_ type: T.Type, from url: URL) -> T? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
