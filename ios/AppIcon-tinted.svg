@@ -1,0 +1,10 @@
+<!-- The icon in the iPhone's tinted look (ios/Shifty/Assets.xcassets/AppIcon.appiconset/AppIcon-tinted.png,
+     1024 px): AppIcon.svg in grays on black, which iOS colors in the tint the user picked. -->
+<svg width="1024" height="1024" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" fill="#000000"/>
+  <!-- progress ring -->
+  <circle cx="256" cy="256" r="138" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="34"/>
+  <path d="M256 118 a138 138 0 0 1 119.5 207" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round"/>
+  <!-- play / start mark -->
+  <path d="M228 206 l78 50 -78 50 z" fill="#ffffff"/>
+</svg>

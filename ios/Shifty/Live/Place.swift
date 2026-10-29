@@ -106,16 +106,21 @@ final class Place: NSObject, CLLocationManagerDelegate {
 
     static let arriveCategory = "shifty.arrive"
     static let leaveCategory = "shifty.leave"
+    /// Alerts' reminder of a break.
+    static let breakCategory = "shifty.break"
 
-    /// The notifications' buttons (Notifications handles them): start or not now; end or still at work.
+    /// The notifications' buttons (Notifications handles them): start or not now; end or still at work; and
+    /// a break, after six hours on end (Alerts).
     static func registerCategories() {
         let start = UNNotificationAction(identifier: "start", title: "התחל משמרת", options: [])
         let later = UNNotificationAction(identifier: "later", title: "לא עכשיו", options: [])
         let end = UNNotificationAction(identifier: "end", title: "סיים משמרת", options: [.destructive])
         let stay = UNNotificationAction(identifier: "stay", title: "אני עדיין בעבודה", options: [])
+        let pause = UNNotificationAction(identifier: "break", title: "התחל הפסקה", options: [])
         UNUserNotificationCenter.current().setNotificationCategories([
             UNNotificationCategory(identifier: arriveCategory, actions: [start, later], intentIdentifiers: []),
             UNNotificationCategory(identifier: leaveCategory, actions: [end, stay], intentIdentifiers: []),
+            UNNotificationCategory(identifier: breakCategory, actions: [pause], intentIdentifiers: []),
         ])
     }
 
@@ -168,6 +173,7 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
             switch action {
             case "start": _ = await ShiftActions.run(.start)
             case "end": _ = await ShiftActions.run(.end)
+            case "break": _ = await ShiftActions.run(.startBreak)
             default: break
             }
             completionHandler()

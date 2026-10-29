@@ -43,8 +43,9 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
   `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay
   period (`PeriodCheck`).
-- `Shifty/Assets.xcassets`: the icon (`AppIcon.svg` at 1024 px), the accent color and the background,
-  in light and dark.
+- `Shifty/Assets.xcassets`: the icon (`AppIcon.svg` at 1024 px, and `AppIcon-dark.svg` and
+  `AppIcon-tinted.svg` for the iPhone's dark and tinted home screen), the accent color and the
+  background, in light and dark.
 - `scripts/`: the builds (`testflight.sh`, `screenshots.sh`) and the check of the Swift without a Mac
   (`check-swift.sh`).
 - `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).

@@ -81,6 +81,17 @@ struct Settings: Hashable {
     /// 0: Sunday.
     var weekStartsOn = 0
 
+    /// The net pay's estimate (Net.swift): the income tax's credit points, and the share of the wage saved
+    /// for the pension. The app's alone, as are the leave's.
+    var creditPoints = 2.25
+    var pensionPercent = 6.0
+    /// The vacation and sick days left (Leave.swift): as the last payslip gives them, on its date (nil: not
+    /// kept), and the vacation days a year of work adds.
+    var vacationBalance = 0.0
+    var sickBalance = 0.0
+    var balanceDate: Date?
+    var vacationDaysPerYear = 12.0
+
     var updatedAt: Date?
 
     /// The standard hours set for a weekday (0 Sunday … 6 Shabbat); nil on a day off.
@@ -185,7 +196,8 @@ extension Settings: Codable {
              overtime1Hours, overtime1Mult, overtime2Mult, nightEnabled, nightStart, nightEnd, nightMult,
              holidayMult, holidaysEnabled, holidayEveHours, vacationHours,
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, autoBreakMinutes, autoBreakAfterHours,
-             travelPerDay, travelMonthlyCap, monthlyIncomeGoal, monthStartDay, weekStartsOn, updatedAt
+             travelPerDay, travelMonthlyCap, monthlyIncomeGoal, monthStartDay, weekStartsOn,
+             creditPoints, pensionPercent, vacationBalance, sickBalance, balanceDate, vacationDaysPerYear, updatedAt
     }
 
     /// As the web app reads its settings (store.getSettings): a missing key, or a null, takes the default.
@@ -229,6 +241,12 @@ extension Settings: Codable {
         monthlyIncomeGoal = value(.monthlyIncomeGoal, d.monthlyIncomeGoal)
         monthStartDay = value(.monthStartDay, d.monthStartDay)
         weekStartsOn = value(.weekStartsOn, d.weekStartsOn)
+        creditPoints = value(.creditPoints, d.creditPoints)
+        pensionPercent = value(.pensionPercent, d.pensionPercent)
+        vacationBalance = value(.vacationBalance, d.vacationBalance)
+        sickBalance = value(.sickBalance, d.sickBalance)
+        balanceDate = ISODate.decodeIfPresent(c, .balanceDate)
+        vacationDaysPerYear = value(.vacationDaysPerYear, d.vacationDaysPerYear)
         updatedAt = ISODate.decodeIfPresent(c, .updatedAt)
     }
 
@@ -263,6 +281,12 @@ extension Settings: Codable {
         try c.encode(monthlyIncomeGoal, forKey: .monthlyIncomeGoal)
         try c.encode(monthStartDay, forKey: .monthStartDay)
         try c.encode(weekStartsOn, forKey: .weekStartsOn)
+        try c.encode(creditPoints, forKey: .creditPoints)
+        try c.encode(pensionPercent, forKey: .pensionPercent)
+        try c.encode(vacationBalance, forKey: .vacationBalance)
+        try c.encode(sickBalance, forKey: .sickBalance)
+        try c.encodeIfPresent(balanceDate.map(ISODate.string), forKey: .balanceDate)
+        try c.encode(vacationDaysPerYear, forKey: .vacationDaysPerYear)
         try c.encodeIfPresent(updatedAt.map(ISODate.string), forKey: .updatedAt)
     }
 }

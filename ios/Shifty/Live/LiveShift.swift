@@ -139,30 +139,42 @@ enum LiveShift {
     }
 }
 
-/// The running shift's notifications, on the device: the day's goal reached, the second tier of overtime,
-/// and a shift still open after twelve hours. Planned again after each change; asked for at the first
-/// shift.
+/// The notifications, on the device: of the running shift, the day's goal reached, the second tier of
+/// overtime, six hours on end without a break, and a shift still open after twelve hours; and each pay
+/// period's summary, on the morning after it ends. Planned again after each change; asked for at the first.
 @MainActor
 enum Alerts {
-    /// Whether they are on (Settings), on by default.
+    /// Whether the shift's are on (Settings), and the break's reminder and the period's summary: each on by
+    /// default.
     static let key = "shiftAlerts"
-    private static let ids = ["shifty.goal", "shifty.overtime", "shifty.open"]
+    static let breakKey = "breakReminder"
+    static let summaryKey = "periodSummary"
+    private static let ids = ["shifty.goal", "shifty.overtime", "shifty.open", "shifty.break"]
+    private static let summaryPrefix = "shifty.summary."
 
     static var enabled: Bool {
+        on(key)
+    }
+
+    private static func on(_ key: String) -> Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? true
     }
 
     static func schedule(_ store: ShiftStore) async {
         let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: ids)
-        guard enabled, let shift = store.active else { return }
-        let planned = plan(store, shift, now: Date())
+        let summaries = await center.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(summaryPrefix) }
+        center.removePendingNotificationRequests(withIdentifiers: ids + summaries)
+        let now = Date()
+        var planned: [Planned] = []
+        if enabled, let shift = store.active { planned += plan(store, shift, now: now) }
+        if on(summaryKey) { planned += periodSummaries(store, now: now) }
         guard !planned.isEmpty, await allowed() else { return }
         for item in planned {
             let content = UNMutableNotificationContent()
             content.title = item.title
             content.body = item.body
             content.sound = .default
+            if let category = item.category { content.categoryIdentifier = category }
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, item.date.timeIntervalSinceNow), repeats: false)
             try? await center.add(UNNotificationRequest(identifier: item.id, content: content, trigger: trigger))
         }
@@ -173,6 +185,25 @@ enum Alerts {
         let date: Date
         let title: String
         let body: String
+        var category: String? = nil
+    }
+
+    /// The pay period's summary on the morning after it ends, and the one before's while that morning is
+    /// still ahead (a shift started early on a period's first day plans them again before it).
+    private static func periodSummaries(_ store: ShiftStore, now: Date) -> [Planned] {
+        let s = store.settings
+        return [-1, 0].compactMap { offset -> Planned? in
+            let range = Calc.period(around: now, monthStartDay: s.monthStartDay, offset: offset)
+            let next = LocalTime.parts(range.end)
+            let morning = LocalTime.date(next.year, next.month0, next.day, 9)
+            let totals = Calc.aggregate(store.shifts, s, range: range, asOf: now.ms)
+            guard morning > now, totals.total > 0 else { return nil }
+            let hours = Format.hoursToHM(totals.netHours)
+            let gross = Format.moneyShort(totals.total, s.currency)
+            let net = Format.moneyShort(Calc.periodNet(store.shifts, s, range: range, asOf: now.ms, projected: false).net, s.currency)
+            return Planned(id: summaryPrefix + LocalTime.dayKey(range.start), date: morning,
+                           title: "סיכום " + Calc.periodTitle(range), body: "\(hours) שעות · \(gross) ברוטו · כ־\(net) נטו")
+        }
     }
 
     private static func plan(_ store: ShiftStore, _ shift: Shift, now: Date) -> [Planned] {
@@ -190,6 +221,12 @@ enum Alerts {
                                        title: "⏱️ " + Format.hoursToHM(s.overtime1Hours) + " שעות נוספות",
                                        body: "מעכשיו כל שעה ב־\(percent)%."))
             }
+        }
+        // six hours on end without a break, from the start or from the last break's end
+        if on(breakKey) && status.activeBreak == nil {
+            let since = max(shift.start, shift.breaks.compactMap(\.end).max() ?? shift.start)
+            planned.append(Planned(id: "shifty.break", date: since.addingTimeInterval(6 * 3600), title: "⏸️ שש שעות ברצף",
+                                   body: "זה זמן טוב לעצור להפסקה.", category: Place.breakCategory))
         }
         planned.append(Planned(id: "shifty.open", date: shift.start.addingTimeInterval(12 * 3600), title: "המשמרת עדיין פתוחה",
                                body: "התחלת ב־" + Format.clock(shift.start) + ". אם סיימת, אפשר לסיים אותה מהמסך הנעול או ב-Shifty."))

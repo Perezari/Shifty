@@ -65,9 +65,13 @@ struct NowView: View {
                 PeriodCard(range: period, totals: periodTotals,
                            projected: Calc.projectedIncome(shifts, settings, range: period, asOf: date.ms),
                            missing: Calc.shortfall(shifts, settings, range: period, asOf: date.ms).total,
-                           currency: settings.currency, now: date)
+                           net: Calc.periodNet(shifts, settings, range: period, asOf: date.ms, projected: true),
+                           settings: settings, now: date)
                 if settings.holidaysEnabled, let coming = Calc.nextHoliday(after: date, within: 14) {
                     HolidayBanner(date: coming.date, info: coming.info, settings: settings, today: date)
+                }
+                if let since = settings.balanceDate, let leave = Calc.leave(shifts, settings, asOf: date) {
+                    LeaveCard(balance: leave, since: since)
                 }
             }
             .padding(.horizontal, 20)
@@ -616,14 +620,17 @@ private struct WeekColumn: View {
     }
 }
 
-/// The pay period: its income so far, where it is heading, its shifts, overtime and hours missing.
+/// The pay period: its income so far, where it is heading, its shifts, overtime and hours missing, and the
+/// net pay it is heading to, which opens line by line.
 private struct PeriodCard: View {
     let range: TimeRange
     let totals: Totals
     let projected: Double
     let missing: Double
-    let currency: String
+    let net: NetPay
+    let settings: Settings
     let now: Date
+    @State private var showsNet = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -636,7 +643,7 @@ private struct PeriodCard: View {
                     .foregroundStyle(.secondary)
             }
             HStack(alignment: .firstTextBaseline) {
-                Text(Format.moneyShort(totals.total, currency))
+                Text(Format.moneyShort(totals.total, settings.currency))
                     .font(.system(size: 30, weight: .bold, design: .rounded))
                     .monospacedDigit()
                 Spacer()
@@ -644,7 +651,7 @@ private struct PeriodCard: View {
                     Text("צפי לסוף התקופה")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(Format.moneyShort(projected, currency))
+                    Text(Format.moneyShort(projected, settings.currency))
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                 }
@@ -656,8 +663,33 @@ private struct PeriodCard: View {
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 30)
                 mini(Format.hoursToHM(missing), "חוסר", missing > 0.01 ? .red : .primary)
             }
+            if net.gross > 0 {
+                Divider()
+                Button {
+                    showsNet = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("נטו משוער לסוף התקופה")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(Format.moneyShort(net.net, settings.currency))
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.accentColor)
+                        Image(systemName: "chevron.forward")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
         }
         .card()
+        .sheet(isPresented: $showsNet) {
+            NetSheet(title: Calc.periodTitle(range), pay: net, settings: settings)
+        }
     }
 
     private func mini(_ value: String, _ title: String, _ color: Color) -> some View {
@@ -679,6 +711,128 @@ private struct PeriodCard: View {
         if days <= 1 { return "נסגרת היום" }
         if days == 2 { return "נסגרת מחר" }
         return "נסגרת בעוד \(days) ימים"
+    }
+}
+
+/// The period's net pay, line by line: the gross it is heading to, what a payslip takes off of it, and
+/// what is left (Net.swift).
+private struct NetSheet: View {
+    let title: String
+    let pay: NetPay
+    let settings: Settings
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("נטו משוער")
+                    .font(.title3.weight(.bold))
+                Spacer()
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            VStack(spacing: 0) {
+                row("ברוטו צפוי", pay.gross, primary: true)
+                row("מס הכנסה", pay.incomeTax)
+                row("ביטוח לאומי", pay.nationalInsurance)
+                row("מס בריאות", pay.health)
+                row("פנסיה", pay.pension)
+            }
+            Divider()
+            HStack(alignment: .firstTextBaseline) {
+                Text("נטו")
+                    .font(.headline)
+                Spacer()
+                Text(Format.moneyShort(pay.net, settings.currency))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.accentColor)
+            }
+            Text(note)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, 26)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func row(_ title: String, _ amount: Double, primary: Bool = false) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(Format.moneyShort(amount, settings.currency))
+                .monospacedDigit()
+                .foregroundStyle(primary ? .primary : .secondary)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var note: String {
+        let points = Self.number(settings.creditPoints)
+        let pension = Self.number(settings.pensionPercent)
+        return "לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, \(points) נקודות זיכוי ו־\(pension)% לפנסיה מהשכר בלי שעות נוספות ונסיעות. אפשר לשנות בהגדרות."
+    }
+
+    /// 6 as "6", 2.25 as "2.25".
+    private static func number(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(value)
+    }
+}
+
+/// The vacation and sick days left (Leave.swift): the last payslip's, and the months and days off since.
+private struct LeaveCard: View {
+    let balance: LeaveBalance
+    let since: Date
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("חופשה ומחלה")
+                    .font(.headline)
+                Spacer()
+                Text("מהתלוש של " + Format.dayMonth(since))
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 0) {
+                column("sun.max.fill", balance.vacation, "ימי חופשה", Color("Holiday"))
+                Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 36)
+                column("cross.case.fill", balance.sick, "ימי מחלה", .pink)
+            }
+        }
+        .card()
+    }
+
+    private func column(_ symbol: String, _ days: Double, _ title: String, _ color: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 34, height: 34)
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(color.opacity(0.16)))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(Self.days(days))
+                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(days < 0 ? Color.red : Color.primary)
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 6)
+        .frame(maxWidth: .infinity)
+    }
+
+    /// 12, 7.5, 8.7: to a tenth of a day.
+    private static func days(_ value: Double) -> String {
+        let tenths = (value * 10).rounded() / 10
+        return tenths == tenths.rounded() ? String(Int(tenths)) : String(tenths)
     }
 }
 

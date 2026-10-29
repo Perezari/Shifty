@@ -246,6 +246,49 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .n-actions div + div { border-top: 0.5px solid var(--page-line); }
 .n-actions .main { font-weight: 600; color: var(--accent); }
 
+/* the period's net pay: a row of its card, and line by line on a sheet */
+.net-row { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; border-top: 1px solid var(--track); background: none;
+  padding: 12px 0 0; font: 400 14.5px/1.2 var(--font-text); color: var(--ink-2); cursor: pointer; text-align: start; }
+.net-row b { margin-inline-start: auto; font: 600 16px/1 var(--font-round); color: var(--accent); }
+.net-row .chev { display: flex; color: var(--ink-3); }
+.dim { position: absolute; inset: 0; border: 0; padding: 0; background: rgba(0, 0, 0, .3); z-index: 7; cursor: pointer; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; border-radius: 38px 38px 0 0; padding: 10px 22px 44px;
+  background: var(--app-bg); box-shadow: 0 -10px 40px rgba(0, 0, 0, .2); display: flex; flex-direction: column; gap: 14px; }
+.sheet .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--ink-3); align-self: center; margin-bottom: 6px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: baseline; }
+.sheet-head b { font-size: 20px; }
+.sheet-head span { font-size: 14px; color: var(--ink-2); }
+.lines > div { display: flex; justify-content: space-between; padding: 8px 0; font-size: 16px; }
+.lines > div > span:last-child { color: var(--ink-2); font-family: var(--font-round); font-variant-numeric: tabular-nums; }
+.lines > div:first-child > span:last-child { color: var(--ink); }
+.net-total { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--track); padding-top: 14px; }
+.net-total span { font-size: 17px; font-weight: 600; }
+.net-total b { font: 700 30px/1 var(--font-round); color: var(--accent); }
+.sheet p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+/* the vacation and sick days left */
+.leave { display: grid; grid-template-columns: 1fr 1fr; }
+.leave > div { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+.leave > div + div { border-inline-start: 1px solid var(--track); }
+.leave .li { width: 34px; height: 34px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; }
+.leave b { display: block; font: 700 20px/1.1 var(--font-round); font-variant-numeric: tabular-nums; }
+.leave span { font-size: 12px; color: var(--ink-2); }
+/* Siri's answers, on glass over the Lock Screen */
+.siri { border-radius: 26px; padding: 13px 15px; background: var(--notif); -webkit-backdrop-filter: blur(30px) saturate(160%);
+  backdrop-filter: blur(30px) saturate(160%); color: var(--ink); display: flex; gap: 11px; align-items: flex-start;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .5), 0 0 22px rgba(120, 170, 255, .45); }
+.siri .s-text { font-size: 15px; line-height: 1.35; }
+.siri .s-app { font-size: 12.5px; color: var(--ink-2); font-weight: 600; margin-bottom: 2px; }
+.mini-icon { width: 38px; height: 38px; flex: none; border-radius: 10px; overflow: hidden; display: block; }
+.mini-icon svg, .icon-band .big svg { display: block; width: 100%; height: 100%; }
+/* the home screen's icon, in its three looks */
+.icon-rows { position: absolute; top: 70px; left: 16px; right: 16px; display: flex; flex-direction: column; gap: 14px; }
+.icon-band { height: 222px; border-radius: 30px; position: relative; overflow: hidden; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px; }
+.icon-band .big { width: 84px; height: 84px; border-radius: 20px; overflow: hidden; box-shadow: 0 6px 18px rgba(0, 0, 0, .25); position: relative; }
+.icon-band .name { font-size: 13px; font-weight: 600; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .4); position: relative; }
+.icon-band .look { position: absolute; top: 12px; inset-inline-start: 14px; font-size: 12px; font-weight: 600; color: #fff;
+  background: rgba(0, 0, 0, .28); padding: 4px 10px; border-radius: 999px; }
+
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 </style>
 
@@ -258,6 +301,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         <button type="button" id="screen-island" data-screen="island">Dynamic Island</button>
         <button type="button" id="screen-widgets" data-screen="widgets">ווידג'טים</button>
         <button type="button" id="screen-place" data-screen="place">התראות</button>
+        <button type="button" id="screen-ask" data-screen="ask">Siri וסיכום</button>
+        <button type="button" id="screen-icon" data-screen="icon">סמל</button>
       </div>
     </div>
     <div class="row">
@@ -293,9 +338,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     break: { now: START + ((3 * 60 + 4) * 60 + 40) * 1000, breaks: [[0, null]], breakFor: 6 * 60 + 12 }, // on a break for 6:12
     idle: { now: at(17, 5), today: [[at(7, 15), at(11, 0)], [at(11, 30), at(15, 15)]] },               // after a shift of 7:30
   };
-  const state = { screen: "now", state: "work", theme: null, plan: null };
+  const state = { screen: "now", state: "work", theme: null, plan: null, sheet: null };
   try { Object.assign(state, JSON.parse(localStorage.getItem("shifty-preview") || "{}")); } catch (e) {}
   state.plan = null;
+  state.sheet = null;
   if (!scenes[state.state]) state.state = "work";
 
   // ---- Format (Shifty/Core/Format.swift) ----
@@ -316,6 +362,26 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   const netAt = (start, breakMs, end) => {
     const gross = end - start;
     return Math.max(0, gross - (gross >= 6 * 3600000 ? Math.max(breakMs, AUTO_BREAK_MIN * 60000) : breakMs)) / 3600000;
+  };
+
+  // ---- the net pay, as Net.swift gives it at 2026's rates: the period heading to ₪ 8,640, ₪ 8,200 of it pensionable ----
+  const BRACKETS = [[7010, .10], [10060, .14], [19000, .20], [25100, .31], [46690, .35], [60130, .47], [Infinity, .50]];
+  function netPay(gross, pensionable, points = 2.25, pensionPct = 6) {
+    const pension = pensionable * pensionPct / 100;
+    let tax = 0, floor = 0;
+    for (const [top, rate] of BRACKETS) { if (gross > floor) tax += (Math.min(gross, top) - floor) * rate; floor = top; }
+    const credit = points * 242 + 0.35 * Math.min(pension, 0.07 * Math.min(pensionable, 9700));
+    const insured = Math.min(gross, 51910), reduced = Math.min(insured, 7703), full = insured - reduced;
+    const p = { gross, incomeTax: Math.max(0, tax - credit), insurance: reduced * .0104 + full * .07, health: reduced * .0323 + full * .0517, pension };
+    p.net = gross - p.incomeTax - p.insurance - p.health - p.pension;
+    return p;
+  }
+  const NET = netPay(8640, 8200);
+  /** "6 שעות ו־42 דקות", as Siri says it (Questions.swift). */
+  const spoken = (hours) => {
+    const t = Math.max(0, Math.round(hours * 60)), h = Math.floor(t / 60), m = t % 60;
+    const ht = h === 1 ? "שעה" : h === 2 ? "שעתיים" : h + " שעות", mt = m === 1 ? "דקה" : m + " דקות";
+    return h === 0 ? mt : m === 0 ? ht : ht + " ו־" + mt;
   };
 
   // ---- the shift at this moment, as Calc.nowStatus gives it ----
@@ -355,6 +421,15 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     check: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     flash: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 2h8l-2 6h-4zM10 8h4v13h-4z"/></svg>',
     camera: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    sun: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4.6"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+    cross: '<svg viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5"/><rect x="3" y="7.5" width="18" height="12.5" rx="2.5" fill="currentColor"/><path fill="#fff" d="M11 10.6h2v2.3h2.3v2H13v2.3h-2v-2.3H8.7v-2H11z"/></svg>',
+    chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  };
+  // the app's icon in its three looks (ios/AppIcon.svg, AppIcon-dark.svg, AppIcon-tinted.svg); the tinted one as iOS colors it, here amber
+  const appIcon = {
+    light: '<svg viewBox="0 0 512 512"><defs><linearGradient id="ai-l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16b8a8"/><stop offset="1" stop-color="#0b7d72"/></linearGradient></defs><rect width="512" height="512" fill="url(#ai-l)"/><circle cx="256" cy="256" r="138" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="34"/><path d="M256 118 a138 138 0 0 1 119.5 207" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round"/><path d="M228 206 l78 50 -78 50 z" fill="#fff"/></svg>',
+    dark: '<svg viewBox="0 0 512 512"><defs><linearGradient id="ai-d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#202427"/><stop offset="1" stop-color="#0b0c0d"/></linearGradient><linearGradient id="ai-df" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d6c4"/><stop offset="1" stop-color="#14a898"/></linearGradient></defs><rect width="512" height="512" fill="url(#ai-d)"/><circle cx="256" cy="256" r="138" fill="none" stroke="#1bb3a3" stroke-opacity=".26" stroke-width="34"/><path d="M256 118 a138 138 0 0 1 119.5 207" fill="none" stroke="#25c4b3" stroke-width="34" stroke-linecap="round"/><path d="M228 206 l78 50 -78 50 z" fill="url(#ai-df)"/></svg>',
+    tinted: '<svg viewBox="0 0 512 512"><defs><linearGradient id="ai-t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a10"/><stop offset="1" stop-color="#120c04"/></linearGradient></defs><rect width="512" height="512" fill="url(#ai-t)"/><circle cx="256" cy="256" r="138" fill="none" stroke="#f2b84b" stroke-opacity=".3" stroke-width="34"/><path d="M256 118 a138 138 0 0 1 119.5 207" fill="none" stroke="#f2b84b" stroke-width="34" stroke-linecap="round"/><path d="M228 206 l78 50 -78 50 z" fill="#f2b84b"/></svg>',
   };
   const sized = (svg, size) => svg.replace("<svg", `<svg width="${size}" height="${size}"`);
   const statusBar = (now, light) => `
@@ -471,8 +546,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     }
     return `<div class="now">${statusBar(s.now)}
       <div class="now-scroll"><div class="stack">${top}${dial(s, center, plan)}<div class="facts glass">${facts}</div>
-        <div class="actions">${actions}</div>${weekCard(s)}${monthCard()}${holidayBanner()}</div></div>
-      ${tabs}<div class="home-ind"></div></div>`;
+        <div class="actions">${actions}</div>${weekCard(s)}${monthCard()}${holidayBanner()}${leaveCard()}</div></div>
+      ${tabs}<div class="home-ind"></div>${state.sheet === "net" ? netSheet() : ""}</div>`;
   }
   const fact = (value, label, color) => `<div><b style="${color ? "color:" + color : ""}"><span class="ltr">${value}</span></b><span>${label}</span></div>`;
 
@@ -501,7 +576,28 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     return `<section class="card glass"><div class="card-head"><span class="title">אוקטובר</span><span class="meta">נסגר בעוד 2 ימים</span></div>
       <div class="money-line"><b class="num"><span class="ltr">${moneyShort(6075.4)}</span></b><span>צפי לסוף החודש <b class="ltr num">${moneyShort(8640)}</b></span></div>
       <div class="mini"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num" style="color:var(--amber)">6:30</b><span>נוספות</span></div><div><b class="num" style="color:var(--red)">2:10</b><span>חוסר</span></div></div>
+      <button class="net-row" type="button" data-sheet="net">נטו משוער לסוף התקופה<b class="ltr">${moneyShort(NET.net)}</b><span class="chev">${sized(icon.chevron, 14)}</span></button>
       </section>`;
+  }
+
+  /** The period's net pay line by line, on a sheet (NowView's NetSheet). */
+  function netSheet() {
+    const row = (title, value) => `<div><span>${title}</span><span class="ltr">${moneyShort(value)}</span></div>`;
+    return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
+      <div class="sheet"><span class="grab"></span>
+        <div class="sheet-head"><b>נטו משוער</b><span>אוקטובר 2026</span></div>
+        <div class="lines">${row("ברוטו צפוי", NET.gross)}${row("מס הכנסה", NET.incomeTax)}${row("ביטוח לאומי", NET.insurance)}${row("מס בריאות", NET.health)}${row("פנסיה", NET.pension)}</div>
+        <div class="net-total"><span>נטו</span><b class="ltr">${moneyShort(NET.net)}</b></div>
+        <p>לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, 2.25 נקודות זיכוי ו־6% לפנסיה מהשכר בלי שעות נוספות ונסיעות. אפשר לשנות בהגדרות.</p>
+      </div>`;
+  }
+
+  /** The vacation and sick days left (Leave.swift): the last payslip's, and the months and days off since. */
+  function leaveCard() {
+    const tile = (svg, color, value, title) => `<div><span class="li" style="color:${color};background:color-mix(in srgb, ${color} 16%, transparent)">${sized(svg, 17)}</span>
+      <div><b>${value}</b><span>${title}</span></div></div>`;
+    return `<section class="card glass"><div class="card-head"><span class="title">חופשה ומחלה</span><span class="meta">מהתלוש של <span class="num">30/9</span></span></div>
+      <div class="leave">${tile(icon.sun, "var(--amber)", "7.5", "ימי חופשה")}${tile(icon.cross, "#FF2D55", "18", "ימי מחלה")}</div></section>`;
   }
 
   /** A shortened day or a holiday coming, from the Hebrew calendar (Holidays.swift): its standard. */
@@ -555,6 +651,44 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       ${note("יצאת מ" + PLACE, "המשמרת פתוחה מ־" + started + ". לסיים אותה?", "16:02")}
       <div class="n-actions"><div class="main" style="color:var(--red)">סיים משמרת</div><div>אני עדיין בעבודה</div></div>
     </div>`;
+  }
+
+  // ---- Siri's answers (Questions.swift), and the period's summary and the break's reminder (Alerts) ----
+  function askScreen() {
+    const s = shift();
+    const today = s.running ? `היום עבדת ${spoken(s.net)} והרווחת ${moneyShort(s.pay)}. המשמרת עדיין פתוחה.`
+      : `היום עבדת ${spoken(7.5)} והרווחת ${moneyShort(7.5 * WAGE)}.`;
+    const goal = !s.running ? "אין משמרת פתוחה עכשיו."
+      : s.remaining <= 0.001 ? "הגעת ליעד של היום. מעכשיו שעות נוספות."
+      : s.open != null ? `בהפסקה עכשיו. נשארו ${spoken(s.remaining)} עד היעד.`
+      : `נשארו ${spoken(s.remaining)} עד היעד, ב־<span class="num">${clock(new Date(s.finish))}</span>.`;
+    const period = `בתקופה הזו עבדת ${spoken(112.5)} והרווחת ${moneyShort(6075.4)}. הצפי לסוף התקופה: ${moneyShort(NET.gross)} ברוטו, בערך ${moneyShort(NET.net)} נטו.`;
+    const answer = (asked, text) => `<div class="w-label">״${asked}״</div>
+      <div class="siri"><span class="mini-icon">${appIcon[dark() ? "dark" : "light"]}</span><div class="n-body"><div class="s-app">Shifty</div><div class="s-text">${text}</div></div></div>`;
+    const note = (title, text, time) => `<div class="notif"><span class="mini-icon">${appIcon[dark() ? "dark" : "light"]}</span>
+      <div class="n-body"><div class="n-top"><b>${title}</b><span>${time}</span></div><div class="n-text">${text}</div></div></div>`;
+    // over the home screen, as Siri answers anywhere
+    return `<div class="wall ${dark() ? "dark-wall" : ""}"></div>${statusBar(s.now, true)}<div class="home-ind" style="background:#fff"></div>
+      <div class="notes" style="top:64px;gap:7px">
+      ${answer("כמה הרווחתי היום ב-Shifty?", today)}
+      ${answer("כמה נשאר ליעד ב-Shifty?", goal)}
+      ${answer("כמה עבדתי החודש ב-Shifty?", period)}
+      <div class="w-label" style="margin-top:8px">בבוקר שאחרי סוף התקופה</div>
+      ${note("סיכום אוקטובר 2026", `<span class="num">152:10</span> שעות · ${moneyShort(NET.gross)} ברוטו · כ־${moneyShort(NET.net)} נטו`, "09:00")}
+      <div class="w-label" style="margin-top:8px">אחרי 6 שעות בלי הפסקה, בלחיצה ארוכה</div>
+      ${note("⏸️ שש שעות ברצף", "זה זמן טוב לעצור להפסקה.", "13:15")}
+      <div class="n-actions"><div class="main" style="color:var(--orange)">התחל הפסקה</div></div>
+    </div>`;
+  }
+
+  // ---- the home screen's icon: light, dark, and tinted in the color picked on the iPhone ----
+  function iconScreen() {
+    const s = shift();
+    const band = (look, title, wall) => `<div class="icon-band"><div class="wall ${wall}"></div><span class="look">${title}</span>
+      <span class="big">${appIcon[look]}</span><span class="name">Shifty</span></div>`;
+    return `<div class="wall dark-wall"></div>${statusBar(s.now, true)}<div class="icon-rows">
+      ${band("light", "בהיר", "")}${band("dark", "כהה", "dark-wall")}${band("tinted", "צבוע", "dark-wall")}
+    </div><div class="home-ind" style="background:#fff"></div>`;
   }
 
   function islandScreen() {
@@ -617,11 +751,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- the page ----
   const notes = {
-    now: '<span class="tag">נבנה עכשיו</span>גרור את הדגל על החוגה כדי לראות כמה תרוויח אם תצא בשעה אחרת. ב״אחרי היעד״ הדגל הופך לווי. מתחת לכפתורים: השבוע, התקופה וחג שמתקרב.',
+    now: '<span class="tag">חדש</span>בכרטיס של התקופה: נטו משוער לסוף התקופה, ובלחיצה עליו הפירוט. בסוף המסך: ימי החופשה והמחלה שנשארו, לפי התלוש. גרירת הדגל על החוגה עדיין מראה כמה מרוויחים אם יוצאים בשעה אחרת.',
     lock: '<span class="tag built">כמו שבבנייה</span>מסך הנעילה, עם הרקע שמתחלף לכהה יחד עם האייפון.',
     island: '<span class="tag built">אחרי התיקון</span>השעון ב-Dynamic Island ברוחב שמספיק לשעות, דקות ושניות.',
     widgets: '<span class="tag built">כמו שבבנייה</span>הווידג\'טים למסך הבית.',
-    place: '<span class="tag">נבנה עכשיו</span>ההתראות מגיעות גם כשהאפליקציה סגורה. כשמגיעים לעבודה וכשיוצאים ממנה, לפי מקום העבודה שנקבע בהגדרות. כשמגיעים ליעד, לפי שעה שנקבעת מראש.',
+    place: '<span class="tag built">כמו שבבנייה</span>ההתראות מגיעות גם כשהאפליקציה סגורה. כשמגיעים לעבודה וכשיוצאים ממנה, לפי מקום העבודה שנקבע בהגדרות. כשמגיעים ליעד, לפי שעה שנקבעת מראש.',
+    ask: '<span class="tag">חדש</span>Siri עונה בלי לפתוח את Shifty. מתחת: הסיכום שמגיע בבוקר שאחרי סוף התקופה, והתזכורת אחרי 6 שעות בלי הפסקה, עם כפתור להפסקה. כל אחד מהם נכבה בהגדרות.',
+    icon: '<span class="tag">חדש</span>הסמל של Shifty במסך הבית: בהיר, כהה, וצבוע בגוון שבוחרים באייפון.',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const dark = () => state.theme === "dark" || (state.theme == null && matchMedia("(prefers-color-scheme: dark)").matches);
@@ -633,7 +769,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   document.addEventListener("touchmove", touch, { passive: true });
   function render() {
     const scroller = device.querySelector(".now-scroll"), kept = scroller ? scroller.scrollTop : 0;
-    device.innerHTML = { now: nowScreen, lock: lockScreen, island: islandScreen, widgets: widgetsScreen, place: placeScreen }[state.screen]();
+    device.innerHTML = { now: nowScreen, lock: lockScreen, island: islandScreen, widgets: widgetsScreen, place: placeScreen,
+      ask: askScreen, icon: iconScreen }[state.screen]();
     const again = device.querySelector(".now-scroll");
     if (again) again.scrollTop = kept;
     document.getElementById("note").innerHTML = notes[state.screen];
@@ -677,8 +814,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.reset) state.plan = null;
-    else if (b.dataset.screen) { state.screen = b.dataset.screen; state.plan = null; }
-    else if (b.dataset.state) { state.state = b.dataset.state; state.plan = null; }
+    else if ("sheet" in b.dataset) state.sheet = b.dataset.sheet || null;
+    else if (b.dataset.screen) { state.screen = b.dataset.screen; state.plan = null; state.sheet = null; }
+    else if (b.dataset.state) { state.state = b.dataset.state; state.plan = null; state.sheet = null; }
     else if (b.dataset.themeSet) { state.theme = b.dataset.themeSet; document.documentElement.dataset.theme = state.theme; }
     else return;
     save(); render();

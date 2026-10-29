@@ -1,7 +1,8 @@
 import Foundation
 
 // Checks the pay period of the Shifts and Calendar screens (Shifty/Core/Period.swift): a period's shifts,
-// days and hours missing, the calendar's weeks, the period picker's months and the period's name.
+// days and hours missing, the calendar's weeks, the period picker's months and the period's name; and the
+// net pay (Net.swift) and the vacation and sick days left (Leave.swift).
 // TZ=Asia/Jerusalem period-check
 
 var failures = 0
@@ -113,6 +114,47 @@ expect(Calc.dialTime(16, start: dialStart, now: dialNow) == LocalTime.date(2026,
 expect(Calc.dialTime(130, start: dialStart, now: dialNow) == LocalTime.date(2026, 9, 29, 16, 20), "16:20 on the dial")
 let leavingLate = Calc.leaving(running, at: LocalTime.date(2026, 9, 29, 17, 16), s, now: dialNow)
 expect(near(leavingLate.netHours, 9.6) && near(leavingLate.overtimeHours, 1), "leaving an hour late: an hour of overtime")
+
+// the net pay, at 2026's rates, with 2.25 credit points and 6% to the pension
+func cents(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 0.001 }
+let pay10k = Calc.netPay(gross: 10_000, pensionable: 9_000, s)
+expect(cents(pay10k.pension, 540) && cents(pay10k.incomeTax, 386.1), "10,000: tax 1,119.6 less 544.5 of points and 189 for the pension")
+expect(cents(pay10k.nationalInsurance, 240.9012) && cents(pay10k.health, 367.5618), "insurance: reduced up to 7,703, full above")
+expect(cents(pay10k.net, 8_465.437), "10,000 is 8,465.44 net")
+let pay5k = Calc.netPay(gross: 5_000, pensionable: 5_000, s)
+expect(pay5k.incomeTax == 0 && cents(pay5k.net, 4_486.5), "5,000: the credits cover the tax")
+let pay30k = Calc.netPay(gross: 30_000, pensionable: 20_000, s)
+expect(cents(pay30k.incomeTax, 5_739.85), "30,000: up to the 35% bracket, the pension's credit at its most")
+expect(cents(pay30k.net, 20_017.687), "30,000 is 20,017.69 net")
+var points = s
+points.creditPoints = 2.75
+points.pensionPercent = 0
+expect(cents(Calc.netPay(gross: 10_000, pensionable: 9_000, points).incomeTax, 1_119.6 - 2.75 * 242), "2.75 points, no pension")
+
+// the vacation and sick days left: 8.5 and 20 on the payslip of 30 September
+var leaveSettings = s
+expect(Calc.leave([], leaveSettings, asOf: now) == nil, "not kept without the payslip's date")
+leaveSettings.balanceDate = LocalTime.date(2026, 8, 30)
+leaveSettings.vacationBalance = 8.5
+leaveSettings.sickBalance = 20
+let daysOff = [
+    Shift(id: "before", start: LocalTime.date(2026, 8, 29, 8), type: .vacation),
+    Shift(id: "v1", start: LocalTime.date(2026, 9, 12, 8), type: .vacation),
+    Shift(id: "s1", start: LocalTime.date(2026, 9, 20, 8), type: .sick),
+    Shift(id: "s2", start: LocalTime.date(2026, 9, 21, 8), type: .sick),
+    Shift(id: "v2", start: LocalTime.date(2026, 10, 5, 8), type: .vacation),
+]
+let october29 = Calc.leave(daysOff, leaveSettings, asOf: now)
+expect(october29 == LeaveBalance(vacation: 7.5, sick: 18, months: 0, vacationTaken: 1, sickTaken: 2),
+       "29 October: no month yet, a vacation day and two sick days since")
+let december2 = Calc.leave(daysOff, leaveSettings, asOf: LocalTime.date(2026, 11, 2, 9))
+expect(december2.map { near($0.vacation, 8.5) && near($0.sick, 21) && $0.months == 2 } == true,
+       "2 December: two months, 2 vacation days and 3 sick days more, two vacation days taken")
+leaveSettings.sickBalance = 89
+expect(Calc.leave(daysOff, leaveSettings, asOf: LocalTime.date(2026, 11, 2, 9)).map { near($0.sick, 88) } == true,
+       "sick days up to 90")
+expect(Calc.monthsBetween(LocalTime.date(2026, 8, 30), LocalTime.date(2026, 9, 30)) == 1
+       && Calc.monthsBetween(LocalTime.date(2026, 8, 30), LocalTime.date(2026, 9, 29, 23, 59)) == 0, "a month on its day")
 
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

@@ -3,12 +3,15 @@ import UniformTypeIdentifiers
 import UIKit
 
 /// The settings (app.js renderSettings): the wage and the workplace, each weekday's standard hours, the
-/// holidays, vacation and sick days, overtime, breaks, Shabbat and night, travel and the pay period, the
-/// look, the lock, iCloud and the backup. Each change is saved as it is made, and goes to iCloud.
+/// holidays, vacation and sick days and the days left of them, overtime, breaks, Shabbat and night, travel
+/// and the pay period, the net pay's estimate, the look, the notifications, the lock, iCloud and the
+/// backup. Each change is saved as it is made, and goes to iCloud.
 struct SettingsView: View {
     @Environment(ShiftStore.self) private var store
     @AppStorage(AppLock.key) private var lockOn = false
     @AppStorage(Alerts.key) private var alerts = true
+    @AppStorage(Alerts.breakKey) private var breakReminder = true
+    @AppStorage(Alerts.summaryKey) private var periodSummary = true
     @AppStorage(Place.enabledKey) private var placeOn = false
     @AppStorage(Place.radiusKey) private var placeRadius = 150.0
     @State private var placeSet = Place.coordinate != nil
@@ -66,6 +69,23 @@ struct SettingsView: View {
                     PercentRow(title: "מחלה, יום 4 והלאה", value: setting(\.sickDay4Pct), range: 0...100)
                 }
 
+                SettingsSection(title: "יתרת חופשה ומחלה",
+                                note: "היתרות והתאריך מהתלוש האחרון. מאז, בכל חודש נוסף חלק מימי החופשה של השנה ו-1.5 ימי מחלה (עד 90), ויורדים ימי החופשה והמחלה שרשמת. לפי החוק, בשבוע עבודה של 5 ימים יש 12 ימי חופשה בשנה בחמש השנים הראשונות.") {
+                    Toggle("מעקב יתרות", isOn: keepsBalance)
+                        .settingsRow()
+                    if s.balanceDate != nil {
+                        Divider()
+                        DatePicker("נכון לתאריך", selection: balanceDate, displayedComponents: .date)
+                            .settingsRow()
+                        Divider()
+                        NumberRow(title: "יתרת חופשה", value: setting(\.vacationBalance), unit: "ימים")
+                        Divider()
+                        NumberRow(title: "יתרת מחלה", value: setting(\.sickBalance), unit: "ימים")
+                        Divider()
+                        NumberRow(title: "ימי חופשה בשנה", value: setting(\.vacationDaysPerYear), unit: "ימים")
+                    }
+                }
+
                 SettingsSection(title: "שעות נוספות") {
                     PercentRow(title: "שעתיים ראשונות", value: multiplier(\.overtime1Mult), range: 100...300)
                     Divider()
@@ -113,6 +133,13 @@ struct SettingsView: View {
                     NumberRow(title: "יעד הכנסה חודשי", value: setting(\.monthlyIncomeGoal), unit: s.currency)
                 }
 
+                SettingsSection(title: "נטו משוער",
+                                note: "לכל תושב 2.25 נקודות זיכוי, ולאישה 2.75. העובד מפריש לפנסיה בדרך כלל 6%. החישוב לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, ולכן התלוש יכול להיות שונה מעט.") {
+                    NumberRow(title: "נקודות זיכוי", value: setting(\.creditPoints), unit: "נק׳")
+                    Divider()
+                    NumberRow(title: "הפרשה לפנסיה", value: setting(\.pensionPercent), unit: "%")
+                }
+
                 SettingsSection(title: "תצוגה") {
                     Picker("מראה", selection: setting(\.theme)) {
                         Text("כמו באייפון").tag("system")
@@ -124,8 +151,15 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(title: "מסך הנעילה והתראות",
-                                note: "המשמרת שרצה מופיעה במסך הנעילה וב-Dynamic Island, עם כפתורים להפסקה ולסיום. ההתראות: כשמגיעים ליעד היומי, כשמתחילות השעות הנוספות של 150%, ואחרי 12 שעות של משמרת פתוחה.") {
+                                note: "המשמרת שרצה מופיעה במסך הנעילה וב-Dynamic Island, עם כפתורים להפסקה ולסיום. ההתראות: כשמגיעים ליעד היומי, כשמתחילות השעות הנוספות של 150%, אחרי 6 שעות ברצף בלי הפסקה, ואחרי 12 שעות של משמרת פתוחה. הסיכום מגיע בבוקר שאחרי סוף התקופה.") {
                     Toggle("התראות על המשמרת", isOn: $alerts)
+                        .settingsRow()
+                    Divider()
+                    Toggle("תזכורת להפסקה אחרי 6 שעות", isOn: $breakReminder)
+                        .settingsRow()
+                        .disabled(!alerts)
+                    Divider()
+                    Toggle("סיכום בסוף כל תקופה", isOn: $periodSummary)
                         .settingsRow()
                 }
 
@@ -243,6 +277,12 @@ struct SettingsView: View {
         .onChange(of: alerts) { _, _ in
             LiveShift.refresh(store)
         }
+        .onChange(of: breakReminder) { _, _ in
+            LiveShift.refresh(store)
+        }
+        .onChange(of: periodSummary) { _, _ in
+            LiveShift.refresh(store)
+        }
         .onChange(of: placeOn) { _, on in
             if on { Place.shared.askAlways() }
             Place.shared.start()
@@ -333,6 +373,29 @@ struct SettingsView: View {
     // MARK: Bindings
 
     /// A setting, saved (and sent to iCloud) as it changes.
+    /// Whether the days off left are kept: from today's payslip, until its own date is picked.
+    private var keepsBalance: Binding<Bool> {
+        Binding(
+            get: { store.settings.balanceDate != nil },
+            set: { on in
+                guard on != (store.settings.balanceDate != nil) else { return }
+                store.updateSettings { $0.balanceDate = on ? LocalTime.startOfDay(Date()) : nil }
+            }
+        )
+    }
+
+    /// The payslip's date, a day.
+    private var balanceDate: Binding<Date> {
+        Binding(
+            get: { store.settings.balanceDate ?? LocalTime.startOfDay(Date()) },
+            set: { date in
+                let day = LocalTime.startOfDay(date)
+                guard store.settings.balanceDate != day else { return }
+                store.updateSettings { $0.balanceDate = day }
+            }
+        )
+    }
+
     private func setting<Value: Equatable>(_ key: WritableKeyPath<Settings, Value>) -> Binding<Value> {
         Binding(
             get: { store.settings[keyPath: key] },
