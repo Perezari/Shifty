@@ -125,6 +125,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .dial .goal { width: 30px; height: 30px; background: var(--knob); color: var(--f); cursor: grab; touch-action: none;
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--f) 18%, transparent), 0 2px 8px rgba(0, 0, 0, .16); }
 .dial .goal-dot { width: 10px; height: 10px; background: var(--knob); box-shadow: 0 0 0 2.5px var(--accent); }
+/* the goal reached: the flag is a check (and on the iPhone the ring glows a moment, and it taps) */
+.dial .goal.done { background: var(--accent); color: #fff; }
 .dial .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
 .dial .date-in { font-size: 13.5px; color: var(--ink-2); font-weight: 500; }
 .dial .time { font-size: 58px; font-weight: 600; letter-spacing: -1.5px; line-height: 1; }
@@ -254,7 +256,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         <button type="button" id="screen-lock" data-screen="lock">מסך נעילה</button>
         <button type="button" id="screen-island" data-screen="island">Dynamic Island</button>
         <button type="button" id="screen-widgets" data-screen="widgets">ווידג'טים</button>
-        <button type="button" id="screen-place" data-screen="place">מיקום</button>
+        <button type="button" id="screen-place" data-screen="place">התראות</button>
       </div>
     </div>
     <div class="row">
@@ -349,6 +351,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
     flag: '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 3h2v18H6z"/><path d="M8 4h10l-2.5 4L18 12H8z"/></svg>',
+    check: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
     flash: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 2h8l-2 6h-4zM10 8h4v13h-4z"/></svg>',
     camera: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   };
@@ -407,10 +410,11 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       const [sx, sy] = point(from, R), [fx, fy] = point(from + leave, R), [gx, gy] = point(from + goal, R), [nx, ny] = point(from + now, R);
       const knob = s.open != null ? "var(--orange)" : now > goal ? "var(--amber)" : "var(--accent)";
       const flagColor = plan ? (plan.extra >= 0 ? "var(--amber)" : "var(--red)") : "var(--accent)";
+      const done = !plan && now >= goal;
       marks = `<span class="mark start" style="left:${sx}px;top:${sy}px">${sized(icon.play, 10)}</span>
         ${plan ? `<span class="mark goal-dot" style="left:${gx}px;top:${gy}px"></span>` : ""}
         <span class="mark knob" style="left:${nx}px;top:${ny}px;--k:${knob}"></span>
-        <span class="mark goal" style="left:${fx}px;top:${fy}px;--f:${flagColor}" aria-label="גרירה לבחירת שעת יציאה">${icon.flag}</span>`;
+        <span class="mark goal${done ? " done" : ""}" style="left:${fx}px;top:${fy}px;--f:${flagColor}" aria-label="גרירה לבחירת שעת יציאה">${done ? icon.check : icon.flag}</span>`;
     } else if (s.today) {
       // a day with no shift running: today's shifts, faint, and the time now
       from = clockDeg(s.today[0][0]);
@@ -488,7 +492,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     }).join("");
     return `<section class="card glass"><div class="card-head"><span class="title">השבוע</span>
       <span class="meta"><b class="ltr num">${hm(total)}</b> שעות${missing > 0.01 ? ` · חסרות <b class="ltr num" style="color:var(--red)">${hm(missing)}</b>` : ""}</span></div>
-      <div class="week">${cols}</div><span class="idea">רעיון 2</span></section>`;
+      <div class="week">${cols}</div></section>`;
   }
 
   /** The pay period: the income so far, where it is heading, and its overtime and hours missing. */
@@ -496,14 +500,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     return `<section class="card glass"><div class="card-head"><span class="title">אוקטובר</span><span class="meta">נסגר בעוד 2 ימים</span></div>
       <div class="money-line"><b class="num"><span class="ltr">${moneyShort(6075.4)}</span></b><span>צפי לסוף החודש <b class="ltr num">${moneyShort(8640)}</b></span></div>
       <div class="mini"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num" style="color:var(--amber)">6:30</b><span>נוספות</span></div><div><b class="num" style="color:var(--red)">2:10</b><span>חוסר</span></div></div>
-      <span class="idea">רעיון 3</span></section>`;
+      </section>`;
   }
 
   /** A shortened day or a holiday coming, from the Hebrew calendar (Holidays.swift): its standard. */
   function holidayBanner() {
     return `<section class="banner glass"><span class="ico">${sized(icon.calendar, 20)}</span>
-      <div style="flex:1"><b>יום מקוצר בקרוב</b><span>ערב חג ביום א׳ · תקן 4:06 במקום 9:06</span></div>
-      <span class="idea" style="align-self:center">רעיון 4</span></section>`;
+      <div style="flex:1"><b>יום מקוצר בעוד 3 ימים</b><span>ערב חג · יום א׳ · תקן 4:06</span></div></section>`;
   }
 
   // ---- the Live Activity, as built (Widget/ShiftLiveActivity.swift) ----
@@ -541,12 +544,14 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const started = s.running ? clock(new Date(s.start)) : "07:15";
     const note = (title, text, time) => `<div class="notif"><span class="n-icon">${sized(icon.timer, 22)}</span>
       <div class="n-body"><div class="n-top"><b>${title}</b><span>${time}</span></div><div class="n-text">${text}</div></div></div>`;
-    return lockWall(s) + `<div class="notes">
+    return lockWall(s) + `<div class="notes" style="top:226px;gap:8px">
       <div class="w-label">כשמגיעים לעבודה, בלחיצה ארוכה</div>
-      ${note("הגעת ל" + PLACE, "להתחיל משמרת עכשיו?", "עכשיו")}
+      ${note("הגעת ל" + PLACE, "להתחיל משמרת עכשיו?", "07:14")}
       <div class="n-actions"><div class="main">התחל משמרת</div><div>לא עכשיו</div></div>
-      <div class="w-label" style="margin-top:14px">כשיוצאים מהעבודה</div>
-      ${note("יצאת מ" + PLACE, "המשמרת פתוחה מ־" + started + ". לסיים אותה?", "לפני דקה")}
+      <div class="w-label" style="margin-top:10px">כשמגיעים ליעד</div>
+      ${note("🎯 הגעת ליעד היומי", hm(GOAL_H) + " שעות · " + money(GOAL_H * WAGE) + " · מעכשיו שעות נוספות", "15:51")}
+      <div class="w-label" style="margin-top:10px">כשיוצאים מהעבודה</div>
+      ${note("יצאת מ" + PLACE, "המשמרת פתוחה מ־" + started + ". לסיים אותה?", "16:02")}
       <div class="n-actions"><div class="main" style="color:var(--red)">סיים משמרת</div><div>אני עדיין בעבודה</div></div>
     </div>`;
   }
@@ -611,11 +616,11 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- the page ----
   const notes = {
-    now: '<span class="tag">הצעה</span>עוד לא בבנייה. גרור את הדגל על החוגה כדי לראות כמה תרוויח אם תצא בשעה אחרת. מתחת לכפתורים, רעיונות 2 עד 4.',
+    now: '<span class="tag">נבנה עכשיו</span>גרור את הדגל על החוגה כדי לראות כמה תרוויח אם תצא בשעה אחרת. ב״אחרי היעד״ הדגל הופך לווי. מתחת לכפתורים: השבוע, התקופה וחג שמתקרב.',
     lock: '<span class="tag built">כמו שבבנייה</span>מסך הנעילה, עם הרקע שמתחלף לכהה יחד עם האייפון.',
     island: '<span class="tag built">אחרי התיקון</span>השעון ב-Dynamic Island ברוחב שמספיק לשעות, דקות ושניות.',
     widgets: '<span class="tag built">כמו שבבנייה</span>הווידג\'טים למסך הבית.',
-    place: '<span class="tag">הצעה</span>תזכורת לפי מיקום. בהגדרות קובעים את מקום העבודה לפי המיקום הנוכחי, והאייפון שואל כשמגיעים וכשיוצאים. הכפתורים בהתראה מתחילים או מסיימים בלי לפתוח את האפליקציה.',
+    place: '<span class="tag">נבנה עכשיו</span>ההתראות מגיעות גם כשהאפליקציה סגורה. כשמגיעים לעבודה וכשיוצאים ממנה, לפי מקום העבודה שנקבע בהגדרות. כשמגיעים ליעד, לפי שעה שנקבעת מראש.',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const dark = () => state.theme === "dark" || (state.theme == null && matchMedia("(prefers-color-scheme: dark)").matches);

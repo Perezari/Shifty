@@ -12,7 +12,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   the screens' colors, `Lock.swift` the lock (Face ID, or the iPhone's passcode, on launch and after a
   minute away: the web app's four digits the iPhone's way, this device's alone), and `Demo.swift` the
   made-up shifts the screenshots show (debug builds only).
-- `Shifty/Views/`: the screens. `NowView` (the running shift on the ring, the day's goal), `ShiftsView`
+- `Shifty/Views/`: the screens. `NowView` (the running shift on a twelve-hour dial, `Core/Dial.swift`: its
+  goal's flag dragged to see the wage of leaving later; then the week, the pay period and a holiday coming), `ShiftsView`
   (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
   of the work, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (every setting
   of the web app, the look, the lock, and the backup to a file and back) and `ShiftEditor` (a shift by
@@ -22,7 +23,9 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   break, as App Intents that the system performs in the app, woken in the background if need be),
   `Shortcuts` the sentences Siri knows ("התחל משמרת בShifty"), `ShiftActivity` the Live Activity's data,
   and `LiveShift` keeps the Live Activity, the notifications (the goal reached, the overtime's 150%, a
-  shift open twelve hours) and the widgets in step with the store after each change.
+  shift open twelve hours) and the widgets in step with the store after each change. `Place` watches the
+  workplace (set in the settings, this iPhone's alone) and asks on arriving whether to start a shift and
+  on leaving whether to end it, in notifications whose buttons do it, also with the app closed.
 - `Widget/`: the widget extension (`com.perezari.shifty.widget`), with the app's engine and store to read
   the shifts from the App Group: the shift's widget for the home screen and the lock screen, the Live
   Activity on the Lock Screen and in the Dynamic Island, and the shift's switch for the Control Center

@@ -9,6 +9,10 @@ struct SettingsView: View {
     @Environment(ShiftStore.self) private var store
     @AppStorage(AppLock.key) private var lockOn = false
     @AppStorage(Alerts.key) private var alerts = true
+    @AppStorage(Place.enabledKey) private var placeOn = false
+    @AppStorage(Place.radiusKey) private var placeRadius = 150.0
+    @State private var placeSet = Place.coordinate != nil
+    @State private var placeBusy = false
     @State private var hoursEdit: HoursEdit?
     @State private var exporting = false
     @State private var backup = BackupFile(data: Data())
@@ -20,6 +24,8 @@ struct SettingsView: View {
     @State private var lockProblem = false
 
     private static let dayNames = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"]
+    /// How far around the workplace counts as there, in meters.
+    private static let radii: [Double] = [100, 150, 250, 400]
 
     var body: some View {
         let s = store.settings
@@ -123,6 +129,43 @@ struct SettingsView: View {
                         .settingsRow()
                 }
 
+                SettingsSection(title: "תזכורת לפי מיקום", note: placeNote) {
+                    Toggle("כשמגיעים לעבודה ויוצאים ממנה", isOn: $placeOn)
+                        .settingsRow()
+                    if placeOn {
+                        Divider()
+                        Button(action: setPlaceHere) {
+                            HStack {
+                                Text(placeButton)
+                                    .foregroundStyle(.tint)
+                                Spacer()
+                                if placeBusy {
+                                    ProgressView()
+                                } else if placeSet {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                }
+                            }
+                            .settingsRow()
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(placeBusy)
+                        Divider()
+                        HStack {
+                            Text("טווח")
+                            Spacer()
+                            Picker("טווח", selection: $placeRadius) {
+                                ForEach(Self.radii, id: \.self) { meters in
+                                    Text(verbatim: "\(Int(meters)) מ׳").tag(meters)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                        .settingsRow()
+                    }
+                }
+
                 SettingsSection(title: "נעילה",
                                 note: "Shifty ננעלת בפתיחה ואחרי דקה ברקע, ונפתחת ב-\(AppLock.biometryName) או בקוד של האייפון. הנעילה היא של האייפון הזה בלבד.") {
                     Toggle("נעילה עם \(AppLock.biometryName)", isOn: $lockSwitch)
@@ -199,6 +242,13 @@ struct SettingsView: View {
         }
         .onChange(of: alerts) { _, _ in
             LiveShift.refresh(store)
+        }
+        .onChange(of: placeOn) { _, on in
+            if on { Place.shared.askAlways() }
+            Place.shared.start()
+        }
+        .onChange(of: placeRadius) { _, _ in
+            Place.shared.start()
         }
         .onAppear { lockSwitch = lockOn }
         .onChange(of: lockSwitch) { _, on in
@@ -330,6 +380,35 @@ struct SettingsView: View {
         Binding(get: { message != nil }, set: { shown in
             if !shown { message = nil }
         })
+    }
+
+    // MARK: The place
+
+    private var placeButton: String {
+        placeSet ? "קבע מחדש את מקום העבודה כאן" : "קבע את מקום העבודה כאן"
+    }
+
+    /// What the place's reminder does, and what it still needs.
+    private var placeNote: String {
+        guard placeOn else {
+            return "האייפון ישאל אם להתחיל משמרת כשמגיעים לעבודה, ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה. מקום העבודה נשמר רק באייפון הזה."
+        }
+        if !placeSet { return "עמוד במקום העבודה ולחץ על הכפתור." }
+        if !Place.shared.always {
+            return "כדי שזה יעבוד גם כשהאפליקציה סגורה, צריך לאפשר מיקום תמיד: בהגדרות האייפון, Shifty, מיקום."
+        }
+        return "מקום העבודה נקבע. ההתראות יגיעו גם כשהאפליקציה סגורה."
+    }
+
+    private func setPlaceHere() {
+        placeBusy = true
+        Place.shared.setHere { found in
+            Task { @MainActor in
+                placeBusy = false
+                placeSet = Place.coordinate != nil
+                if !found { message = "לא הצלחתי למצוא את המיקום. בדוק שהמיקום מאופשר ל-Shifty." }
+            }
+        }
     }
 
     // MARK: iCloud

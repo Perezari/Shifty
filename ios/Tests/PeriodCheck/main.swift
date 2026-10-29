@@ -71,5 +71,48 @@ expect(summary.totals.count == 5 && summary.totals.workedDays == 4, "five shifts
 expect(summary.breakdowns["sick3"]?.sickTier == 1, "the first day of sickness")
 expect(near(summary.days.values.reduce(0) { $0 + $1.pay }, summary.totals.pay), "the days' pay is the period's")
 
+// the week of Wednesday 4 November: Sunday's two shifts, a sick and a vacation day that are no hours worked
+let week = Calc.week(shifts, s, around: LocalTime.date(2026, 10, 4, 9), asOf: now.ms)
+expect(week.count == 7 && LocalTime.dayKey(week[0].date) == "2026-10-1" && LocalTime.dayKey(week[6].date) == "2026-10-7", "Sunday to Shabbat")
+expect(near(week[0].hours, 10) && near(week[2].hours, 0) && near(week[4].hours, 3) && near(week[5].hours, 2), "each day's hours worked")
+expect(week[0].standard == 9.6 && week[4].standard == 8.6 && week[5].standard == nil && week[6].standard == nil, "each day's standard")
+
+// November's income heading on: 4 days worked, 17 days left with a standard from the 7th
+let asOfNovember = LocalTime.date(2026, 10, 6, 20)
+let novemberTotal = Calc.aggregate(shifts, s, range: november, asOf: asOfNovember.ms).total
+expect(near(Calc.projectedIncome(shifts, s, range: november, asOf: asOfNovember.ms), novemberTotal + novemberTotal / 4 * 17),
+       "the average day worked for each day left")
+
+// the next shortened day: Erev Rosh Hashana 5787, Friday 11 September 2026
+if let next = Calc.nextHoliday(after: LocalTime.date(2026, 8, 6, 10), within: 14) {
+    expect(LocalTime.dayKey(next.date) == "2026-8-11" && next.info.kind == .short, "Erev Rosh Hashana")
+} else {
+    expect(false, "a holiday within two weeks of 6 September")
+}
+expect(Calc.nextHoliday(after: LocalTime.date(2026, 10, 1), within: 14) == nil, "none in November")
+
+// the dial: a shift from 7:15, a break 9:45 to 10:10, now 12:32 (Thursday 29 October, a goal of 8:36)
+let dialStart = LocalTime.date(2026, 9, 29, 7, 15)
+var running = Shift(id: "dial", start: dialStart)
+running.breaks = [Break(start: LocalTime.date(2026, 9, 29, 9, 45), end: LocalTime.date(2026, 9, 29, 10, 10))]
+let dialNow = LocalTime.date(2026, 9, 29, 12, 32)
+expect(near(Calc.dialDegrees(dialStart), 217.5) && near(Calc.dialDegrees(dialNow), 16), "angles on twelve hours")
+let layout = Calc.dial(running, s, at: dialNow)
+expect(near(layout.startDeg, 217.5) && near(layout.nowDeg, 158.5), "the start, and now 5:17 after it")
+expect(layout.pieces.map(\.kind) == [.work, .pause, .work, .ahead], "work, the break, work, and ahead to the goal")
+expect(near(layout.pieces[1].from, 75) && near(layout.pieces[1].to, 87.5), "the break from 2:30 to 2:55")
+// the goal: 8:36 of Thursday and the break's 25 minutes, 9:01 after the start
+expect(near(layout.goalDeg ?? 0, 270.5) && near(Calc.goalTime(running, s, asOf: dialNow.ms).ms, LocalTime.date(2026, 9, 29, 16, 16).ms),
+       "the goal at 16:16")
+let late = Calc.dial(running, s, at: dialNow, leave: LocalTime.date(2026, 9, 29, 17, 16))
+expect(late.pieces.suffix(2).map(\.kind) == [.ahead, .plannedOvertime] && near(late.leaveDeg ?? 0, 300.5), "an hour past the goal")
+let early = Calc.dial(running, s, at: dialNow, leave: LocalTime.date(2026, 9, 29, 15, 16))
+expect(early.pieces.suffix(2).map(\.kind) == [.ahead, .short], "an hour short of it")
+expect(Calc.dialTime(16, start: dialStart, now: dialNow) == LocalTime.date(2026, 9, 29, 12, 30).addingTimeInterval(0)
+       || Calc.dialTime(16, start: dialStart, now: dialNow) == dialNow, "a point is never before now")
+expect(Calc.dialTime(130, start: dialStart, now: dialNow) == LocalTime.date(2026, 9, 29, 16, 20), "16:20 on the dial")
+let leavingLate = Calc.leaving(running, at: LocalTime.date(2026, 9, 29, 17, 16), s, now: dialNow)
+expect(near(leavingLate.netHours, 9.6) && near(leavingLate.overtimeHours, 1), "leaving an hour late: an hour of overtime")
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

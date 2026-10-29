@@ -175,7 +175,7 @@ enum Alerts {
     }
 
     /// Asks once; the answer stands after.
-    private static func allowed() async -> Bool {
+    static func allowed() async -> Bool {
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         switch settings.authorizationStatus {

@@ -34,6 +34,9 @@ targets:
         NSFaceIDUsageDescription: Shifty משתמשת ב-Face ID כדי להיפתח כשהנעילה פועלת.
         # The running shift on the Lock Screen and in the Dynamic Island (Live/LiveShift.swift).
         NSSupportsLiveActivities: true
+        # The workplace watched, to ask about the shift on arriving and on leaving (Live/Place.swift).
+        NSLocationWhenInUseUsageDescription: Shifty שומרת את מקום העבודה שלך כדי לשאול על המשמרת כשמגיעים וכשיוצאים.
+        NSLocationAlwaysAndWhenInUseUsageDescription: כדי לשאול אם להתחיל משמרת כשמגיעים לעבודה ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה.
         UILaunchScreen:
           UIColorName: Background
         UIRequiresFullScreen: true

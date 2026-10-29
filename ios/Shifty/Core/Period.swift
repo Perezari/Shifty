@@ -93,3 +93,49 @@ extension Calc {
         return (middle.year, middle.month0)
     }
 }
+
+/// A day of the week on the Now screen: the net hours worked on it and the standard it is expected to meet.
+struct WeekDay: Hashable {
+    var date: Date
+    var hours: Double
+    /// nil on a day off, where working less is no shortfall.
+    var standard: Double?
+}
+
+extension Calc {
+    /// The week of `date`, from the settings' first day: each day's net hours of work (paid days off are not
+    /// hours worked) and its standard.
+    static func week(_ shifts: [Shift], _ s: Settings, around date: Date, asOf now: Double) -> [WeekDay] {
+        let first = LocalTime.parts(weekRange(date, weekStartsOn: s.weekStartsOn).start)
+        return (0..<7).map { i in
+            let day = LocalTime.date(first.year, first.month0, first.day + i)
+            let hours = aggregate(shifts, s, range: dayRange(day), asOf: now).netHours
+            return WeekDay(date: day, hours: hours, standard: expectedStandard(day, s))
+        }
+    }
+
+    /// Where the pay period's income is heading: what it has, and its average day worked for each day left in
+    /// it, from tomorrow, that has a standard.
+    static func projectedIncome(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> Double {
+        let totals = aggregate(shifts, s, range: range, asOf: now)
+        guard totals.workedDays > 0 else { return totals.total }
+        var day = LocalTime.addingDays(1, to: LocalTime.startOfDay(Date(ms: now)))
+        var left = 0
+        while day < range.end {
+            if expectedStandard(day, s) != nil { left += 1 }
+            day = LocalTime.addingDays(1, to: day)
+        }
+        return totals.total + totals.total / Double(totals.workedDays) * Double(left)
+    }
+
+    /// The next shortened day or holiday after `date`, within `days` days.
+    static func nextHoliday(after date: Date, within days: Int) -> (date: Date, info: Holidays.Info)? {
+        let today = LocalTime.startOfDay(date)
+        for i in 1...max(1, days) {
+            let day = LocalTime.addingDays(i, to: today)
+            let info = Holidays.info(day)
+            if info.kind != nil { return (day, info) }
+        }
+        return nil
+    }
+}

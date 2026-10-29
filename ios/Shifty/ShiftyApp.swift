@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct ShiftyApp: App {
@@ -12,6 +13,11 @@ struct ShiftyApp: App {
         }
         #endif
         _store = State(initialValue: ShiftStore.shared)
+        // the notifications' buttons, and the workplace watched: here, as the app may be launched in the
+        // background for them
+        UNUserNotificationCenter.current().delegate = Notifications.shared
+        Place.registerCategories()
+        Place.shared.start()
     }
 
     var body: some Scene {
