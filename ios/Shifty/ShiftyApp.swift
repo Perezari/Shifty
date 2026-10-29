@@ -36,6 +36,15 @@ struct RootView: View {
     @Environment(\.scenePhase) private var phase
     @State private var tab: AppTab = .now
 
+    /// The look chosen in the settings: the iPhone's, light or dark.
+    private var scheme: ColorScheme? {
+        switch store.settings.theme {
+        case "light": .light
+        case "dark": .dark
+        default: nil
+        }
+    }
+
     /// iCloud, but not for the screenshots' made-up shifts.
     private var syncs: Bool {
         #if DEBUG
@@ -52,25 +61,23 @@ struct RootView: View {
             }
             Tab("משמרות", systemImage: "list.bullet", value: AppTab.shifts) {
                 NavigationStack {
-                    Placeholder(title: "משמרות", symbol: "list.bullet",
-                                note: "כאן יהיו המשמרות לפי תקופה, עם הסיכומים, הוספה ועריכה.")
+                    ShiftsView()
                 }
             }
             Tab("לוח", systemImage: "calendar", value: AppTab.calendar) {
                 NavigationStack {
-                    Placeholder(title: "לוח", symbol: "calendar",
-                                note: "כאן יהיה הלוח של התקופה, עם פרטי כל יום ושעות החוסר.")
+                    CalendarView()
                 }
             }
             Tab("הגדרות", systemImage: "gearshape", value: AppTab.settings) {
                 NavigationStack {
-                    Placeholder(title: "הגדרות", symbol: "gearshape",
-                                note: "כאן יהיו השכר, שעות התקן, השעות הנוספות, החגים, הלילה, הנסיעות והנעילה.",
-                                footer: "Shifty · גרסה \(AppInfo.version)")
+                    SettingsView()
                 }
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
+        .preferredColorScheme(scheme)
+        .modifier(LockGate())
         .task {
             if syncs { ICloud.start(store) }
         }
@@ -83,38 +90,6 @@ struct RootView: View {
             if let screen = Screenshot.current { tab = screen.tab }
             #endif
         }
-    }
-}
-
-/// A tab still to come: its title, and a card saying what it will hold.
-struct Placeholder: View {
-    let title: String
-    let symbol: String
-    let note: String
-    var footer: String? = nil
-
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: symbol)
-                        .font(.title3)
-                        .foregroundStyle(.tint)
-                    Text(note)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .card()
-                if let footer {
-                    Text(footer)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-        }
-        .background(Color.appBackground.ignoresSafeArea())
-        .navigationTitle(title)
     }
 }
 

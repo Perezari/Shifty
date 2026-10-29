@@ -31,7 +31,8 @@ struct Settings: Hashable {
     var appName = "Shifty"
     var workplaceName = "מקום העבודה שלי"
     var currency = "₪"
-    var theme = "light"
+    /// "light" or "dark", as the web app's; here also "system", the iPhone's own appearance, by default.
+    var theme = "system"
 
     var hourlyWage = 50.0
     /// The standard of a day without its own.

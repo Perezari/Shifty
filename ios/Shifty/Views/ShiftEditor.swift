@@ -23,33 +23,42 @@ struct ShiftEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    DatePicker("תאריך", selection: $date, displayedComponents: .date)
-                    DatePicker("שעת כניסה", selection: $start, displayedComponents: .hourAndMinute)
-                    if hasEnd {
-                        DatePicker("שעת יציאה", selection: $end, displayedComponents: .hourAndMinute)
-                    } else {
-                        Button("הוספת שעת יציאה") { hasEnd = true }
+                if let dayOff {
+                    // a paid day off has no hours to edit: it is deleted, and added again on its day
+                    Section {
+                        LabeledContent("תאריך", value: Format.dateFull(dayOff.start))
+                    } footer: {
+                        Text("יום חופש או מחלה אפשר רק למחוק, ולהוסיף מחדש מהלוח.")
                     }
-                }
-                Section {
-                    Stepper(value: $breakMinutes, in: 0...600, step: 5) {
-                        HStack {
-                            Text("הפסקה")
-                            Spacer()
-                            Text("\(breakMinutes) דק׳")
-                                .monospacedDigit()
-                                .foregroundStyle(.secondary)
+                } else {
+                    Section {
+                        DatePicker("תאריך", selection: $date, displayedComponents: .date)
+                        DatePicker("שעת כניסה", selection: $start, displayedComponents: .hourAndMinute)
+                        if hasEnd {
+                            DatePicker("שעת יציאה", selection: $end, displayedComponents: .hourAndMinute)
+                        } else {
+                            Button("הוספת שעת יציאה") { hasEnd = true }
                         }
                     }
-                    Toggle("שבת / חג", isOn: $isHoliday)
-                }
-                Section {
-                    TextField("הערה", text: $note, axis: .vertical)
+                    Section {
+                        Stepper(value: $breakMinutes, in: 0...600, step: 5) {
+                            HStack {
+                                Text("הפסקה")
+                                Spacer()
+                                Text("\(breakMinutes) דק׳")
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Toggle("שבת / חג", isOn: $isHoliday)
+                    }
+                    Section {
+                        TextField("הערה", text: $note, axis: .vertical)
+                    }
                 }
                 if shift != nil {
                     Section {
-                        Button("מחיקת משמרת", role: .destructive) { deleting = true }
+                        Button(deleteTitle, role: .destructive) { deleting = true }
                     }
                 }
             }
@@ -64,14 +73,16 @@ struct ShiftEditor: View {
                     }
                     .accessibilityLabel("ביטול")
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(action: save) {
-                        Image(systemName: "checkmark")
+                if dayOff == nil {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(action: save) {
+                            Image(systemName: "checkmark")
+                        }
+                        .accessibilityLabel("שמירה")
                     }
-                    .accessibilityLabel("שמירה")
                 }
             }
-            .confirmationDialog("למחוק את המשמרת?", isPresented: $deleting, titleVisibility: .visible) {
+            .confirmationDialog(deleteQuestion, isPresented: $deleting, titleVisibility: .visible) {
                 Button("מחיקה", role: .destructive, action: delete)
             }
         }
@@ -79,8 +90,27 @@ struct ShiftEditor: View {
         .onAppear(perform: load)
     }
 
+    /// The shift edited, when it is a paid vacation or sick day.
+    private var dayOff: Shift? {
+        guard let shift, shift.type != .work else { return nil }
+        return shift
+    }
+
     private var title: String {
-        shift == nil ? "משמרת חדשה" : "עריכת משמרת"
+        guard let shift else { return "משמרת חדשה" }
+        switch shift.type {
+        case .vacation: return "יום חופש"
+        case .sick: return "יום מחלה"
+        case .work: return "עריכת משמרת"
+        }
+    }
+
+    private var deleteTitle: String {
+        dayOff == nil ? "מחיקת משמרת" : "מחיקת היום"
+    }
+
+    private var deleteQuestion: String {
+        dayOff == nil ? "למחוק את המשמרת?" : "למחוק את היום?"
     }
 
     private func load() {

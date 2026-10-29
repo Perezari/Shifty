@@ -30,6 +30,8 @@ targets:
         CFBundleLocalizations: [he]
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.productivity
+        # The lock (Lock.swift).
+        NSFaceIDUsageDescription: Shifty משתמשת ב-Face ID כדי להיפתח כשהנעילה פועלת.
         UILaunchScreen:
           UIColorName: Background
         UIRequiresFullScreen: true

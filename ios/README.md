@@ -9,20 +9,28 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 - `project.yml`: the XcodeGen spec. The Xcode project and `Shifty/Info.plist` are generated on the
   build Mac and not kept in git.
 - `Shifty/`: the app. `ShiftyApp.swift` holds the store and the tabs, `Theme.swift` the glass card and
-  the screens' colors, and `Demo.swift` the made-up shifts the screenshots show (debug builds only).
-- `Shifty/Views/`: the screens. `NowView` (the running shift on the ring, the day's goal),
-  `ShiftEditor` (a shift by hand).
+  the screens' colors, `Lock.swift` the lock (Face ID, or the iPhone's passcode, on launch and after a
+  minute away: the web app's four digits the iPhone's way, this device's alone), and `Demo.swift` the
+  made-up shifts the screenshots show (debug builds only).
+- `Shifty/Views/`: the screens. `NowView` (the running shift on the ring, the day's goal), `ShiftsView`
+  (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
+  of the work, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (every setting
+  of the web app, the look, the lock, and the backup to a file and back) and `ShiftEditor` (a shift by
+  hand). `Components` holds what they share: the period's bar and picker, the summary card, a shift's
+  row, the settings' cards and the wheel of hours and minutes.
 - `Shifty/ICloud.swift`: the shifts and the settings in iCloud's key-value store, on the user's other
   devices and back after a reinstall. The merging is `Core/CloudMirror.swift`: each shift by its
   `updatedAt`, the settings as the web app's cloud.js merges them. (The web app and the desktop widget
   sync through Supabase instead, and do not see the iPhone's shifts.)
 - `Shifty/Core/`: everything without SwiftUI, ported line by line from the web app's `assets/js`:
   `Calc` (the wage engine, calc.js), `Holidays` (holidays.js, on Foundation's Hebrew calendar),
-  `Format` (format.js), `Models` (a shift and the settings, in the web app's JSON) and `ShiftStore`
-  (store.js: two JSON files in the App Group's container). `LocalTime` makes dates the way
-  JavaScript's `Date` does, so the engine gives the web app's results to the last bit.
+  `Format` (format.js), `Models` (a shift and the settings, in the web app's JSON), `Period` (a pay
+  period as the Shifts and Calendar screens add it up) and `ShiftStore` (store.js: two JSON files in the
+  App Group's container; restoring a backup replaces the shifts in iCloud too). `LocalTime` makes dates
+  the way JavaScript's `Date` does, so the engine gives the web app's results to the last bit.
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
-  `compare.mjs`) and the store's checks (`StoreCheck`).
+  `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay
+  period (`PeriodCheck`).
 - `Shifty/Assets.xcassets`: the icon (`AppIcon.svg` at 1024 px), the accent color and the background,
   in light and dark.
 - `scripts/`: the builds (`testflight.sh`, `screenshots.sh`) and the check of the Swift without a Mac
@@ -31,8 +39,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 ## Checking the Swift without a Mac
 
 WSL's Ubuntu has Swift: `check-swift.sh` parses every file, type-checks those that do not use
-SwiftUI and runs the store's checks and the cloud mirror's (two devices on a cloud in memory). From
-PowerShell, at the root of the repository:
+SwiftUI and runs the checks of the store, the cloud mirror (two devices on a cloud in memory) and the
+pay period. From PowerShell, at the root of the repository:
 
 ```powershell
 wsl -d Ubuntu-24.04 -- bash -lc "cd /mnt/c/Users/ari/Documents/GitHub/Shifty && tr -d '\r' < ios/scripts/check-swift.sh | bash"

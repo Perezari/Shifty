@@ -16,12 +16,17 @@ extension ShiftStore {
             $0.travelPerDay = 22.6
         }
 
-        // Sunday to Thursday of the last four weeks, a little over or under the day's standard
+        // Sunday to Thursday of the last four weeks, a little over or under the day's standard, with a day of
+        // vacation and one sick
         let today = LocalTime.startOfDay(Date())
         for back in 1...28 {
             let day = LocalTime.addingDays(-back, to: today)
             let p = LocalTime.parts(day)
             guard p.weekday <= 4 else { continue }
+            if back == 9 || back == 17 {
+                store.addDayOff(day, type: back == 9 ? .vacation : .sick)
+                continue
+            }
             let start = LocalTime.date(p.year, p.month0, p.day, 7 + back % 2, (back * 13) % 60)
             let hours = 8.4 + Double(back % 5) * 0.35
             let shift = Shift(id: "demo\(back)", start: start, end: start.addingTimeInterval(hours * 3600))

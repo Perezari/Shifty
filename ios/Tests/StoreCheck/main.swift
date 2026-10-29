@@ -69,15 +69,39 @@ MainActor.assumeIsolated {
      "exportedAt":"2026-10-28T10:00:00.000Z"}
     """
     do {
+        var changes = 0
+        store.onChange = { changes += 1 }
+        let before = ShiftStore.now()
+        Thread.sleep(forTimeInterval: 0.005)
         try store.importBackup(Data(web.utf8))
         expect(store.settings.hourlyWage == 61 && store.settings.theme == "dark" && store.settings.vacationHours == 8.6,
                "a web backup's settings, the others by default")
         expect(store.shifts.map(\.type) == [.work, .sick] && store.shifts[0].breaks.count == 1, "a web backup's shifts")
         expect(ISODate.string(store.shifts[0].start) == "2026-10-27T05:00:00.000Z", "a time to the millisecond")
+        // the backup replaces what is here on the other devices too
+        expect(changes == 1, "a restore goes to iCloud")
+        expect(store.settings.updatedAt.map { $0 > before } == true && store.shifts.allSatisfy { $0.updatedAt.map { $0 > before } == true },
+               "what a restore brings is newer than iCloud's")
+        expect(store.records.contains { $0.id == shift.id && $0.deleted && $0.updatedAt.map { $0 > before } == true },
+               "a shift the backup lacks is deleted")
+        expect(store.records.filter { $0.id == vacation.id }.count == 1 && store.records.contains { $0.id == vacation.id && $0.deleted },
+               "a tombstone stays one")
 
         let restored = ShiftStore(folder: other)
         try restored.importBackup(try store.exportBackup())
-        expect(restored.shifts == store.shifts && restored.settings == store.settings, "this app's backup restores what it holds")
+        func plain(_ list: [Shift]) -> [Shift] {
+            list.map { shift in
+                var shift = shift
+                shift.updatedAt = nil
+                return shift
+            }
+        }
+        var restoredSettings = restored.settings
+        var storeSettings = store.settings
+        restoredSettings.updatedAt = nil
+        storeSettings.updatedAt = nil
+        expect(plain(restored.shifts) == plain(store.shifts) && restoredSettings == storeSettings,
+               "this app's backup restores what it holds")
     } catch {
         expect(false, "a backup: \(error)")
     }

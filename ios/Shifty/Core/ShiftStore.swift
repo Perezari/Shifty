@@ -169,17 +169,36 @@ final class ShiftStore {
         return try encoder.encode(Backup(settings: settings, shifts: shifts, exportedAt: ISODate.string(Self.now())))
     }
 
-    /// Restores a backup of the web app or of this app (store.importAll): it replaces what is here.
+    /// Restores a backup of the web app or of this app (store.importAll): it replaces what is here, on the
+    /// other devices too. What it restores is stamped now, so that it wins over iCloud's copy, and a shift
+    /// here that the backup lacks is deleted, as a tombstone, so that iCloud does not bring it back.
     func importBackup(_ data: Data) throws {
         let backup = try JSONDecoder().decode(Backup.self, from: data)
-        if let restored = backup.settings {
+        let stamp = Self.now()
+        if var restored = backup.settings {
+            restored.updatedAt = stamp
             settings = restored
             saveSettings()
         }
         if let restored = backup.shifts {
-            records = restored
+            let kept = Set(restored.map(\.id))
+            var list = restored.map { shift -> Shift in
+                var shift = shift
+                shift.updatedAt = stamp
+                return shift
+            }
+            for record in records where !kept.contains(record.id) {
+                var gone = record
+                if !gone.deleted {
+                    gone.deleted = true
+                    gone.updatedAt = stamp
+                }
+                list.append(gone)
+            }
+            records = list
             saveShifts()
         }
+        onChange?()
     }
 
     // MARK: Files
