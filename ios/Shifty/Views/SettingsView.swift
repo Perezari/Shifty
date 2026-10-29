@@ -372,7 +372,6 @@ struct SettingsView: View {
 
     // MARK: Bindings
 
-    /// A setting, saved (and sent to iCloud) as it changes.
     /// Whether the days off left are kept: from today's payslip, until its own date is picked.
     private var keepsBalance: Binding<Bool> {
         Binding(
@@ -396,6 +395,7 @@ struct SettingsView: View {
         )
     }
 
+    /// A setting, saved (and sent to iCloud) as it changes.
     private func setting<Value: Equatable>(_ key: WritableKeyPath<Settings, Value>) -> Binding<Value> {
         Binding(
             get: { store.settings[keyPath: key] },
