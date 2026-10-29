@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The running shift: its net time on the ring toward the day's goal, its wage so far, and starting and
-/// ending it and its breaks. With no shift running, today's work (app.js renderNow).
+/// The running shift: its time worked on the ring toward the day's goal, then one card with its wage, when
+/// the goal is reached and what it brings, and the buttons for a break and the end. With no shift running,
+/// today's work and a button to start (app.js renderNow). The ring's clock reads as the Lock Screen's.
 struct NowView: View {
     @Environment(ShiftStore.self) private var store
     @State private var adding = false
@@ -28,20 +29,17 @@ struct NowView: View {
     private func screen(at date: Date) -> some View {
         let settings = store.settings
         let status = Calc.nowStatus(store.shifts, settings, active: store.active, at: date.ms)
-        let hoursTitle = status.active == nil ? "שעות היום" : "שעות נטו"
-        let payTitle = status.active == nil ? "שכר היום" : "שכר במשמרת"
+        var periodTotal: Double? = nil
+        if status.active == nil {
+            let period = Calc.period(around: date, monthStartDay: settings.monthStartDay)
+            periodTotal = Calc.aggregate(store.shifts, settings, range: period, asOf: date.ms).total
+        }
         return ScrollView {
-            VStack(spacing: 22) {
+            VStack(spacing: 28) {
                 NowHeader(status: status, date: date, settings: settings)
                 NowRing(status: status, now: date)
-                GlassEffectContainer(spacing: 12) {
-                    HStack(spacing: 12) {
-                        StatCard(title: hoursTitle, value: Format.hoursToHM(status.netHours), symbol: "clock")
-                        StatCard(title: payTitle, value: Format.money(status.pay, settings.currency), symbol: "shekelsign.circle")
-                    }
-                }
+                NowStats(status: status, settings: settings, periodTotal: periodTotal)
                 actions(status)
-                GoalCard(status: status, settings: settings)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -50,11 +48,11 @@ struct NowView: View {
         .scrollIndicators(.hidden)
     }
 
-    /// The screen's one prominent button: start the shift, end it, or end its break.
+    /// Start, or add by hand; while working, a break and the end; on a break, back to work and the end.
     @ViewBuilder
     private func actions(_ status: NowStatus) -> some View {
         if status.active == nil {
-            VStack(spacing: 10) {
+            HStack(spacing: 10) {
                 Button(action: start) {
                     Label("התחל משמרת", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
@@ -63,21 +61,22 @@ struct NowView: View {
                 Button {
                     adding = true
                 } label: {
-                    Label("הוספה ידנית", systemImage: "plus")
-                        .frame(maxWidth: .infinity)
+                    Image(systemName: "plus")
+                        .frame(width: 24)
                 }
                 .buttonStyle(.glass)
+                .accessibilityLabel("הוספה ידנית")
             }
             .controlSize(.large)
         } else if status.activeBreak != nil {
-            VStack(spacing: 10) {
+            HStack(spacing: 10) {
                 Button(action: endBreak) {
-                    Label("סיים הפסקה", systemImage: "play.fill")
+                    Label("חזרה לעבודה", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassProminent)
                 Button(action: end) {
-                    Label("סיים משמרת", systemImage: "stop.fill")
+                    Label("סיום משמרת", systemImage: "stop.fill")
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity)
                 }
@@ -87,16 +86,17 @@ struct NowView: View {
         } else {
             HStack(spacing: 10) {
                 Button(action: startBreak) {
-                    Label("התחל הפסקה", systemImage: "pause.fill")
+                    Label("הפסקה", systemImage: "pause.fill")
+                        .foregroundStyle(.orange)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glass)
                 Button(action: end) {
-                    Label("סיים משמרת", systemImage: "stop.fill")
+                    Label("סיום משמרת", systemImage: "stop.fill")
+                        .foregroundStyle(.red)
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glassProminent)
-                .tint(.red)
+                .buttonStyle(.glass)
             }
             .controlSize(.large)
         }
@@ -170,30 +170,24 @@ private struct NowHeader: View {
     }
 }
 
-/// The ring: the net time worked, filling toward the day's goal.
+/// The ring: the time worked filling toward the day's goal, and past the goal the overtime as a second lap
+/// in amber. It starts at the top and runs clockwise, as a clock's hand, in Hebrew too.
 private struct NowRing: View {
     let status: NowStatus
     let now: Date
 
     var body: some View {
         ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.07), lineWidth: 18)
-            if status.progress > 0 {
-                Circle()
-                    .trim(from: 0, to: status.progress)
-                    .stroke(fill, style: StrokeStyle(lineWidth: 18, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-            }
+            rings
             VStack(spacing: 6) {
-                Text(Format.hms(status.netMs))
-                    .font(.system(size: 46, weight: .semibold, design: .rounded))
+                Text(Format.timer(status.netMs))
+                    .font(.system(size: 52, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(idle ? Color.secondary : Color.primary)
                 Text(label)
                     .font(.subheadline.weight(.medium))
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(status.activeBreak == nil ? Color.secondary : Color.orange)
                 if let started = status.active?.start {
                     Text("התחלה " + Format.clock(started))
                         .font(.footnote)
@@ -202,13 +196,40 @@ private struct NowRing: View {
                 }
             }
         }
-        .frame(width: 260, height: 260)
+        .frame(width: 272, height: 272)
         .animation(.easeInOut(duration: 0.6), value: status.progress)
+    }
+
+    private var rings: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.07), lineWidth: 18)
+            if status.progress > 0 {
+                Circle()
+                    .trim(from: 0, to: status.progress)
+                    .stroke(fill, style: StrokeStyle(lineWidth: 18, lineCap: .round))
+                    .opacity(status.activeBreak == nil ? 1 : 0.45)
+            }
+            if overtime > 0 {
+                Circle()
+                    .trim(from: 0, to: overtime)
+                    .stroke(Color("Holiday"), style: StrokeStyle(lineWidth: 18, lineCap: .round))
+            }
+        }
+        .rotationEffect(.degrees(-90))
+        // right to left, SwiftUI turns the ring the other way, from the bottom
+        .environment(\.layoutDirection, .leftToRight)
     }
 
     /// Nothing worked today and nothing running: the time is faint.
     private var idle: Bool {
         status.active == nil && status.netHours == 0
+    }
+
+    /// The overtime's share of a lap, its length the day's goal.
+    private var overtime: Double {
+        guard status.goal > 0 else { return 0 }
+        return max(0, min(1, status.overtimeHours / status.goal))
     }
 
     private var fill: AngularGradient {
@@ -218,96 +239,72 @@ private struct NowRing: View {
 
     private var label: String {
         if let pause = status.activeBreak {
-            return "בהפסקה · " + Format.hms(now.ms - pause.start.ms)
+            return "הפסקה " + Format.timer(now.ms - pause.start.ms)
         }
         if status.active != nil { return "זמן עבודה" }
         return status.netHours > 0 ? "עבדת היום" : "לא במשמרת"
     }
 }
 
-/// A number and its name, on glass.
-private struct StatCard: View {
-    let title: String
-    let value: String
-    let symbol: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: symbol)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.title2.weight(.semibold))
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-        }
-        .card(padding: 14)
-    }
-}
-
-/// The day's goal: how far, how much is left and when it is reached, and the wage it brings, or the
-/// pay period's income against the monthly goal.
-private struct GoalCard: View {
+/// The numbers under the ring, in one card. While working: the wage so far; when the goal is reached, or the
+/// overtime past it; and the wage at the goal, or the period's income against the monthly goal. With none
+/// running: today's wage, the period's income and the day's goal.
+private struct NowStats: View {
     let status: NowStatus
     let settings: Settings
+    /// The pay period's income, with none running.
+    let periodTotal: Double?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("היעד היומי")
-                    .font(.headline)
-                Spacer()
-                Text(Format.hoursToHM(status.netHours) + " / " + Format.hoursToHM(status.goal) + " ש׳")
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-            }
-            ProgressView(value: status.progress)
-            Text(remaining)
-                .font(.footnote)
-                .monospacedDigit()
-                .foregroundStyle(reached ? Color.green : Color.secondary)
-            Divider()
-            HStack(alignment: .firstTextBaseline) {
-                Text(projectionTitle)
-                    .font(.subheadline)
-                Spacer()
-                Text(projection)
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
+        HStack(spacing: 0) {
+            ForEach(cells.indices, id: \.self) { index in
+                if index > 0 {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.08))
+                        .frame(width: 1, height: 36)
+                }
+                VStack(spacing: 4) {
+                    Text(cells[index].value)
+                        .font(.title3.weight(.semibold))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    Text(cells[index].title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                .frame(maxWidth: .infinity)
             }
         }
-        .card()
+        .padding(.vertical, 16)
+        .padding(.horizontal, 8)
+        .card(padding: 0)
     }
 
-    private var reached: Bool {
-        status.remaining <= 0.001
-    }
-
-    /// "נותרו 4:14 ליעד · סיום ב־16:38", or "הגעת ליעד ✓" and the overtime.
-    private var remaining: String {
-        if reached {
-            let overtime = status.overtimeHours > 0.001 ? " · שעות נוספות +" + Format.hoursToHM(status.overtimeHours) : ""
-            return "הגעת ליעד ✓" + overtime
+    private var cells: [SummaryCell] {
+        let currency = settings.currency
+        guard status.active != nil else {
+            return [
+                SummaryCell(title: "שכר היום", value: Format.money(status.pay, currency)),
+                SummaryCell(title: "בתקופה", value: Format.moneyShort(periodTotal ?? 0, currency)),
+                SummaryCell(title: "יעד יומי", value: Format.hoursToHM(status.goal)),
+            ]
         }
-        var text = "נותרו " + Format.hoursToHM(status.remaining) + " ליעד"
-        if let finish = status.finishMs {
-            text += " · סיום ב־" + Format.clock(Date(ms: finish))
+        var cells = [SummaryCell(title: "שכר עד עכשיו", value: Format.money(status.pay, currency))]
+        if status.remaining <= 0.001 {
+            cells.append(SummaryCell(title: "שעות נוספות", value: "+" + Format.hoursToHM(status.overtimeHours)))
+        } else if let finish = status.finishMs {
+            cells.append(SummaryCell(title: "יעד · עוד " + Format.hoursToHM(status.remaining),
+                                     value: Format.clock(Date(ms: finish))))
         }
-        return text
-    }
-
-    private var projectionTitle: String {
-        settings.monthlyIncomeGoal > 0 ? "יעד חודשי" : "צפי שכר בסיום היעד"
-    }
-
-    private var projection: String {
         if settings.monthlyIncomeGoal > 0 {
-            let total = Format.moneyShort(status.periodTotal ?? 0, settings.currency)
-            return total + " מתוך " + Format.moneyShort(settings.monthlyIncomeGoal, settings.currency)
+            cells.append(SummaryCell(title: "מתוך " + Format.moneyShort(settings.monthlyIncomeGoal, currency),
+                                     value: Format.moneyShort(status.periodTotal ?? 0, currency)))
+        } else if let projected = status.projected {
+            cells.append(SummaryCell(title: "צפי ביעד", value: Format.moneyShort(projected, currency)))
         }
-        guard let projected = status.projected else { return "—" }
-        return Format.money(projected, settings.currency)
+        return cells
     }
 }

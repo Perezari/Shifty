@@ -29,23 +29,20 @@ enum WidgetStyle {
     })
 }
 
-/// A button of a widget or of the Live Activity: a capsule, filled for the main action.
-struct WidgetButtonLabel: View {
-    let title: String
+/// A round button of a widget or of the Live Activity: its symbol in its color, on a lighter disc of it, as
+/// the iPhone's own timers have.
+struct RoundIcon: View {
     let symbol: String
-    var color: Color = WidgetStyle.accent
-    var filled = false
+    let color: Color
+    var size: CGFloat = 44
 
     var body: some View {
-        Label(title, systemImage: symbol)
-            .font(.caption.weight(.semibold))
-            .lineLimit(1)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 10)
-            .foregroundStyle(filled ? Color.white : color)
+        Image(systemName: symbol)
+            .font(.system(size: size * 0.36, weight: .bold))
+            .foregroundStyle(color)
+            .frame(width: size, height: size)
             .background {
-                Capsule().fill(filled ? color : color.opacity(0.15))
+                Circle().fill(color.opacity(0.18))
             }
     }
 }

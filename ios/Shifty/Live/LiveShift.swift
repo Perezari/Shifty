@@ -89,7 +89,8 @@ enum LiveShift {
         if let finish = status.finishMs { goalAt = Date(ms: finish) }
         return ShiftActivityAttributes.ContentState(workingSince: Date(ms: now.ms - status.netMs), goalAt: goalAt,
                                                     breakSince: status.activeBreak?.start, worked: status.netMs / 1000,
-                                                    goalHours: status.goal)
+                                                    goalHours: status.goal, start: shift.start,
+                                                    workplace: store.settings.workplaceName)
     }
 
     /// Starts the running shift's activity, updates it, or ends it; and ends any of a shift no longer running.

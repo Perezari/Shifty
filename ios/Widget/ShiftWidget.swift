@@ -2,8 +2,9 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-/// The shift on the home screen and the lock screen: the running shift's clock and its bar toward the day's
-/// goal, with buttons for a break and the end; with none running, today's hours and a button to start.
+/// The shift on the home screen and the lock screen, in the Live Activity's look: the running shift's clock
+/// in the app's color (a break's in orange), its way toward the day's goal, and round buttons for a break
+/// and the end; with none running, today's hours and a button to start.
 struct ShiftWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "shift", provider: ShiftTimeline()) { entry in
@@ -98,59 +99,70 @@ struct ShiftWidgetView: View {
     // MARK: Home screen
 
     private var small: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             header
-            Spacer(minLength: 0)
+            Spacer(minLength: 4)
             clock
-                .font(.system(size: 26, weight: .semibold, design: .rounded))
+                .font(.system(size: 34, weight: .semibold, design: .rounded))
             bar
-            Spacer(minLength: 0)
-            Group {
-                if entry.running {
-                    Button(intent: EndShiftIntent()) {
-                        WidgetButtonLabel(title: "סיום", symbol: "stop.fill", color: .red, filled: true)
-                    }
-                } else {
-                    Button(intent: StartShiftIntent()) {
-                        WidgetButtonLabel(title: "התחלה", symbol: "play.fill", filled: true)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private var medium: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                header
+                .padding(.top, 8)
+            Spacer(minLength: 8)
+            HStack(spacing: 8) {
+                buttons(size: 36)
                 Spacer(minLength: 0)
-                clock
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                bar
-                Text(detail)
-                    .font(.caption)
+                Text(wayEnd)
+                    .font(.caption2.weight(.semibold))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            VStack(spacing: 8) {
-                if entry.running {
-                    Button(intent: ToggleBreakIntent()) {
-                        WidgetButtonLabel(title: breakTitle, symbol: breakSymbol, color: .orange)
-                    }
-                    Button(intent: EndShiftIntent()) {
-                        WidgetButtonLabel(title: "סיום", symbol: "stop.fill", color: .red, filled: true)
-                    }
-                } else {
-                    Button(intent: StartShiftIntent()) {
-                        WidgetButtonLabel(title: "התחלה", symbol: "play.fill", filled: true)
-                    }
+        }
+    }
+
+    private var medium: some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                Spacer(minLength: 4)
+                clock
+                    .font(.system(size: 40, weight: .semibold, design: .rounded))
+                Spacer(minLength: 8)
+                bar
+                HStack {
+                    Text(wayStart)
+                    Spacer(minLength: 6)
+                    Text(wayEnd)
+                }
+                .font(.caption2.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .padding(.top, 6)
+            }
+            VStack(spacing: 10) {
+                buttons(size: 48)
+            }
+        }
+    }
+
+    /// While a shift runs, a break (or back from it) and the end; else, the start.
+    @ViewBuilder
+    private func buttons(size: CGFloat) -> some View {
+        Group {
+            if entry.running {
+                Button(intent: ToggleBreakIntent()) {
+                    RoundIcon(symbol: breakSymbol, color: breakColor, size: size)
+                }
+                Button(intent: EndShiftIntent()) {
+                    RoundIcon(symbol: "stop.fill", color: .red, size: size)
+                }
+            } else {
+                Button(intent: StartShiftIntent()) {
+                    RoundIcon(symbol: "play.fill", color: WidgetStyle.accent, size: size)
                 }
             }
-            .buttonStyle(.plain)
-            .frame(width: 112)
         }
+        .buttonStyle(.plain)
     }
 
     private var header: some View {
@@ -168,12 +180,12 @@ struct ShiftWidgetView: View {
 
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title + " · " + detail)
+            Label(title + " · " + wayEnd, systemImage: symbol)
                 .font(.caption2.weight(.semibold))
                 .lineLimit(1)
                 .widgetAccentable()
             clock
-                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .font(.system(size: 24, weight: .semibold, design: .rounded))
             bar
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -185,7 +197,7 @@ struct ShiftWidgetView: View {
             ZStack {
                 AccessoryWidgetBackground()
                 VStack(spacing: 1) {
-                    Image(systemName: entry.onBreak ? "pause.fill" : "timer")
+                    Image(systemName: symbol)
                         .font(.system(size: 13, weight: .semibold))
                     clock
                         .font(.system(size: 11, weight: .semibold))
@@ -204,11 +216,15 @@ struct ShiftWidgetView: View {
 
     @ViewBuilder
     private var inline: some View {
-        if entry.running && !entry.onBreak {
+        if entry.running {
             Label {
-                Text(entry.workingSince, style: .timer)
+                if let since = entry.breakSince {
+                    Text(since, style: .timer)
+                } else {
+                    Text(entry.workingSince, style: .timer)
+                }
             } icon: {
-                Image(systemName: "timer")
+                Image(systemName: symbol)
             }
         } else {
             Text(title + " " + Format.hoursToHM(entry.worked / 3600))
@@ -217,14 +233,13 @@ struct ShiftWidgetView: View {
 
     // MARK: Parts
 
-    /// The time worked: running from `workingSince`, standing during a break, or today's hours.
-    @ViewBuilder
+    /// The time worked, running; a break's; or today's hours.
     private var clock: some View {
         Group {
-            if entry.running && !entry.onBreak {
-                Text(entry.workingSince, style: .timer)
+            if let since = entry.breakSince {
+                Text(since, style: .timer)
             } else if entry.running {
-                Text(Format.hms(entry.worked * 1000))
+                Text(entry.workingSince, style: .timer)
             } else {
                 Text(Format.hoursToHM(entry.worked / 3600))
             }
@@ -232,6 +247,8 @@ struct ShiftWidgetView: View {
         .monospacedDigit()
         .lineLimit(1)
         .minimumScaleFactor(0.6)
+        .multilineTextAlignment(.leading)
+        .foregroundStyle(clockColor)
     }
 
     /// The bar toward the goal, filling by itself while working.
@@ -255,24 +272,38 @@ struct ShiftWidgetView: View {
         return entry.onBreak ? "בהפסקה" : "במשמרת"
     }
 
+    private var symbol: String {
+        entry.onBreak ? "pause.fill" : "timer"
+    }
+
     private var dot: Color {
         guard entry.running else { return .secondary }
         return entry.onBreak ? .orange : .green
     }
 
-    /// "יעד ב־16:38", "הגעת ליעד ✓", "מ־12:30" on a break, or today's pay.
-    private var detail: String {
-        guard entry.running else { return Format.money(entry.pay, entry.currency) }
-        if let since = entry.breakSince { return "מ־" + Format.clock(since) }
-        guard let goal = entry.goalAt, goal > entry.date else { return "הגעת ליעד ✓" }
-        return "יעד ב־" + Format.clock(goal)
+    private var clockColor: Color {
+        guard entry.running else { return .primary }
+        return entry.onBreak ? .orange : WidgetStyle.accent
     }
 
-    private var breakTitle: String {
-        entry.onBreak ? "המשך" : "הפסקה"
+    /// Under the bar's right end: the start, or today's pay.
+    private var wayStart: String {
+        guard let start = entry.start else { return Format.money(entry.pay, entry.currency) }
+        return "התחלה " + Format.clock(start)
+    }
+
+    /// Under its left end: the goal's time, reached, or the day's goal.
+    private var wayEnd: String {
+        guard entry.running else { return "יעד " + Format.hoursToHM(entry.goalHours) }
+        guard let goal = entry.goalAt, goal > entry.date else { return "הגעת ליעד ✓" }
+        return "יעד " + Format.clock(goal)
     }
 
     private var breakSymbol: String {
         entry.onBreak ? "play.fill" : "pause.fill"
+    }
+
+    private var breakColor: Color {
+        entry.onBreak ? WidgetStyle.accent : Color.orange
     }
 }

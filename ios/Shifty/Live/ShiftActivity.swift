@@ -17,10 +17,15 @@ struct ShiftActivityAttributes: ActivityAttributes {
         var worked: Double
         /// The day's goal, in hours.
         var goalHours: Double
+        /// The shift's start and the workplace as they are now: the start may be edited after the activity
+        /// began, and the attributes stay as they were then. Missing in an activity of an earlier build.
+        var start: Date?
+        var workplace: String?
     }
 
     /// The shift's id, to tell it from a shift that ran before.
     var shiftID: String
+    /// The start and the workplace when the activity began (ContentState has them as they are now).
     var start: Date
     var workplace: String
 }

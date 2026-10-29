@@ -24,6 +24,16 @@ enum Format {
         return pad(t / 3600) + ":" + pad(t % 3600 / 60) + ":" + pad(t % 60)
     }
 
+    /// "57:24", or "4:52:56" from an hour, of milliseconds: as the iPhone's timers count, so that the app's
+    /// clock reads as the Lock Screen's (not the web app's).
+    static func timer(_ ms: Double) -> String {
+        let t = Int((max(ms, 0) / 1000).rounded(.down))
+        let hours = t / 3600
+        let minutes = t % 3600 / 60
+        let seconds = pad(t % 60)
+        return hours > 0 ? "\(hours):" + pad(minutes) + ":" + seconds : "\(minutes):" + seconds
+    }
+
     /// "8:41", of hours.
     static func hoursToHM(_ hours: Double) -> String {
         let total = Int(jsRound((hours > 0 ? hours : 0) * 60))

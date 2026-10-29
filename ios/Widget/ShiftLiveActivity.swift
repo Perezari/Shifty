@@ -3,51 +3,48 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
-/// The running shift on the Lock Screen and in the Dynamic Island: its clock, its bar toward the day's goal,
-/// when the goal is reached, and buttons for a break and the end. The app keeps it in step
-/// (Shifty/Live/LiveShift.swift); between changes its clocks and bar run on their own.
+/// The running shift on the Lock Screen and in the Dynamic Island: its clock large in the app's color, the
+/// state and the workplace over it, round buttons for a break and the end beside it, and under them the
+/// shift's way from its start to the day's goal. During a break the clock is the break's, in orange. The app
+/// keeps it in step (Shifty/Live/LiveShift.swift); between changes its clocks and bar run on their own.
 struct ShiftLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ShiftActivityAttributes.self) { context in
-            ActivityLockScreen(context: context)
+            LockScreenActivity(state: context.state, attributes: context.attributes, stale: context.isStale)
                 .environment(\.layoutDirection, .rightToLeft)
-                .activityBackgroundTint(WidgetStyle.background)
                 .widgetURL(URL(string: "shifty://now"))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    ActivityStatus(state: context.state, workplace: context.attributes.workplace)
-                        .padding(.leading, 4)
+                    ActivityHeadline(state: context.state, attributes: context.attributes, short: true)
+                        .padding(.horizontal, 6)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     ActivityClock(state: context.state)
-                        .font(.title2.weight(.semibold))
-                        .padding(.trailing, 4)
+                        .font(.system(size: 26, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ActivityLook.color(context.state))
+                        .padding(.horizontal, 6)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 10) {
-                        ActivityBar(state: context.state)
-                        HStack(spacing: 8) {
-                            ActivityGoal(state: context.state, stale: context.isStale)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.secondary)
-                            Spacer(minLength: 0)
-                            ActivityButtons(state: context.state)
-                                .frame(width: 190)
-                        }
+                    HStack(alignment: .center, spacing: 14) {
+                        ActivityWay(state: context.state, attributes: context.attributes, stale: context.isStale)
+                        ActivityButtons(state: context.state, size: 42)
                     }
+                    .padding(.horizontal, 6)
+                    .padding(.top, 4)
                     .environment(\.layoutDirection, .rightToLeft)
                 }
             } compactLeading: {
-                Image(systemName: ActivityStatus.symbol(context.state))
-                    .foregroundStyle(ActivityStatus.color(context.state))
+                Image(systemName: ActivityLook.symbol(context.state))
+                    .foregroundStyle(ActivityLook.color(context.state))
             } compactTrailing: {
                 ActivityClock(state: context.state)
-                    .font(.caption.weight(.semibold))
-                    .frame(maxWidth: 58)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(ActivityLook.color(context.state))
+                    .frame(maxWidth: 52)
             } minimal: {
-                Image(systemName: ActivityStatus.symbol(context.state))
-                    .foregroundStyle(ActivityStatus.color(context.state))
+                Image(systemName: ActivityLook.symbol(context.state))
+                    .foregroundStyle(ActivityLook.color(context.state))
             }
             .widgetURL(URL(string: "shifty://now"))
             .keylineTint(WidgetStyle.accent)
@@ -55,60 +52,33 @@ struct ShiftLiveActivity: Widget {
     }
 }
 
-/// The Lock Screen's activity: the state and the start, the clock and when the goal is reached, the bar,
-/// and the buttons.
-private struct ActivityLockScreen: View {
-    let context: ActivityViewContext<ShiftActivityAttributes>
+/// The Lock Screen's activity: the headline and the clock with the buttons beside them, and the way to the
+/// goal under them.
+private struct LockScreenActivity: View {
+    let state: ShiftActivityAttributes.ContentState
+    let attributes: ShiftActivityAttributes
+    let stale: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                ActivityStatus(state: context.state, workplace: context.attributes.workplace)
-                Spacer(minLength: 8)
-                Text("התחלה " + Format.clock(context.attributes.start))
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ActivityHeadline(state: state, attributes: attributes, short: false)
+                    ActivityClock(state: state)
+                        .font(.system(size: 44, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ActivityLook.color(state))
+                }
+                ActivityButtons(state: state, size: 50)
             }
-            HStack(alignment: .lastTextBaseline) {
-                ActivityClock(state: context.state)
-                    .font(.system(size: 36, weight: .semibold, design: .rounded))
-                Spacer(minLength: 8)
-                ActivityGoal(state: context.state, stale: context.isStale)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-            ActivityBar(state: context.state)
-            ActivityButtons(state: context.state)
+            ActivityWay(state: state, attributes: attributes, stale: stale)
         }
-        .padding(16)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
     }
 }
 
-/// "במשמרת" or "בהפסקה", with the workplace.
-private struct ActivityStatus: View {
-    let state: ShiftActivityAttributes.ContentState
-    let workplace: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: Self.symbol(state))
-                .foregroundStyle(Self.color(state))
-            VStack(alignment: .leading, spacing: 0) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(workplace)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
-    }
-
-    private var title: String {
-        state.breakSince == nil ? "במשמרת" : "בהפסקה"
-    }
-
+/// The colors and symbols of working and of a break.
+private enum ActivityLook {
     static func symbol(_ state: ShiftActivityAttributes.ContentState) -> String {
         state.breakSince == nil ? "timer" : "pause.fill"
     }
@@ -118,42 +88,88 @@ private struct ActivityStatus: View {
     }
 }
 
-/// The time worked: running while working, standing during a break.
+/// "במשמרת · אביבי מטבחים", or during a break "בהפסקה · עבדת 57:24", after a dot of its color; the
+/// Dynamic Island's has the state alone.
+private struct ActivityHeadline: View {
+    let state: ShiftActivityAttributes.ContentState
+    let attributes: ShiftActivityAttributes
+    let short: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(ActivityLook.color(state))
+                .frame(width: 7, height: 7)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            if let detail {
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .lineLimit(1)
+    }
+
+    private var title: String {
+        state.breakSince == nil ? "במשמרת" : "בהפסקה"
+    }
+
+    /// The workplace, unless it is the default; during a break, the time worked.
+    private var detail: String? {
+        guard !short else { return nil }
+        if state.breakSince != nil {
+            return "· עבדת " + Format.timer(state.worked * 1000)
+        }
+        let place = state.workplace ?? attributes.workplace
+        guard !place.isEmpty, place != Settings().workplaceName else { return nil }
+        return "· " + place
+    }
+}
+
+/// The time worked, running; during a break, the break's.
 private struct ActivityClock: View {
     let state: ShiftActivityAttributes.ContentState
 
     var body: some View {
         Group {
-            if state.breakSince == nil {
-                Text(state.workingSince, style: .timer)
+            if let since = state.breakSince {
+                Text(since, style: .timer)
             } else {
-                Text(Format.hms(state.worked * 1000))
+                Text(state.workingSince, style: .timer)
             }
         }
         .monospacedDigit()
-        .multilineTextAlignment(.center)
+        .lineLimit(1)
+        .multilineTextAlignment(.leading)
     }
 }
 
-/// When the goal is reached; during a break, how long the break runs.
-private struct ActivityGoal: View {
+/// The shift's way from its start to the goal: the bar, the start under its right end and the goal under its
+/// left.
+private struct ActivityWay: View {
     let state: ShiftActivityAttributes.ContentState
-    /// Past the goal's time.
+    let attributes: ShiftActivityAttributes
     let stale: Bool
 
     var body: some View {
-        if let since = state.breakSince {
-            HStack(spacing: 4) {
-                Text("הפסקה")
-                Text(since, style: .timer)
-                    .monospacedDigit()
+        VStack(spacing: 6) {
+            ActivityBar(state: state)
+            HStack {
+                Text("התחלה " + Format.clock(state.start ?? attributes.start))
+                Spacer(minLength: 8)
+                Text(goal)
             }
-        } else if let goal = state.goalAt, !stale {
-            Text("יעד ב־" + Format.clock(goal))
-                .monospacedDigit()
-        } else {
-            Text("הגעת ליעד ✓")
+            .font(.caption.weight(.medium))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
+    }
+
+    private var goal: String {
+        guard let at = state.goalAt, !stale else { return "הגעת ליעד ✓" }
+        return "יעד " + Format.clock(at)
     }
 }
 
@@ -171,7 +187,7 @@ private struct ActivityBar: View {
             .tint(WidgetStyle.accent)
         } else {
             ProgressView(value: share)
-                .tint(ActivityStatus.color(state))
+                .tint(ActivityLook.color(state))
         }
     }
 
@@ -181,27 +197,34 @@ private struct ActivityBar: View {
     }
 }
 
-/// A break, or back from it, and the end.
+/// A break, or back from it, and the end, as round buttons.
 private struct ActivityButtons: View {
     let state: ShiftActivityAttributes.ContentState
+    let size: CGFloat
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Button(intent: ToggleBreakIntent()) {
-                WidgetButtonLabel(title: breakTitle, symbol: breakSymbol, color: .orange)
+                RoundIcon(symbol: breakSymbol, color: breakColor, size: size)
             }
+            .accessibilityLabel(breakLabel)
             Button(intent: EndShiftIntent()) {
-                WidgetButtonLabel(title: "סיום", symbol: "stop.fill", color: .red, filled: true)
+                RoundIcon(symbol: "stop.fill", color: .red, size: size)
             }
+            .accessibilityLabel("סיום משמרת")
         }
         .buttonStyle(.plain)
     }
 
-    private var breakTitle: String {
-        state.breakSince == nil ? "הפסקה" : "המשך"
-    }
-
     private var breakSymbol: String {
         state.breakSince == nil ? "pause.fill" : "play.fill"
+    }
+
+    private var breakColor: Color {
+        state.breakSince == nil ? Color.orange : WidgetStyle.accent
+    }
+
+    private var breakLabel: String {
+        state.breakSince == nil ? "הפסקה" : "סיום הפסקה"
     }
 }
