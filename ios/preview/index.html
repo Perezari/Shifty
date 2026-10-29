@@ -13,20 +13,23 @@
   --page-ink-2: #5C686C;
   --page-line: rgba(17, 24, 26, .10);
   --chip: rgba(255, 255, 255, .72);
-  /* the app (Assets.xcassets: AccentColor, Background) and iOS's system colors */
+  /* the app (Assets.xcassets: AccentColor, Background, Holiday) and iOS's system colors */
   --app-bg: #F4F5F7;
   --ink: #0B0F12;
   --ink-2: rgba(60, 60, 67, .62);
-  --ink-3: rgba(60, 60, 67, .34);
+  --ink-3: rgba(60, 60, 67, .32);
   --accent: #0F9D8F;
+  --accent-deep: #0B7D72;
+  --accent-soft: rgba(15, 157, 143, .16);
   --orange: #FF9500;
   --red: #FF3B30;
   --green: #34C759;
   --amber: #B07D2A;
-  --track: rgba(11, 15, 18, .07);
-  --glass: rgba(255, 255, 255, .58);
-  --glass-edge: rgba(255, 255, 255, .85);
-  --glass-shade: rgba(20, 30, 35, .08);
+  --track: rgba(11, 15, 18, .06);
+  --knob: #FFFFFF;
+  --glass: rgba(255, 255, 255, .62);
+  --glass-edge: rgba(255, 255, 255, .9);
+  --glass-shade: rgba(20, 30, 35, .07);
   --activity: rgba(255, 255, 255, .88);
   --font-text: -apple-system, "SF Pro Text", system-ui, "Rubik", "Segoe UI", sans-serif;
   --font-round: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, "Rubik", sans-serif;
@@ -35,9 +38,10 @@
   :root:not([data-theme="light"]) {
     --page: #08090B; --page-ink: #EEF2F2; --page-ink-2: #98A3A6; --page-line: rgba(238, 242, 242, .12);
     --chip: rgba(40, 44, 48, .72);
-    --app-bg: #15171C; --ink: #F5F7F8; --ink-2: rgba(235, 235, 245, .62); --ink-3: rgba(235, 235, 245, .32);
-    --accent: #1BB3A3; --orange: #FF9F0A; --red: #FF453A; --green: #30D158; --amber: #D8A64E;
-    --track: rgba(255, 255, 255, .09); --glass: rgba(44, 48, 54, .5); --glass-edge: rgba(255, 255, 255, .16);
+    --app-bg: #15171C; --ink: #F5F7F8; --ink-2: rgba(235, 235, 245, .62); --ink-3: rgba(235, 235, 245, .3);
+    --accent: #1BB3A3; --accent-deep: #148F83; --accent-soft: rgba(27, 179, 163, .2);
+    --orange: #FF9F0A; --red: #FF453A; --green: #30D158; --amber: #D8A64E;
+    --track: rgba(255, 255, 255, .07); --knob: #F5F7F8; --glass: rgba(44, 48, 54, .55); --glass-edge: rgba(255, 255, 255, .14);
     --glass-shade: rgba(0, 0, 0, .35); --activity: rgba(28, 28, 30, .88);
     color-scheme: dark;
   }
@@ -45,9 +49,10 @@
 :root[data-theme="dark"] {
   --page: #08090B; --page-ink: #EEF2F2; --page-ink-2: #98A3A6; --page-line: rgba(238, 242, 242, .12);
   --chip: rgba(40, 44, 48, .72);
-  --app-bg: #15171C; --ink: #F5F7F8; --ink-2: rgba(235, 235, 245, .62); --ink-3: rgba(235, 235, 245, .32);
-  --accent: #1BB3A3; --orange: #FF9F0A; --red: #FF453A; --green: #30D158; --amber: #D8A64E;
-  --track: rgba(255, 255, 255, .09); --glass: rgba(44, 48, 54, .5); --glass-edge: rgba(255, 255, 255, .16);
+  --app-bg: #15171C; --ink: #F5F7F8; --ink-2: rgba(235, 235, 245, .62); --ink-3: rgba(235, 235, 245, .3);
+  --accent: #1BB3A3; --accent-deep: #148F83; --accent-soft: rgba(27, 179, 163, .2);
+  --orange: #FF9F0A; --red: #FF453A; --green: #30D158; --amber: #D8A64E;
+  --track: rgba(255, 255, 255, .07); --knob: #F5F7F8; --glass: rgba(44, 48, 54, .55); --glass-edge: rgba(255, 255, 255, .14);
   --glass-shade: rgba(0, 0, 0, .35); --activity: rgba(28, 28, 30, .88);
   color-scheme: dark;
 }
@@ -60,12 +65,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 /* the controls */
 .bar { width: 100%; max-width: 640px; display: flex; flex-direction: column; gap: 8px; }
 .row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+@media (max-width: 520px) { .row { flex-direction: column; align-items: center; } }
 .seg { display: inline-flex; background: var(--page-line); border-radius: 999px; padding: 3px; gap: 2px; flex-wrap: wrap; justify-content: center; }
 .seg button { font: 500 13px/1 var(--font-text); color: var(--page-ink); background: transparent; border: 0;
   border-radius: 999px; padding: 8px 12px; cursor: pointer; white-space: nowrap; }
 .seg button[aria-pressed="true"] { background: var(--chip); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); font-weight: 600; }
 .seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.note { font-size: 12.5px; color: var(--page-ink-2); text-align: center; text-wrap: balance; max-width: 46ch; line-height: 1.45; }
+.note { font-size: 12.5px; color: var(--page-ink-2); text-align: center; text-wrap: balance; max-width: 50ch; line-height: 1.5; margin: 0; }
 .tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 3px 8px; border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); margin-inline-end: 6px; }
 .tag.built { background: var(--page-line); color: var(--page-ink-2); }
@@ -90,61 +96,46 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .glass { background: var(--glass); -webkit-backdrop-filter: blur(22px) saturate(180%); backdrop-filter: blur(22px) saturate(180%);
   box-shadow: inset 0 0.5px 0 var(--glass-edge), inset 0 0 0 0.5px var(--glass-edge), 0 6px 20px var(--glass-shade); }
 
-/* ---- the Now screen ---- */
-.now { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; }
-.ambient { position: absolute; inset: 0; transition: background 600ms ease; }
-.now-body { position: relative; flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; padding: 64px 20px 112px; gap: 22px; }
-.chip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; font-size: 15px; font-weight: 600; }
-.chip .dot { width: 8px; height: 8px; border-radius: 50%; }
-.chip .place { color: var(--ink-2); font-weight: 500; }
-.date { font-size: 13px; color: var(--ink-2); margin-top: -14px; }
+/* ---- the Now screen: the shift on a clock's dial ---- */
+.now { position: absolute; inset: 0; }
+.now-body { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; padding: 66px 20px 112px; gap: 26px; }
+.topline { font-size: 14px; color: var(--ink-2); font-weight: 500; }
+
+/* 320 points: the track of 12 hours at a radius of 146, 20 wide; the ticks inside it; the hours at 104 */
+.dial { position: relative; width: 320px; height: 320px; flex: none; }
+.dial .face, .dial .arc { position: absolute; inset: 4px; border-radius: 50%;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #000 calc(100% - 19.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 20px), #000 calc(100% - 19.5px)); }
+.dial .face { background: var(--track); }
+.dial .tick { position: absolute; left: 50%; top: 31px; width: 1.5px; height: 4px; margin-left: -0.75px; border-radius: 1px;
+  background: var(--ink-3); transform-origin: 50% 129px; }
+.dial .tick.major { width: 2px; margin-left: -1px; height: 8px; background: var(--ink-2); }
+.dial .hour { position: absolute; font: 600 12px/1 var(--font-round); color: var(--ink-3); transform: translate(-50%, -50%); }
+.dial .mark { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; }
+.dial .knob { width: 30px; height: 30px; background: var(--knob); box-shadow: 0 0 0 3.5px var(--k), 0 4px 14px rgba(0, 0, 0, .22); }
+.dial .knob::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--k); }
+.dial .start { width: 20px; height: 20px; background: var(--accent-deep); color: #fff; }
+.dial .goal { width: 22px; height: 22px; background: var(--knob); color: var(--accent); box-shadow: 0 2px 8px rgba(0, 0, 0, .14); }
+.dial .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--track); font-size: 13px; font-weight: 600; }
+.pill .dot { width: 7px; height: 7px; border-radius: 50%; }
+.dial .time { font-size: 52px; font-weight: 600; letter-spacing: -1.5px; line-height: 1; }
+.dial .earned { font-size: 22px; font-weight: 600; color: var(--accent); }
 .pulse { animation: pulse 1.6s ease-in-out infinite; }
-@keyframes pulse { 50% { opacity: .35; } }
+@keyframes pulse { 50% { opacity: .3; } }
 
-.ring { position: relative; width: 292px; height: 292px; }
-.ring .track, .ring .arc, .ring .over { position: absolute; inset: 0; border-radius: 50%;
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 22px), #000 calc(100% - 21px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 22px), #000 calc(100% - 21px)); }
-.ring .track { background: var(--track); }
-.ring .arc { background: conic-gradient(from 0deg, color-mix(in srgb, var(--ring) 50%, transparent), var(--ring) calc(var(--p) * 360deg), transparent 0);
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--ring) 40%, transparent)); transition: opacity 400ms; }
-.ring .over { background: conic-gradient(from 0deg, color-mix(in srgb, var(--amber) 60%, transparent), var(--amber) calc(var(--o) * 360deg), transparent 0); }
-.ring .cap { position: absolute; inset: 0; transform: rotate(calc(var(--a) * 360deg)); pointer-events: none; }
-.ring .cap::before { content: ""; position: absolute; top: 0; left: 50%; width: 22px; height: 22px; margin-left: -11px; border-radius: 50%; background: var(--c); }
-.ring .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
-.ring .caption { font-size: 15px; font-weight: 500; color: var(--ink-2); }
-.ring .clock { font-size: 64px; font-weight: 600; letter-spacing: -1px; line-height: 1.05; }
-.ring .sub { font-size: 14px; color: var(--ink-3); }
+.facts { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
+.facts div + div { border-inline-start: 1px solid var(--track); }
+.facts b { display: block; font: 600 21px/1.2 var(--font-round); font-variant-numeric: tabular-nums; }
+.facts span { font-size: 12.5px; color: var(--ink-2); }
 
-.controls { width: 100%; display: grid; grid-template-columns: 88px 1fr 88px; align-items: center; gap: 8px; }
-.round { width: 88px; height: 88px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 3px;
-  font-size: 15px; font-weight: 600; border: 0; cursor: pointer; position: relative; }
-.round svg { width: 20px; height: 20px; }
-.round::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--tint); opacity: .14; pointer-events: none; }
-.money { text-align: center; }
-.money .value { font-size: 30px; font-weight: 600; color: var(--accent); }
-.money .label { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
-.start-row { width: 100%; display: flex; gap: 10px; }
-.start { flex: 1; height: 56px; border-radius: 999px; border: 0; background: var(--accent); color: #fff; font: 600 17px/1 var(--font-text);
-  display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 8px 20px color-mix(in srgb, var(--accent) 35%, transparent); cursor: pointer; }
-.plus { width: 56px; height: 56px; border-radius: 50%; border: 0; display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; }
-
-.card { width: 100%; border-radius: 26px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
-.card-head { display: flex; justify-content: space-between; align-items: baseline; }
-.card-head .title { font-size: 15px; font-weight: 600; }
-.card-head .meta { font-size: 13px; color: var(--ink-2); }
-.card-head .meta b { color: var(--ink); font-weight: 600; }
-.timeline { position: relative; height: 12px; border-radius: 6px; background: var(--track); overflow: hidden; }
-.timeline .seg { position: absolute; top: 0; bottom: 0; }
-.timeline .now-mark { position: absolute; top: -3px; bottom: -3px; width: 3px; border-radius: 2px; background: var(--ink); }
-.times { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--ink-2); }
-.times b { display: block; font-size: 15px; color: var(--ink); font-weight: 600; margin-bottom: 1px; }
-.times .mid { text-align: center; }
-.times .end { text-align: left; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
-.stats div + div { border-inline-start: 1px solid var(--track); }
-.stats b { display: block; font-size: 19px; font-weight: 600; }
-.stats span { font-size: 12.5px; color: var(--ink-2); }
+/* the buttons at the bottom, over the tab bar, where the thumb is */
+.actions { width: 100%; display: flex; gap: 10px; margin-top: auto; }
+.capsule { flex: 1; height: 56px; border-radius: 999px; border: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+  font: 600 17px/1 var(--font-text); color: var(--ink); cursor: pointer; }
+.capsule svg { width: 17px; height: 17px; }
+.capsule.prominent { background: var(--accent); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 8px 22px color-mix(in srgb, var(--accent) 32%, transparent); }
+.square { flex: none; width: 56px; padding: 0; }
 
 .tabs { position: absolute; bottom: 24px; left: 16px; right: 16px; height: 64px; border-radius: 32px; display: grid; grid-template-columns: repeat(4, 1fr); padding: 4px; z-index: 4; }
 .tabs div { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 10.5px; font-weight: 600; color: var(--ink); border-radius: 28px; }
@@ -188,7 +179,6 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .di-compact { top: 11px; height: 37px; border-radius: 20px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; gap: 92px; }
 .di-expanded { top: 11px; width: 378px; border-radius: 46px; padding: 18px 22px 20px; display: flex; flex-direction: column; gap: 14px; }
 .di-row { display: flex; justify-content: space-between; align-items: center; }
-.di-label { font-size: 12px; color: rgba(255, 255, 255, .55); text-align: center; margin-top: 8px; }
 
 .widgets { position: absolute; top: 78px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; gap: 22px; }
 .w { border-radius: 24px; background: var(--app-bg); color: var(--ink); padding: 15px; box-shadow: 0 8px 30px rgba(0, 0, 0, .18); display: flex; flex-direction: column; }
@@ -199,7 +189,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .w-clock { font-weight: 600; color: var(--accent); line-height: 1.1; }
 .w-label { font-size: 11px; color: rgba(255, 255, 255, .85); text-align: center; margin-top: 6px; font-weight: 500; text-shadow: 0 1px 2px rgba(0, 0, 0, .3); }
 
-@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } .ambient, .ring .arc { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 </style>
 
 <main class="page" dir="rtl" lang="he">
@@ -213,8 +203,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       </div>
     </div>
     <div class="row">
-      <div class="seg" role="group" aria-label="מצב" id="states">
+      <div class="seg" role="group" aria-label="מצב">
         <button type="button" id="state-work" data-state="work">במשמרת</button>
+        <button type="button" id="state-over" data-state="over">אחרי היעד</button>
         <button type="button" id="state-break" data-state="break">בהפסקה</button>
         <button type="button" id="state-idle" data-state="idle">לא במשמרת</button>
       </div>
@@ -239,12 +230,14 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   // each state as a moment of today's shift, from 07:15; the moment runs on from when the page opened
   const START = at(7, 15);
   const scenes = {
-    work: { now: START + ((5 * 60 + 17) * 60 + 13) * 1000, breaks: [[150, 25]] },                    // 5:17 in, after a break of 25 minutes
-    break: { now: START + ((3 * 60 + 4) * 60 + 40) * 1000, breaks: [[180, null]], breakFor: 6 * 60 + 12 }, // on a break for 6:12
-    idle: { now: at(17, 5) },                                                                         // after a shift of 7:30
+    work: { now: START + ((5 * 60 + 17) * 60 + 13) * 1000, breaks: [[150, 25]] },                     // 5:17 in, after a break of 25 minutes
+    over: { now: START + ((9 * 60 + 12) * 60 + 5) * 1000, breaks: [[150, 25]] },                      // past the goal, overtime
+    break: { now: START + ((3 * 60 + 4) * 60 + 40) * 1000, breaks: [[0, null]], breakFor: 6 * 60 + 12 }, // on a break for 6:12
+    idle: { now: at(17, 5), today: [[at(7, 15), at(11, 0)], [at(11, 30), at(15, 15)]] },               // after a shift of 7:30
   };
   const state = { screen: "now", state: "work", theme: null };
-  try { const saved = JSON.parse(localStorage.getItem("shifty-preview") || "{}"); Object.assign(state, saved); } catch (e) {}
+  try { Object.assign(state, JSON.parse(localStorage.getItem("shifty-preview") || "{}")); } catch (e) {}
+  if (!scenes[state.state]) state.state = "work";
 
   // ---- Format (Shifty/Core/Format.swift) ----
   const pad = (n) => String(n).padStart(2, "0");
@@ -262,24 +255,21 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   function shift() {
     const scene = scenes[state.state], elapsed = (Date.now() - loaded) / 1000;
     const now = scene.now + elapsed * 1000;
-    if (!scene.breaks) return { now, running: false };
+    if (!scene.breaks) return { now, running: false, today: scene.today };
     const start = START;
     let breakMs = 0, open = null; const breaks = [];
     for (const [after, minutes] of scene.breaks) {
-      const bs = start + after * 60000;
       if (minutes == null) { const since = now - (scene.breakFor + elapsed) * 1000; open = since; breaks.push([since, now]); breakMs += now - since; }
-      else { breaks.push([bs, bs + minutes * 60000]); breakMs += minutes * 60000; }
+      else { const bs = start + after * 60000; breaks.push([bs, bs + minutes * 60000]); breakMs += minutes * 60000; }
     }
     const gross = now - start;
     const deducted = gross >= 6 * 3600000 ? Math.max(breakMs, AUTO_BREAK_MIN * 60000) : breakMs;
-    const netMs = Math.max(0, gross - deducted);
-    const net = netMs / 3600000;
+    const netMs = Math.max(0, gross - deducted), net = netMs / 3600000;
     const regular = Math.min(net, GOAL_H), ot1 = Math.min(Math.max(0, net - GOAL_H), 2), ot2 = Math.max(0, net - GOAL_H - 2);
     const pay = (regular + ot1 * 1.25 + ot2 * 1.5) * WAGE;
-    const loggedForFinish = scene.breaks.reduce((a, [, m]) => a + (m == null ? (scene.breakFor + elapsed) * 1000 : m * 60000), 0);
-    const finish = start + GOAL_H * 3600000 + Math.max(loggedForFinish, AUTO_BREAK_MIN * 60000);
-    return { now, running: true, start, breaks, open, netMs, net, pay, progress: Math.min(1, net / GOAL_H),
-      overtime: Math.max(0, net - GOAL_H), remaining: GOAL_H - net, finish, projected: net > 0.001 ? pay * (GOAL_H / net) : 0 };
+    const finish = start + GOAL_H * 3600000 + Math.max(breakMs, AUTO_BREAK_MIN * 60000);
+    return { now, running: true, start, breaks, open, netMs, net, pay, overtime: Math.max(0, net - GOAL_H),
+      remaining: GOAL_H - net, finish, projected: net > 0.001 ? pay * (GOAL_H / net) : 0 };
   }
 
   // ---- icons, as the SF Symbols the app uses ----
@@ -292,9 +282,11 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>',
     stop: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    flag: '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M6 3h2v18H6z"/><path d="M8 4h10l-2.5 4L18 12H8z"/></svg>',
     flash: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M8 2h8l-2 6h-4zM10 8h4v13h-4z"/></svg>',
     camera: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
   };
+  const sized = (svg, size) => svg.replace("<svg", `<svg width="${size}" height="${size}"`);
   const statusBar = (now, light) => `
     <div class="island"></div>
     <div class="status" style="${light ? "color:#fff" : ""}">
@@ -303,119 +295,130 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <svg width="27" height="13" viewBox="0 0 27 13" fill="none"><rect x=".5" y=".5" width="23" height="12" rx="3.5" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="16" height="9" rx="2" fill="currentColor"/><rect x="24.5" y="4.5" width="1.6" height="4" rx=".8" fill="currentColor" opacity=".4"/></svg></span>
     </div>`;
 
-  // ---- the Now screen: proposed (Shifty/Views/NowView.swift, after this preview is agreed) ----
-  function nowScreen() {
-    const s = shift(), onBreak = s.running && s.open != null;
-    const look = !s.running ? "idle" : onBreak ? "break" : "work";
-    const ambient = {
-      work: "radial-gradient(70% 45% at 85% 4%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 70%), radial-gradient(60% 40% at 10% 12%, color-mix(in srgb, var(--green) 16%, transparent), transparent 70%), radial-gradient(90% 50% at 50% 48%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 75%)",
-      break: "radial-gradient(70% 45% at 85% 4%, color-mix(in srgb, var(--orange) 30%, transparent), transparent 70%), radial-gradient(60% 40% at 10% 12%, color-mix(in srgb, var(--amber) 18%, transparent), transparent 70%), radial-gradient(90% 50% at 50% 48%, color-mix(in srgb, var(--orange) 8%, transparent), transparent 75%)",
-      idle: "radial-gradient(70% 45% at 85% 4%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%), radial-gradient(60% 40% at 10% 12%, color-mix(in srgb, #5E7A8A 14%, transparent), transparent 70%)",
-    }[look];
-    const tabs = `<nav class="tabs glass"><div class="on">${icon.timer}עכשיו</div><div>${icon.list}משמרות</div><div>${icon.calendar}לוח</div><div>${icon.gear}הגדרות</div></nav>`;
-    if (!s.running) {
-      const today = 7.5, todayPay = today * WAGE;
-      return `<div class="now"><div class="ambient" style="background:${ambient}"></div>${statusBar(s.now)}
-        <div class="now-body">
-          <div class="chip glass"><span class="dot" style="background:var(--ink-3)"></span>לא במשמרת</div>
-          <div class="date">${dayLine(new Date(s.now))}</div>
-          ${ring(today / GOAL_H, 0, "var(--accent)", 1, "עבדת היום", hm(today), money(todayPay))}
-          <div class="start-row"><button class="start" type="button">${icon.play.replace("<svg", '<svg width="18" height="18"')}התחל משמרת</button>
-            <button class="plus glass" type="button" aria-label="הוספה ידנית"><span style="width:22px;height:22px;display:block">${icon.plus}</span></button></div>
-          <section class="card glass">
-            <div class="card-head"><span class="title">${months[new Date(s.now).getMonth()]}</span><span class="meta">עד היום <b class="ltr num">${moneyShort(6075.4)}</b></span></div>
-            <div class="stats"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num">112:30</b><span>שעות</span></div><div><b class="num">2:10</b><span>שעות חוסר</span></div></div>
-          </section>
-        </div>${tabs}<div class="home-ind"></div></div>`;
+  // ---- the dial: twelve hours as an analog clock, the shift on it from its start to the day's goal ----
+  const C = 160, R = 146;
+  const clockDeg = (t) => { const d = new Date(t); return ((d.getHours() % 12) + d.getMinutes() / 60 + d.getSeconds() / 3600) * 30; };
+  const spanDeg = (ms) => Math.min(360, Math.max(0, ms / 3600000 * 30));
+  const point = (deg, r) => { const a = deg * Math.PI / 180; return [C + r * Math.sin(a), C - r * Math.cos(a)]; };
+  /** One conic gradient of the arc's pieces, each [from, to, color] in degrees from the start, in order. */
+  const arc = (fromDeg, pieces) => {
+    const stops = pieces.filter(([a, b]) => b > a).map(([a, b, c]) => `${c} ${a.toFixed(2)}deg ${b.toFixed(2)}deg`);
+    const last = pieces.length ? Math.max(...pieces.map((p) => p[1])) : 0;
+    return `conic-gradient(from ${fromDeg.toFixed(2)}deg, ${stops.join(", ")}${stops.length ? ", " : ""}transparent ${last.toFixed(2)}deg 360deg)`;
+  };
+  const face = () => {
+    let ticks = "";
+    for (let i = 0; i < 60; i++) ticks += `<i class="tick${i % 5 === 0 ? " major" : ""}" style="transform:rotate(${i * 6}deg)"></i>`;
+    const hours = [[12, 0], [3, 90], [6, 180], [9, 270]].map(([h, deg]) => { const [x, y] = point(deg, 108); return `<span class="hour" style="left:${x}px;top:${y}px">${h}</span>`; }).join("");
+    return `<div class="face"></div>${ticks}${hours}`;
+  };
+
+  function dial(s, center) {
+    let pieces = [], from = 0, marks = "";
+    if (s.running) {
+      from = clockDeg(s.start);
+      const rel = (t) => spanDeg(t - s.start);
+      const goal = rel(s.finish), now = rel(s.now);
+      // the work, the breaks in orange, past the goal in amber, and what is left to the goal in the accent's shade
+      let cursor = s.start;
+      const work = (a, b) => {
+        if (b <= a) return;
+        if (b <= goal) pieces.push([a, b, "var(--accent)"]);
+        else if (a >= goal) pieces.push([a, b, "var(--amber)"]);
+        else { pieces.push([a, goal, "var(--accent)"]); pieces.push([goal, b, "var(--amber)"]); }
+      };
+      for (const [bs, be] of s.breaks) { work(rel(cursor), rel(bs)); pieces.push([rel(bs), rel(Math.min(be, s.now)), "var(--orange)"]); cursor = be; }
+      if (cursor < s.now) work(rel(cursor), now);
+      if (goal > now) pieces.push([now, goal, "var(--accent-soft)"]);
+      const [sx, sy] = point(from, R), [gx, gy] = point(from + goal, R), [nx, ny] = point(from + now, R);
+      const knob = s.open != null ? "var(--orange)" : now > goal ? "var(--amber)" : "var(--accent)";
+      marks = `<span class="mark start" style="left:${sx}px;top:${sy}px">${sized(icon.play, 10)}</span>
+        <span class="mark goal" style="left:${gx}px;top:${gy}px">${icon.flag}</span>
+        <span class="mark knob" style="left:${nx}px;top:${ny}px;--k:${knob}"></span>`;
+    } else if (s.today) {
+      // a day with no shift running: today's shifts, faint, and the time now
+      from = clockDeg(s.today[0][0]);
+      const rel = (t) => spanDeg(t - s.today[0][0]);
+      for (const [a, b] of s.today) pieces.push([rel(a), rel(b), "color-mix(in srgb, var(--accent) 45%, transparent)"]);
+      const [nx, ny] = point(clockDeg(s.now), R);
+      marks = `<span class="mark knob" style="left:${nx}px;top:${ny}px;--k:var(--ink-3)"></span>`;
     }
-    const color = onBreak ? "var(--orange)" : "var(--accent)";
-    const centerClock = onBreak ? timer(s.now - s.open) : timer(s.netMs);
-    const caption = onBreak ? '<span style="color:var(--orange)">הפסקה</span>' : "זמן עבודה";
-    const sub = onBreak ? "עבדת " + timer(s.netMs) : "התחלה " + clock(new Date(s.start));
-    return `<div class="now"><div class="ambient" style="background:${ambient}"></div>${statusBar(s.now)}
-      <div class="now-body">
-        <div class="chip glass"><span class="dot pulse" style="background:${onBreak ? "var(--orange)" : "var(--green)"}"></span>${onBreak ? "בהפסקה" : "במשמרת"}<span class="place">· ${PLACE}</span></div>
-        <div class="date">${dayLine(new Date(s.now))}</div>
-        ${ring(s.progress, s.overtime / GOAL_H, "var(--accent)", onBreak ? 0.4 : 1, caption, centerClock, sub, onBreak)}
-        <div class="controls">
-          ${onBreak
-            ? `<button class="round glass" type="button" style="--tint:var(--accent);color:var(--accent)">${icon.play}חזרה</button>`
-            : `<button class="round glass" type="button" style="--tint:var(--orange);color:var(--orange)">${icon.pause}הפסקה</button>`}
-          <div class="money"><div class="value num"><span class="ltr">${money(s.pay)}</span></div><div class="label">הרווחת עד עכשיו</div></div>
-          <button class="round glass" type="button" style="--tint:var(--red);color:var(--red)">${icon.stop}סיום</button>
-        </div>
-        ${timeline(s)}
-      </div>${tabs}<div class="home-ind"></div></div>`;
+    return `<div class="dial">${face()}<div class="arc" style="background:${arc(from, pieces)}"></div>${marks}<div class="center">${center}</div></div>`;
   }
 
-  function ring(p, over, colorVar, dim, caption, big, sub, orangeClock) {
-    const pp = Math.max(0, Math.min(1, p));
-    return `<div class="ring" style="--p:${pp};--o:${Math.min(1, over)};--ring:${colorVar}">
-      <div class="track"></div>
-      <div class="arc" style="opacity:${dim}"></div>
-      ${pp > 0.002 ? `<div class="cap" style="--a:0;--c:color-mix(in srgb, ${colorVar} 50%, transparent);opacity:${dim}"></div><div class="cap" style="--a:${pp};--c:${colorVar};opacity:${dim}"></div>` : ""}
-      ${over > 0 ? `<div class="over"></div><div class="cap" style="--a:${Math.min(1, over)};--c:var(--amber)"></div>` : ""}
-      <div class="center"><div class="caption">${caption}</div>
-        <div class="clock num" style="${orangeClock ? "color:var(--orange)" : ""}"><span class="ltr">${big}</span></div>
-        <div class="sub">${sub}</div></div></div>`;
+  // ---- the Now screen: proposed (Shifty/Views/NowView.swift, once this preview is agreed) ----
+  function nowScreen() {
+    const s = shift(), onBreak = s.running && s.open != null, past = s.running && s.remaining <= 0;
+    const tabs = `<nav class="tabs glass"><div class="on">${icon.timer}עכשיו</div><div>${icon.list}משמרות</div><div>${icon.calendar}לוח</div><div>${icon.gear}הגדרות</div></nav>`;
+    const top = `<div class="topline">${dayLine(new Date(s.now))} · ${PLACE}</div>`;
+    let center, facts, actions;
+    if (!s.running) {
+      const today = 7.5;
+      center = `<span class="pill"><span class="dot" style="background:var(--ink-3)"></span>לא במשמרת</span>
+        <span class="time num"><span class="ltr">${hm(today)}</span></span>
+        <span class="earned num"><span class="ltr">${money(today * WAGE)}</span></span>`;
+      facts = fact("14", "משמרות החודש") + fact(moneyShort(6075.4), "הכנסה החודש") + fact(hm(GOAL_H), "יעד יומי");
+      actions = `<button class="capsule prominent" type="button">${icon.play}התחל משמרת</button>
+        <button class="capsule glass square" type="button" aria-label="הוספה ידנית">${icon.plus}</button>`;
+    } else {
+      const pill = onBreak
+        ? `<span class="pill" style="color:var(--orange)"><span class="dot pulse" style="background:var(--orange)"></span>בהפסקה <span class="num ltr">${timer(s.now - s.open)}</span></span>`
+        : `<span class="pill"><span class="dot pulse" style="background:var(--green)"></span>במשמרת</span>`;
+      center = `${pill}<span class="time num"><span class="ltr">${timer(s.netMs)}</span></span>
+        <span class="earned num"><span class="ltr">${money(s.pay)}</span></span>`;
+      facts = fact(clock(new Date(s.start)), "התחלה")
+        + (past ? fact("+" + hm(s.overtime), "שעות נוספות", "var(--amber)") : fact(clock(new Date(s.finish)), "יעד · עוד " + hm(s.remaining)))
+        + fact(moneyShort(s.projected), "צפי ביעד");
+      actions = onBreak
+        ? `<button class="capsule prominent" type="button">${icon.play}חזרה לעבודה</button>
+           <button class="capsule glass" type="button" style="color:var(--red)">${icon.stop}סיום</button>`
+        : `<button class="capsule glass" type="button"><span style="color:var(--orange);display:flex">${icon.pause}</span>הפסקה</button>
+           <button class="capsule glass" type="button"><span style="color:var(--red);display:flex">${icon.stop}</span>סיום משמרת</button>`;
+    }
+    return `<div class="now">${statusBar(s.now)}
+      <div class="now-body">${top}${dial(s, center)}<div class="facts">${facts}</div><div class="actions">${actions}</div></div>
+      ${tabs}<div class="home-ind"></div></div>`;
   }
-
-  /** The shift's day: from its start on the right to the goal on the left, the work in the accent, the breaks in orange. */
-  function timeline(s) {
-    const end = Math.max(s.finish, s.now), span = end - s.start;
-    const pos = (t) => ((t - s.start) / span) * 100;
-    let segs = `<div class="seg" style="right:0;width:${pos(s.now)}%;background:var(--accent)"></div>`;
-    for (const [a, b] of s.breaks) segs += `<div class="seg" style="right:${pos(a)}%;width:${pos(b) - pos(a)}%;background:var(--orange)"></div>`;
-    segs += `<div class="now-mark" style="right:calc(${pos(s.now)}% - 1.5px)"></div>`;
-    const left = s.remaining > 0.001 ? "עוד " + hm(s.remaining) : "+" + hm(s.overtime) + " נוספות";
-    const breakMin = Math.round(s.breaks.reduce((a, [x, y]) => a + (y - x), 0) / 60000);
-    return `<section class="card glass">
-      <div class="card-head"><span class="title">המשמרת</span><span class="meta">צפי ביעד <b class="ltr num">${moneyShort(s.projected)}</b></span></div>
-      <div class="timeline">${segs}</div>
-      <div class="times"><div><b class="num">${clock(new Date(s.start))}</b>התחלה</div>
-        <div class="mid"><b class="num">${left}</b>הפסקות ${breakMin}׳</div>
-        <div class="end"><b class="num">${clock(new Date(s.finish))}</b>יעד</div></div>
-    </section>`;
-  }
+  const fact = (value, label, color) => `<div><b style="${color ? "color:" + color : ""}"><span class="ltr">${value}</span></b><span>${label}</span></div>`;
 
   // ---- the Live Activity, as built (Widget/ShiftLiveActivity.swift) ----
+  const roundIcon = (svg, tint, size) => `<span class="ri" style="--tint:${tint};width:${size}px;height:${size}px">${sized(svg, Math.round(size * 0.36))}</span>`;
   function activityCard(s) {
     const onBreak = s.open != null;
     const tint = onBreak ? "var(--orange)" : "var(--accent)";
     const clockText = onBreak ? timer(s.now - s.open) : timer(s.netMs);
     const head = onBreak ? `בהפסקה<span class="place">· עבדת ${timer(s.netMs)}</span>` : `במשמרת<span class="place">· ${PLACE}</span>`;
     const share = Math.min(1, s.net / GOAL_H);
+    const goalText = s.remaining > 0 ? "יעד <span class=\"num\">" + clock(new Date(s.finish)) + "</span>" : "הגעת ליעד ✓";
     return `<div class="activity">
       <div class="a-top"><div class="a-left">
           <div class="a-head"><span class="dot" style="background:${tint}"></span>${head}</div>
           <div class="a-clock num" style="color:${tint}"><span class="ltr">${clockText}</span></div></div>
         <div class="a-btns">${roundIcon(onBreak ? icon.play : icon.pause, onBreak ? "var(--accent)" : "var(--orange)", 50)}${roundIcon(icon.stop, "var(--red)", 50)}</div></div>
       <div class="a-bar"><i style="width:${share * 100}%;background:${tint}"></i></div>
-      <div class="a-way"><span>התחלה <span class="num">${clock(new Date(s.start))}</span></span><span>יעד <span class="num">${clock(new Date(s.finish))}</span></span></div>
+      <div class="a-way"><span>התחלה <span class="num">${clock(new Date(s.start))}</span></span><span>${goalText}</span></div>
     </div>`;
   }
-  const roundIcon = (svg, tint, size) => `<span class="ri" style="--tint:${tint};width:${size}px;height:${size}px">${svg.replace("<svg", `<svg width="${Math.round(size * 0.36)}" height="${Math.round(size * 0.36)}"`)}</span>`;
 
   function lockScreen() {
     const s = shift();
-    if (!s.running) return `<div class="wall"></div>${statusBar(s.now, true)}<div class="lock-date">${dayLine(new Date(s.now))}</div><div class="lock-clock">${clock(new Date(s.now))}</div>
-      <div class="activity" style="align-items:center;color:var(--ink-2);font-size:14px">אין משמרת שרצה: מסך הנעילה בלי Live Activity</div>`;
-    return `<div class="wall ${dark() ? "dark-wall" : ""}"></div>${statusBar(s.now, true)}
+    const wall = `<div class="wall ${dark() ? "dark-wall" : ""}"></div>${statusBar(s.now, true)}
       <div class="lock-date">${dayLine(new Date(s.now))}</div><div class="lock-clock">${clock(new Date(s.now))}</div>
-      ${activityCard(s)}
       <div class="lock-buttons"><div>${icon.flash}</div><div>${icon.camera}</div></div><div class="home-ind" style="background:#fff"></div>`;
+    if (!s.running) return wall + `<div class="activity" style="align-items:center;color:var(--ink-2);font-size:14px">אין משמרת שרצה, ואין Live Activity</div>`;
+    return wall + activityCard(s);
   }
 
   function islandScreen() {
     const s = shift();
     const wall = `<div class="wall dark-wall"></div>${statusBar(s.now, true)}`;
-    if (!s.running) return wall + `<div class="di" style="top:11px;width:126px;height:37px;border-radius:20px"></div><div class="widgets" style="top:120px"><div class="w-label" style="font-size:14px">אין משמרת שרצה</div></div>`;
+    if (!s.running) return wall + `<div class="widgets" style="top:120px"><div class="w-label" style="font-size:14px">אין משמרת שרצה</div></div>`;
     const onBreak = s.open != null, tint = onBreak ? "var(--orange)" : "var(--accent)";
     const t = onBreak ? timer(s.now - s.open) : timer(s.netMs);
     const share = Math.min(1, s.net / GOAL_H);
     return wall + `
       <div class="di di-compact" style="color:${tint}"><span style="width:18px;height:18px;display:block">${onBreak ? icon.pause : icon.timer}</span><span class="num" style="font-size:14px;font-weight:600;width:64px;text-align:center"><span class="ltr">${t}</span></span></div>
-      <div class="widgets" style="top:70px"><div class="w-label">מצומצם, כמו באייפון: הסמל מימין והשעון משמאל, ברוחב שלם</div></div>
+      <div class="widgets" style="top:70px"><div class="w-label">מצומצם: הסמל מימין, והשעון משמאל ברוחב שלם</div></div>
       <div class="di di-expanded" style="top:150px">
         <div class="di-row"><span style="display:flex;align-items:center;gap:6px;font-size:15px;font-weight:600"><span style="width:7px;height:7px;border-radius:50%;background:${tint}"></span>${onBreak ? "בהפסקה" : "במשמרת"}</span>
           <span class="num" style="font-size:26px;font-weight:600;color:${tint}"><span class="ltr">${t}</span></span></div>
@@ -435,7 +438,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const dot = !running ? "var(--ink-3)" : onBreak ? "var(--orange)" : "var(--green)";
     const t = !running ? "7:30" : onBreak ? timer(s.now - s.open) : timer(s.netMs);
     const share = running ? Math.min(1, s.net / GOAL_H) : 7.5 / GOAL_H;
-    const wayEnd = !running ? "יעד " + hm(GOAL_H) : "יעד " + clock(new Date(s.finish));
+    const wayEnd = !running ? "יעד " + hm(GOAL_H) : s.remaining > 0 ? "יעד " + clock(new Date(s.finish)) : "הגעת ליעד ✓";
     const wayStart = !running ? money(7.5 * WAGE) : "התחלה " + clock(new Date(s.start));
     const btns = (size) => running
       ? roundIcon(onBreak ? icon.play : icon.pause, onBreak ? "var(--accent)" : "var(--orange)", size) + roundIcon(icon.stop, "var(--red)", size)
@@ -466,7 +469,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- the page ----
   const notes = {
-    now: '<span class="tag">הצעה חדשה</span>עוד לא בבנייה. שעון גדול בטבעת, הכסף בין הכפתורים, ומתחת שורת הזמן של המשמרת מההתחלה עד היעד, עם ההפסקות בכתום.',
+    now: '<span class="tag">הצעה חדשה</span>עוד לא בבנייה. המשמרת על חוגה של שעון: הקשת מתחילה בשעת ההתחלה ונגמרת בדגל של היעד, הצבוע הוא מה שעבדת, ההפסקות בכתום, והנקודה הלבנה היא עכשיו. על הרקע הקלאסי.',
     lock: '<span class="tag built">כמו שבבנייה</span>מסך הנעילה, עם הרקע שמתחלף לכהה יחד עם האייפון.',
     island: '<span class="tag built">אחרי התיקון</span>השעון ב-Dynamic Island ברוחב שמספיק לשעות, דקות ושניות.',
     widgets: '<span class="tag built">כמו שבבנייה</span>הווידג\'טים למסך הבית.',
@@ -482,9 +485,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     for (const b of document.querySelectorAll("[data-theme-set]")) b.setAttribute("aria-pressed", String(b.dataset.themeSet === (dark() ? "dark" : "light")));
   }
   function fit() {
-    const width = Math.min(document.documentElement.clientWidth - 32, 402);
-    stage.style.setProperty("--s", String(Math.max(0.5, width / 402)));
-    device.style.setProperty("--s", String(Math.max(0.5, width / 402)));
+    const scale = String(Math.max(0.5, Math.min(document.documentElement.clientWidth - 32, 402) / 402));
+    stage.style.setProperty("--s", scale);
+    device.style.setProperty("--s", scale);
   }
   function save() { try { localStorage.setItem("shifty-preview", JSON.stringify(state)); } catch (e) {} }
 
