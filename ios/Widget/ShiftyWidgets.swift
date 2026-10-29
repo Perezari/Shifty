@@ -14,17 +14,27 @@ struct ShiftyWidgets: WidgetBundle {
     }
 }
 
-/// The app's colors, from the extension's own asset catalog (Widget/Assets.xcassets). A named color keeps
-/// its light and its dark version in what the system draws of the extension; one worked out in code was
-/// fixed when the Live Activity was drawn, and missed the iPhone's switch to dark.
+/// The app's colors, from the extension's own asset catalog (Widget/Assets.xcassets), each with its light
+/// and its dark version.
 enum WidgetStyle {
     static let accent = Color("Accent")
     /// The widgets' background, the app's.
     static let background = Color("Surface")
-    /// The Live Activity's on the Lock Screen: white in light, dark in dark, and its text over it. The
-    /// activity draws both itself, so that they always come out of the same drawing, in the same mode.
-    static let activity = Color("ActivityBackground")
-    static let activityText = Color("ActivityText")
+
+    /// The Live Activity's background on the Lock Screen, white or dark, and its text over it: plain
+    /// colors, as the app says (ContentState.dark). iOS draws the Lock Screen's activities light or dark by
+    /// the wallpaper, not by the iPhone's appearance, and named ones stayed light with the iPhone dark.
+    static func activity(dark: Bool) -> Color {
+        dark ? rgb(0x1C1C1E).opacity(0.88) : Color.white.opacity(0.88)
+    }
+
+    static func activityText(dark: Bool) -> Color {
+        dark ? rgb(0xF5F7F8) : rgb(0x0B0F12)
+    }
+
+    private static func rgb(_ hex: UInt32) -> Color {
+        Color(red: Double(hex >> 16 & 0xFF) / 255, green: Double(hex >> 8 & 0xFF) / 255, blue: Double(hex & 0xFF) / 255)
+    }
 }
 
 /// A round button of a widget or of the Live Activity: its symbol in its color, on a lighter disc of it, as

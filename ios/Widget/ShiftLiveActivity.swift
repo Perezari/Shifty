@@ -11,7 +11,7 @@ struct ShiftLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ShiftActivityAttributes.self) { context in
             // The background is the activity's own, drawn with its text: set as the system's tint, it turned
-            // dark with the iPhone while the text stayed as last drawn, dark on dark.
+            // dark with the iPhone while the text, drawn in the wallpaper's light, stayed dark.
             LockScreenActivity(state: context.state, attributes: context.attributes, stale: context.isStale)
                 .environment(\.layoutDirection, .rightToLeft)
                 .activityBackgroundTint(Color.clear)
@@ -58,11 +58,19 @@ struct ShiftLiveActivity: Widget {
 }
 
 /// The Lock Screen's activity: the headline and the clock with the buttons beside them, and the way to the
-/// goal under them.
+/// goal under them, light or dark as Shifty looks.
 private struct LockScreenActivity: View {
     let state: ShiftActivityAttributes.ContentState
     let attributes: ShiftActivityAttributes
     let stale: Bool
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.isLuminanceReduced) private var dimmed
+
+    /// As the app says; iOS's own is the wallpaper's, and is taken only from an activity of an earlier
+    /// build. Dimmed on the Always-On display, dark, as iOS draws the activities then.
+    private var dark: Bool {
+        dimmed || (state.dark ?? (scheme == .dark))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -77,10 +85,12 @@ private struct LockScreenActivity: View {
             }
             ActivityWay(state: state, attributes: attributes, stale: stale)
         }
-        .foregroundStyle(WidgetStyle.activityText)
+        .foregroundStyle(WidgetStyle.activityText(dark: dark))
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
-        .background(WidgetStyle.activity)
+        .background(WidgetStyle.activity(dark: dark))
+        // the bar's track and the app's colors in the same light or dark
+        .environment(\.colorScheme, dark ? .dark : .light)
     }
 }
 

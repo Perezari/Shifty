@@ -40,6 +40,7 @@ enum AppTab: Hashable {
 struct RootView: View {
     @Environment(ShiftStore.self) private var store
     @Environment(\.scenePhase) private var phase
+    @Environment(\.colorScheme) private var colorScheme
     @State private var tab: AppTab = .now
 
     /// The look chosen in the settings: the iPhone's, light or dark.
@@ -101,6 +102,10 @@ struct RootView: View {
             if syncs { LiveShift.refresh(store) }
         }
         .onChange(of: store.settings) { _, _ in
+            if syncs { LiveShift.refresh(store) }
+        }
+        // the iPhone turned light or dark: the Lock Screen's activity with it
+        .onChange(of: colorScheme) { _, _ in
             if syncs { LiveShift.refresh(store) }
         }
         // a widget or the Live Activity opens the app on the running shift

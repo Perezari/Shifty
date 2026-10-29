@@ -1,5 +1,6 @@
 import ActivityKit
 import Foundation
+import UIKit
 import UserNotifications
 import WidgetKit
 
@@ -90,7 +91,28 @@ enum LiveShift {
         return ShiftActivityAttributes.ContentState(workingSince: Date(ms: now.ms - status.netMs), goalAt: goalAt,
                                                     breakSince: status.activeBreak?.start, worked: status.netMs / 1000,
                                                     goalHours: status.goal, start: shift.start,
-                                                    workplace: store.settings.workplaceName)
+                                                    workplace: store.settings.workplaceName, dark: dark(store.settings))
+    }
+
+    /// Whether the Lock Screen's activity is dark: as Shifty looks, by its setting or by the iPhone's. iOS
+    /// draws it light or dark by the wallpaper, and a light one stayed light with the iPhone dark.
+    static func dark(_ settings: Settings) -> Bool {
+        switch settings.theme {
+        case "dark": true
+        case "light": false
+        default: iPhoneDark
+        }
+    }
+
+    /// The iPhone's appearance, from the app's screen; woken in the background without one, as it was last.
+    private static var iPhoneDark: Bool {
+        let key = "iPhoneDark"
+        let scene = UIApplication.shared.connectedScenes.first(where: { $0 is UIWindowScene }) as? UIWindowScene
+        guard let style = scene?.screen.traitCollection.userInterfaceStyle, style != .unspecified else {
+            return UserDefaults.standard.bool(forKey: key)
+        }
+        UserDefaults.standard.set(style == .dark, forKey: key)
+        return style == .dark
     }
 
     /// Starts the running shift's activity, updates it, or ends it; and ends any of a shift no longer running.
