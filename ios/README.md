@@ -44,6 +44,7 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   in light and dark.
 - `scripts/`: the builds (`testflight.sh`, `screenshots.sh`) and the check of the Swift without a Mac
   (`check-swift.sh`).
+- `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).
 
 ## Checking the Swift without a Mac
 

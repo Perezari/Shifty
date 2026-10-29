@@ -12,6 +12,7 @@ struct ShiftLiveActivity: Widget {
         ActivityConfiguration(for: ShiftActivityAttributes.self) { context in
             LockScreenActivity(state: context.state, attributes: context.attributes, stale: context.isStale)
                 .environment(\.layoutDirection, .rightToLeft)
+                .activityBackgroundTint(WidgetStyle.activity)
                 .widgetURL(URL(string: "shifty://now"))
         } dynamicIsland: { context in
             DynamicIsland {
@@ -38,10 +39,12 @@ struct ShiftLiveActivity: Widget {
                 Image(systemName: ActivityLook.symbol(context.state))
                     .foregroundStyle(ActivityLook.color(context.state))
             } compactTrailing: {
-                ActivityClock(state: context.state)
+                // wide enough for "8:88:88": narrower, the clock was cut to "1:27:…"
+                ActivityClock(state: context.state, alignment: .center)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(ActivityLook.color(context.state))
-                    .frame(maxWidth: 52)
+                    .minimumScaleFactor(0.7)
+                    .frame(width: 64)
             } minimal: {
                 Image(systemName: ActivityLook.symbol(context.state))
                     .foregroundStyle(ActivityLook.color(context.state))
@@ -130,6 +133,7 @@ private struct ActivityHeadline: View {
 /// The time worked, running; during a break, the break's.
 private struct ActivityClock: View {
     let state: ShiftActivityAttributes.ContentState
+    var alignment: TextAlignment = .leading
 
     var body: some View {
         Group {
@@ -141,7 +145,7 @@ private struct ActivityClock: View {
         }
         .monospacedDigit()
         .lineLimit(1)
-        .multilineTextAlignment(.leading)
+        .multilineTextAlignment(alignment)
     }
 }
 

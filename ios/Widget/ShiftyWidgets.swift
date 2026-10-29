@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import WidgetKit
 
 /// Shifty outside the app: the shift's widget, on the home screen and the lock screen; the running shift's
@@ -15,18 +14,15 @@ struct ShiftyWidgets: WidgetBundle {
     }
 }
 
-/// The app's colors (its Assets.xcassets), which the extension does not have.
+/// The app's colors, from the extension's own asset catalog (Widget/Assets.xcassets). A named color keeps
+/// its light and its dark version in what the system draws of the extension; one worked out in code was
+/// fixed when the Live Activity was drawn, and missed the iPhone's switch to dark.
 enum WidgetStyle {
-    static let accent = Color(UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.106, green: 0.702, blue: 0.639, alpha: 1)
-            : UIColor(red: 0.059, green: 0.616, blue: 0.561, alpha: 1)
-    })
-    static let background = Color(UIColor { traits in
-        traits.userInterfaceStyle == .dark
-            ? UIColor(red: 0.082, green: 0.090, blue: 0.110, alpha: 1)
-            : UIColor(red: 0.957, green: 0.961, blue: 0.969, alpha: 1)
-    })
+    static let accent = Color("Accent")
+    /// The widgets' background, the app's.
+    static let background = Color("Surface")
+    /// The Live Activity's on the Lock Screen: white in light, dark in dark.
+    static let activity = Color("ActivityBackground")
 }
 
 /// A round button of a widget or of the Live Activity: its symbol in its color, on a lighter disc of it, as
