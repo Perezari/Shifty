@@ -103,27 +103,88 @@ struct Settings: Hashable {
 // MARK: JSON, the web app's
 
 /// Dates as the web app writes them: ISO 8601 in UTC, to the millisecond ("2026-10-28T07:00:00.000Z").
+/// Written and read by arithmetic, not by a calendar and a formatter, which took most of a save's time;
+/// another form is read by Foundation's (Tests/SyncCheck holds the two equal).
 enum ISODate {
     private static let withFraction = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
     private static let plain = Date.ISO8601FormatStyle()
 
-    private static let utc: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar
-    }()
-
     static func parse(_ text: String) -> Date? {
+        if let ms = webMs(text) { return Date(ms: Double(ms)) }
         guard let date = (try? withFraction.parse(text)) ?? (try? plain.parse(text)) else { return nil }
         return Date(ms: date.ms)
     }
 
     static func string(_ date: Date) -> String {
         let ms = Int(date.ms)
-        let seconds = Int((Double(ms) / 1000).rounded(.down))
-        let c = utc.dateComponents([.year, .month, .day, .hour, .minute, .second], from: Date(timeIntervalSince1970: Double(seconds)))
-        return String(format: "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ",
-                      c.year ?? 1970, c.month ?? 1, c.day ?? 1, c.hour ?? 0, c.minute ?? 0, c.second ?? 0, ms - seconds * 1000)
+        let days = Int((Double(ms) / 86_400_000).rounded(.down))
+        let time = ms - days * 86_400_000
+        let day = civil(days)
+        let clock = "\(digits(time / 3_600_000, 2)):\(digits(time / 60_000 % 60, 2)):\(digits(time / 1000 % 60, 2))"
+        return "\(digits(day.year, 4))-\(digits(day.month, 2))-\(digits(day.day, 2))T\(clock).\(digits(time % 1000, 3))Z"
+    }
+
+    /// The milliseconds of exactly "2026-10-28T07:00:00.000Z", as the web app and `string` write a date; nil
+    /// for any other form, and for a day or a time that does not exist.
+    private static func webMs(_ text: String) -> Int? {
+        var text = text
+        return text.withUTF8 { b -> Int? in
+            guard b.count == 24, b[4] == 0x2D, b[7] == 0x2D, b[10] == 0x54, b[13] == 0x3A, b[16] == 0x3A,
+                  b[19] == 0x2E, b[23] == 0x5A else { return nil }
+            func number(_ from: Int, _ count: Int) -> Int? {
+                var value = 0
+                for i in from..<from + count {
+                    let digit = Int(b[i]) - 0x30
+                    guard digit >= 0 && digit <= 9 else { return nil }
+                    value = value * 10 + digit
+                }
+                return value
+            }
+            guard let year = number(0, 4), let month = number(5, 2), let day = number(8, 2),
+                  let hour = number(11, 2), let minute = number(14, 2), let second = number(17, 2),
+                  let milli = number(20, 3),
+                  (1...12).contains(month), day >= 1, day <= monthLength(month, year),
+                  hour < 24, minute < 60, second < 60 else { return nil }
+            let time = hour * 3_600_000 + minute * 60_000 + second * 1000 + milli
+            return days(year, month, day) * 86_400_000 + time
+        }
+    }
+
+    /// `value` in `count` digits at least, zeros before it ("%02d").
+    private static func digits(_ value: Int, _ count: Int) -> String {
+        let text = String(value)
+        return text.count < count ? String(repeating: "0", count: count - text.count) + text : text
+    }
+
+    /// The Gregorian year, month and day of a day counted from 1 January 1970 (Howard Hinnant's
+    /// civil_from_days).
+    private static func civil(_ days: Int) -> (year: Int, month: Int, day: Int) {
+        let z = days + 719_468
+        let era = (z >= 0 ? z : z - 146_096) / 146_097
+        let dayOfEra = z - era * 146_097
+        let yearOfEra = (dayOfEra - dayOfEra / 1_460 + dayOfEra / 36_524 - dayOfEra / 146_096) / 365
+        let dayOfYear = dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)
+        let m = (5 * dayOfYear + 2) / 153
+        let month = m < 10 ? m + 3 : m - 9
+        return (yearOfEra + era * 400 + (month <= 2 ? 1 : 0), month, dayOfYear - (153 * m + 2) / 5 + 1)
+    }
+
+    /// Its inverse: the days from 1 January 1970 to a Gregorian date (days_from_civil).
+    private static func days(_ year: Int, _ month: Int, _ day: Int) -> Int {
+        let y = month <= 2 ? year - 1 : year
+        let era = (y >= 0 ? y : y - 399) / 400
+        let yearOfEra = y - era * 400
+        let dayOfYear = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1
+        let dayOfEra = yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear
+        return era * 146_097 + dayOfEra - 719_468
+    }
+
+    private static func monthLength(_ month: Int, _ year: Int) -> Int {
+        switch month {
+        case 2: year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) ? 29 : 28
+        case 4, 6, 9, 11: 30
+        default: 31
+        }
     }
 
     static func decode<K: CodingKey>(_ container: KeyedDecodingContainer<K>, _ key: K) throws -> Date {

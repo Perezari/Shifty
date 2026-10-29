@@ -11,8 +11,7 @@ struct CalendarView: View {
 
     var body: some View {
         let range = Calc.period(around: Date(), monthStartDay: store.settings.monthStartDay, offset: offset)
-        let running = store.active.map { Calc.inRange($0, range) } ?? false
-        TimelineView(.periodic(from: .now, by: running ? 30 : 60)) { context in
+        TimelineView(.periodic(from: .now, by: 60)) { context in
             month(range, at: context.date)
         }
         .background(Color.appBackground.ignoresSafeArea())

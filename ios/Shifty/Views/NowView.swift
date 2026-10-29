@@ -5,7 +5,8 @@ import SwiftUI
 /// is dragged to another time to see the wage of leaving then, the iPhone ticking at each quarter of an hour;
 /// on reaching the goal it turns into a check, the ring glows and the iPhone taps. Under the dial: the start,
 /// the goal and the wage at it, the buttons, then the week, the pay period and a holiday coming. With no shift
-/// running, today's work and a button to start (app.js renderNow). Designed in ios/preview first.
+/// running, today's work and a button to start (app.js renderNow). Designed in ios/preview first. While a shift
+/// runs the dial and its numbers are drawn again each second, the cards under them each minute.
 struct NowView: View {
     @Environment(ShiftStore.self) private var store
     @State private var adding = false
@@ -17,9 +18,20 @@ struct NowView: View {
 
     var body: some View {
         let running = store.active != nil
-        TimelineView(.periodic(from: .now, by: running ? 1 : 30)) { context in
-            screen(at: context.date)
+        ScrollView {
+            VStack(spacing: 14) {
+                TimelineView(.periodic(from: .now, by: running ? 1 : 30)) { context in
+                    shift(at: context.date)
+                }
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    cards(at: context.date)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
+        .scrollIndicators(.hidden)
         .background(Color.appBackground.ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .medium), trigger: tapped)
         .sensoryFeedback(.success, trigger: celebrations)
@@ -44,44 +56,53 @@ struct NowView: View {
         return Int(plan.timeIntervalSince1970 / 900)
     }
 
-    private func screen(at date: Date) -> some View {
+    /// The state, the dial, its numbers and the buttons; the buttons' glass on its own, so that pressed they
+    /// never merge with a card's.
+    private func shift(at date: Date) -> some View {
         let settings = store.settings
         let shifts = store.shifts
         let status = Calc.nowStatus(shifts, settings, active: store.active, at: date.ms)
         let reached = status.active != nil && status.remaining <= 0.001
         let period = Calc.period(around: date, monthStartDay: settings.monthStartDay)
         let periodTotals = Calc.aggregate(shifts, settings, range: period, asOf: date.ms)
-        let days = Calc.week(shifts, settings, around: date, asOf: date.ms)
-        let today = LocalTime.startOfDay(date)
-        let weekStart = days.first?.date ?? today
-        let weekMissing = Calc.shortfall(shifts, settings, range: TimeRange(start: weekStart, end: today), asOf: date.ms).total
-        return ScrollView {
+        return VStack(spacing: 14) {
             VStack(spacing: 14) {
                 NowCapsule(status: status, settings: settings, now: date)
                 dial(status, settings, shifts, at: date, reached: reached)
                 NowFacts(cells: facts(status, settings, totals: periodTotals, at: date))
-                actions(status)
-                WeekCard(days: days, missing: weekMissing, today: date)
-                PeriodCard(range: period, totals: periodTotals,
-                           projected: Calc.projectedIncome(shifts, settings, range: period, asOf: date.ms),
-                           missing: Calc.shortfall(shifts, settings, range: period, asOf: date.ms).total,
-                           net: Calc.periodNet(shifts, settings, range: period, asOf: date.ms, projected: true),
-                           settings: settings, now: date)
-                if settings.holidaysEnabled, let coming = Calc.nextHoliday(after: date, within: 14) {
-                    HolidayBanner(date: coming.date, info: coming.info, settings: settings, today: date)
-                }
-                if let since = settings.balanceDate, let leave = Calc.leave(shifts, settings, asOf: date) {
-                    LeaveCard(balance: leave, since: since)
-                }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 24)
+            .glassGroup()
+            actions(status)
         }
-        .scrollIndicators(.hidden)
         .onChange(of: reached) { was, now in
             if now && !was { celebrate() }
         }
+    }
+
+    /// The week, the pay period, a holiday coming and the days off left.
+    private func cards(at date: Date) -> some View {
+        let settings = store.settings
+        let shifts = store.shifts
+        let period = Calc.period(around: date, monthStartDay: settings.monthStartDay)
+        let days = Calc.week(shifts, settings, around: date, asOf: date.ms)
+        let today = LocalTime.startOfDay(date)
+        let weekStart = days.first?.date ?? today
+        let weekMissing = Calc.shortfall(shifts, settings, range: TimeRange(start: weekStart, end: today), asOf: date.ms).total
+        return VStack(spacing: 14) {
+            WeekCard(days: days, missing: weekMissing, today: date)
+            PeriodCard(range: period, totals: Calc.aggregate(shifts, settings, range: period, asOf: date.ms),
+                       projected: Calc.projectedIncome(shifts, settings, range: period, asOf: date.ms),
+                       missing: Calc.shortfall(shifts, settings, range: period, asOf: date.ms).total,
+                       net: Calc.periodNet(shifts, settings, range: period, asOf: date.ms, projected: true),
+                       settings: settings, now: date)
+            if settings.holidaysEnabled, let coming = Calc.nextHoliday(after: date, within: 14) {
+                HolidayBanner(date: coming.date, info: coming.info, settings: settings, today: date)
+            }
+            if let since = settings.balanceDate, let leave = Calc.leave(shifts, settings, asOf: date) {
+                LeaveCard(balance: leave, since: since)
+            }
+        }
+        .glassGroup()
     }
 
     // MARK: The dial

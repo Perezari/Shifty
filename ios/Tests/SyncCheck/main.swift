@@ -2,7 +2,8 @@ import Foundation
 
 // Checks the cloud mirror (Shifty/Core/CloudMirror.swift) on a cloud in memory: two devices in step, edits
 // and deletions both ways, settings changed on both, a new install that must not wipe the cloud's
-// settings, and no writing back and forth once the devices agree.
+// settings, and no writing back and forth once the devices agree. Then the dates of the files and the
+// cloud (ISODate, in Models.swift) against Foundation's calendar and formatter, which they replaced.
 // TZ=Asia/Jerusalem sync-check
 
 final class MemoryCloud: CloudStore {
@@ -123,6 +124,43 @@ MainActor.assumeIsolated {
     var dSettings = d.settings
     dSettings.updatedAt = nil
     expect(dSettings == cloudSettings, "an untouched install takes the cloud's settings")
+}
+
+// the dates, written and read as Foundation wrote and read them before
+let utc: Calendar = {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "UTC")!
+    return calendar
+}()
+let withFraction = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+func foundationString(_ date: Date) -> String {
+    let ms = Int(date.ms)
+    let seconds = Int((Double(ms) / 1000).rounded(.down))
+    let c = utc.dateComponents([.year, .month, .day, .hour, .minute, .second], from: Date(timeIntervalSince1970: Double(seconds)))
+    return String(format: "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ", c.year!, c.month!, c.day!, c.hour!, c.minute!, c.second!, ms - seconds * 1000)
+}
+func foundationParse(_ text: String) -> Date? {
+    ((try? withFraction.parse(text)) ?? (try? Date.ISO8601FormatStyle().parse(text))).map { Date(ms: $0.ms) }
+}
+// every 11.45 hours or so, from 1970 to 2100, at all the milliseconds; the days around 1970; leap days
+var moments = (0..<100_000).map { Double($0 * 41_234_567 + $0 % 1000) }
+moments += [-86_400_001, -86_400_000, -1000, -1, 0, 1, 999, 86_399_999]
+moments += [(2000, 1, 29), (2024, 1, 29), (2100, 1, 28), (2100, 2, 1), (2026, 9, 28)].map {
+    LocalTime.date($0.0, $0.1, $0.2, 23, 59).ms + 59_999
+}
+var wrong = 0
+for ms in moments {
+    let date = Date(ms: ms)
+    let text = ISODate.string(date)
+    if text != foundationString(date) || ISODate.parse(text) != foundationParse(text) || ISODate.parse(text) != date {
+        wrong += 1
+        if wrong <= 3 { print("ISODate:", ms, text, foundationString(date)) }
+    }
+}
+expect(wrong == 0, "dates written and read as Foundation does: \(wrong) of \(moments.count) differ")
+for text in ["2026-02-29T07:00:00.000Z", "2024-02-29T07:00:00.000Z", "2026-10-28T24:00:00.000Z", "2026-10-28T07:60:00.000Z",
+             "2026-10-28T07:00:00Z", "2026-10-28T07:00:00.5Z", "2026-10-28 07:00:00.000Z", "2026-1O-28T07:00:00.000Z", "", "x"] {
+    expect(ISODate.parse(text) == foundationParse(text), "\(text) read as Foundation reads it")
 }
 
 for url in folders { try? FileManager.default.removeItem(at: url) }

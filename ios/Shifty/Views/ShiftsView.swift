@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The shifts of a pay period, the newest first: the period's hours, hours missing, shifts and income, and
 /// each shift's hours and pay, a running one's live (app.js renderShifts). A shift opens in the editor, and
-/// a swipe deletes it.
+/// a swipe deletes it. The list is drawn again each minute, the running shift's row each second.
 struct ShiftsView: View {
     @Environment(ShiftStore.self) private var store
     @State private var offset = 0
@@ -12,8 +12,7 @@ struct ShiftsView: View {
 
     var body: some View {
         let range = Calc.period(around: Date(), monthStartDay: store.settings.monthStartDay, offset: offset)
-        let running = store.active.map { Calc.inRange($0, range) } ?? false
-        TimelineView(.periodic(from: .now, by: running ? 1 : 60)) { context in
+        TimelineView(.periodic(from: .now, by: 60)) { context in
             list(range, at: context.date)
         }
         .background(Color.appBackground.ignoresSafeArea())
@@ -70,8 +69,8 @@ struct ShiftsView: View {
                     Button {
                         editing = shift
                     } label: {
-                        ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency,
-                                 short: summary.days[LocalTime.dayKey(shift.start)]?.short == true && shift.type == .work)
+                        row(shift, breakdown, settings,
+                            short: summary.days[LocalTime.dayKey(shift.start)]?.short == true && shift.type == .work)
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -88,5 +87,18 @@ struct ShiftsView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
+    }
+
+    /// A shift's row; the running one's pay goes up each second.
+    @ViewBuilder
+    private func row(_ shift: Shift, _ breakdown: Breakdown, _ settings: Settings, short: Bool) -> some View {
+        if shift.end == nil {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                ShiftRow(shift: shift, breakdown: Calc.breakdown(shift, settings, asOf: context.date.ms),
+                         currency: settings.currency, short: short)
+            }
+        } else {
+            ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency, short: short)
+        }
     }
 }
