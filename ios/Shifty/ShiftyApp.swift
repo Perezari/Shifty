@@ -92,6 +92,8 @@ struct RootView: View {
         .onChange(of: phase) { _, now in
             // coming back may bring another device's changes; leaving sends this device's at once
             if syncs && now != .inactive { ICloud.syncNow() }
+            // and the Lock Screen's activity is drawn again, in the iPhone's light or dark of now
+            if syncs && now == .active { LiveShift.refresh(store) }
         }
         // each change, here, from iCloud or from a button outside the app, reaches the Lock Screen,
         // the Dynamic Island, the notifications and the widgets

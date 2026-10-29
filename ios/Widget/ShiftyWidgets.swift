@@ -21,8 +21,10 @@ enum WidgetStyle {
     static let accent = Color("Accent")
     /// The widgets' background, the app's.
     static let background = Color("Surface")
-    /// The Live Activity's on the Lock Screen: white in light, dark in dark.
+    /// The Live Activity's on the Lock Screen: white in light, dark in dark, and its text over it. The
+    /// activity draws both itself, so that they always come out of the same drawing, in the same mode.
     static let activity = Color("ActivityBackground")
+    static let activityText = Color("ActivityText")
 }
 
 /// A round button of a widget or of the Live Activity: its symbol in its color, on a lighter disc of it, as

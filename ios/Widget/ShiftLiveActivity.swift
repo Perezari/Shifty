@@ -10,9 +10,11 @@ import WidgetKit
 struct ShiftLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: ShiftActivityAttributes.self) { context in
+            // The background is the activity's own, drawn with its text: set as the system's tint, it turned
+            // dark with the iPhone while the text stayed as last drawn, dark on dark.
             LockScreenActivity(state: context.state, attributes: context.attributes, stale: context.isStale)
                 .environment(\.layoutDirection, .rightToLeft)
-                .activityBackgroundTint(WidgetStyle.activity)
+                .activityBackgroundTint(Color.clear)
                 .widgetURL(URL(string: "shifty://now"))
         } dynamicIsland: { context in
             DynamicIsland {
@@ -75,8 +77,10 @@ private struct LockScreenActivity: View {
             }
             ActivityWay(state: state, attributes: attributes, stale: stale)
         }
+        .foregroundStyle(WidgetStyle.activityText)
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
+        .background(WidgetStyle.activity)
     }
 }
 
