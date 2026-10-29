@@ -216,9 +216,16 @@ struct NowView: View {
         return cells
     }
 
-    /// Start, or add by hand; while working, a break and the end; on a break, back to work and the end.
-    @ViewBuilder
+    /// Start, or add by hand; while working, a break and the end; on a break, back to work and the end. Their
+    /// corners are the cards' (Theme.swift), not a capsule's.
     private func actions(_ status: NowStatus) -> some View {
+        actionButtons(status)
+            .controlSize(.large)
+            .buttonBorderShape(.roundedRectangle(radius: 24))
+    }
+
+    @ViewBuilder
+    private func actionButtons(_ status: NowStatus) -> some View {
         if status.active == nil {
             HStack(spacing: 10) {
                 Button(action: start) {
