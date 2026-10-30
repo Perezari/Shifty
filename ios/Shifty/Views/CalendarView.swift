@@ -46,7 +46,10 @@ struct CalendarView: View {
                 if Screenshot.current == .day {
                     // after the tab has appeared: a sheet asked for during the switch is dropped
                     try? await Task.sleep(for: .seconds(1.5))
-                    opened = DayRef(date: LocalTime.addingDays(-1, to: LocalTime.startOfDay(Date())))
+                    // the last day worked before today, not a Saturday's empty sheet
+                    let today = LocalTime.startOfDay(Date())
+                    let last = store.shifts.filter { $0.type == .work && $0.end != nil && $0.start < today }.map(\.start).max()
+                    opened = DayRef(date: LocalTime.startOfDay(last ?? LocalTime.addingDays(-1, to: today)))
                 }
             }
             #endif

@@ -8,18 +8,21 @@ extension ShiftStore {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("shifty-demo", isDirectory: true)
         try? FileManager.default.removeItem(at: folder)
         let store = ShiftStore(folder: folder)
+        let today = LocalTime.startOfDay(Date())
         store.updateSettings {
             $0.workplaceName = "סטודיו גל"
             $0.hourlyWage = 54
             $0.standardByDay = [9.1, 9.1, 9.1, 9.1, 8.1, nil, nil]
             $0.autoBreakMinutes = 30
             $0.travelPerDay = 22.6
+            // the pay period well along on any day the screenshots are taken: the calendar month from its
+            // middle, and before it the period from the 15th
+            $0.monthStartDay = LocalTime.parts(today).day >= 15 ? 1 : 15
         }
 
-        // Sunday to Thursday of the last four weeks, a little over or under the day's standard, with a day of
-        // vacation and one sick
-        let today = LocalTime.startOfDay(Date())
-        for back in 1...28 {
+        // Sunday to Thursday of the last five weeks, all of the period, a little over or under the day's
+        // standard, with a day of vacation and one sick
+        for back in 1...35 {
             let day = LocalTime.addingDays(-back, to: today)
             let p = LocalTime.parts(day)
             guard p.weekday <= 4 else { continue }

@@ -4,7 +4,8 @@
 #
 # The TestFlight workflow reads the variable group "app_store", set in the app's Environment
 # variables, each variable Secret: APPLE_API_ISSUER, APPLE_API_KEY (the Key ID), APPLE_API_KEY_P8 (the
-# text of the .p8 file) and APPLE_DEVELOPMENT_TEAM.
+# text of the .p8 file) and APPLE_DEVELOPMENT_TEAM. The screenshots workflow needs none: it photographs
+# the app in the simulator, with made-up shifts.
 definitions:
   scripts:
     - &prepare

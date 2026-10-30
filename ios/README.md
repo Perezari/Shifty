@@ -78,7 +78,10 @@ Builds run on Codemagic, only when started there by hand (Start new build); a pe
 - "Shifty · TestFlight" signs the app and uploads it to TestFlight. It reads the variable group
   `app_store`: `APPLE_API_ISSUER`, `APPLE_API_KEY` (the Key ID), `APPLE_API_KEY_P8` (the text of the
   .p8 file) and `APPLE_DEVELOPMENT_TEAM`.
-- "Shifty · screenshots" builds for the simulator and photographs the screens, light and dark.
+- "Shifty · screenshots" builds for the simulator and photographs the App Store's screens with made-up
+  shifts (`Shifty/Demo.swift`), 1206 × 2622, numbered in the store's order: the running shift, the
+  shifts, the calendar, a shift's menu on a long press, a day, a new shift, the settings, and three of
+  them in dark. The app runs on Israel's clock, and the status bar shows the same minute.
 
 `scripts/testflight.sh` archives without signing (the team has no registered devices, so there is no
 development profile), signs the archive for no one with the app's entitlements (an unsigned archive

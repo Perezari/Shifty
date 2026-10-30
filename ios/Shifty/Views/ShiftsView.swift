@@ -104,6 +104,11 @@ struct ShiftsView: View {
                         }
                     }
                     .shiftMenu(shift, breakdown, settings, edit: { editing = shift }, copy: { copying = shift })
+                    #if DEBUG
+                    // the screenshot of a menu: the last shift before the running one, lifted
+                    .environment(\.liftsForScreenshot,
+                                 Screenshot.current == .menu && shift.id == summary.shifts.dropFirst().first?.id)
+                    #endif
                     .cardRow()
                 }
             }

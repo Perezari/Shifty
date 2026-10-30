@@ -62,6 +62,13 @@ extension EnvironmentValues {
     @Entry var lifter: Lifter? = nil
 }
 
+#if DEBUG
+extension EnvironmentValues {
+    /// The thing the screenshot of a menu lifts once its screen is up (Screenshot.menu).
+    @Entry var liftsForScreenshot = false
+}
+#endif
+
 extension View {
     /// Where long presses lift things: over this view, blurred under the thing lifted and its menu.
     func liftHost() -> some View {
@@ -118,6 +125,9 @@ private struct Liftable: ViewModifier {
     @State private var place = LiftSpot()
     /// Held down, before it lifts: it gives a little under the finger, as iOS's do.
     @GestureState private var pressing = false
+    #if DEBUG
+    @Environment(\.liftsForScreenshot) private var liftsForScreenshot
+    #endif
 
     func body(content: Content) -> some View {
         content
@@ -137,6 +147,14 @@ private struct Liftable: ViewModifier {
                 if held { lifter?.ready() }
             }
             .accessibilityAction(named: "אפשרויות") { lift() }
+            #if DEBUG
+            .task {
+                // after the tab has appeared, where it is on the screen known
+                guard liftsForScreenshot else { return }
+                try? await Task.sleep(for: .seconds(1.5))
+                lift()
+            }
+            #endif
     }
 
     private func lift() {
