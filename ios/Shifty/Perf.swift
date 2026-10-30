@@ -12,6 +12,9 @@ final class Perf {
 
     /// The strip's line, once a second.
     private(set) var line = ""
+    /// The last few things done (a tab chosen, a long press), each with the time its first frame took to come.
+    private(set) var events: [String] = []
+    @ObservationIgnored private var pending: (name: String, at: CFTimeInterval)?
     @ObservationIgnored private var running = false
     @ObservationIgnored private var link: CADisplayLink?
     @ObservationIgnored private var clock: FrameClock?
@@ -31,6 +34,12 @@ final class Perf {
         shared.draws[name, default: 0] += 1
     }
 
+    /// Something done, timed to the next frame: how long the main thread took over it.
+    static func event(_ name: String) {
+        guard shared.running else { return }
+        shared.pending = (name, CACurrentMediaTime())
+    }
+
     func run(_ on: Bool) {
         guard on != running else { return }
         running = on
@@ -39,6 +48,8 @@ final class Perf {
             link = nil
             clock = nil
             line = ""
+            events = []
+            pending = nil
             return
         }
         let clock = FrameClock { [weak self] link in
@@ -57,10 +68,16 @@ final class Perf {
     }
 
     private func frame(_ link: CADisplayLink) {
+        if let done = pending {
+            pending = nil
+            events.append("\(done.name) \(Int(((CACurrentMediaTime() - done.at) * 1000).rounded()))ms")
+            if events.count > 4 { events.removeFirst() }
+        }
         let now = link.timestamp
         if last > 0 {
             let gap = now - last
-            if gap > max(link.duration, 1.0 / 120) * 1.5 { late += 1 }
+            // later than one and a half frames at 60 a second
+            if gap > 0.025 { late += 1 }
             worst = max(worst, gap)
         }
         last = now
@@ -91,15 +108,21 @@ private final class FrameClock: NSObject {
     }
 }
 
-/// The measures, on a strip under the status bar.
+/// The measures, on a strip under the status bar: the last second, and under it the last things done.
 struct PerfStrip: View {
     var body: some View {
-        Text(Perf.shared.line)
-            .font(.caption2.monospacedDigit())
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color.black.opacity(0.75), in: Capsule())
-            .allowsHitTesting(false)
+        let perf = Perf.shared
+        VStack(spacing: 2) {
+            Text(perf.line)
+            if !perf.events.isEmpty {
+                Text(perf.events.joined(separator: " · "))
+            }
+        }
+        .font(.caption2.monospacedDigit())
+        .foregroundStyle(.white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(Color.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .allowsHitTesting(false)
     }
 }

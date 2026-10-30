@@ -1,8 +1,10 @@
 import SwiftUI
+import UIKit
 
 /// The pay period as a month of days (app.js renderCalendar), a heat map of the work: each day worked filled
 /// by its hours against its standard, red when it fell short, a day off and a holiday marked, and today
-/// ringed. A day opens with its shifts, to add one or a day off; a long press lifts it with its menu.
+/// ringed. A day opens with its shifts, to add one or a day off; a long press lifts it with its menu. Drawn
+/// again each minute while it is on screen.
 struct CalendarView: View {
     @Environment(ShiftStore.self) private var store
     @Environment(\.lifter) private var lifter
@@ -11,44 +13,43 @@ struct CalendarView: View {
     @State private var opened: DayRef?
     @State private var adding: DayRef?
     @State private var copying: Shift?
-    @State private var added = 0
+    /// The minute the month shows, again each minute while it is on screen.
+    @State private var now = Date()
 
     var body: some View {
-        let range = Calc.period(around: Date(), monthStartDay: store.settings.monthStartDay, offset: offset)
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            month(range, at: context.date)
-        }
-        .background(Color.appBackground.ignoresSafeArea())
-        .navigationTitle("לוח")
-        .sensoryFeedback(.success, trigger: added)
-        .sheet(item: $opened) { day in
-            // its own place to lift a shift over, as a sheet is drawn over the tabs
-            DayDetail(date: day.date)
-                .environment(store)
-                .liftHost()
-        }
-        .sheet(item: $adding) { day in
-            ShiftEditor(shift: nil, day: day.date)
-                .environment(store)
-        }
-        .sheet(item: $copying) { shift in
-            ShiftEditor(shift: nil, day: Date(), from: shift)
-                .environment(store)
-        }
-        .sheet(isPresented: $picking) {
-            PeriodPicker(current: Calc.periodMonth(range)) { year, month in
-                offset = Calc.periodOffset(year: year, month0: month, monthStartDay: store.settings.monthStartDay, now: Date())
+        let range = Calc.period(around: now, monthStartDay: store.settings.monthStartDay, offset: offset)
+        month(range, at: now)
+            .background(Color.appBackground.ignoresSafeArea())
+            .navigationTitle("לוח")
+            .minutes($now)
+            .sheet(item: $opened) { day in
+                // its own place to lift a shift over, as a sheet is drawn over the tabs
+                DayDetail(date: day.date)
+                    .environment(store)
+                    .liftHost()
             }
-        }
-        #if DEBUG
-        .task {
-            if Screenshot.current == .day {
-                // after the tab has appeared: a sheet asked for during the switch is dropped
-                try? await Task.sleep(for: .seconds(1.5))
-                opened = DayRef(date: LocalTime.addingDays(-1, to: LocalTime.startOfDay(Date())))
+            .sheet(item: $adding) { day in
+                ShiftEditor(shift: nil, day: day.date)
+                    .environment(store)
             }
-        }
-        #endif
+            .sheet(item: $copying) { shift in
+                ShiftEditor(shift: nil, day: Date(), from: shift)
+                    .environment(store)
+            }
+            .sheet(isPresented: $picking) {
+                PeriodPicker(current: Calc.periodMonth(range)) { year, month in
+                    offset = Calc.periodOffset(year: year, month0: month, monthStartDay: store.settings.monthStartDay, now: Date())
+                }
+            }
+            #if DEBUG
+            .task {
+                if Screenshot.current == .day {
+                    // after the tab has appeared: a sheet asked for during the switch is dropped
+                    try? await Task.sleep(for: .seconds(1.5))
+                    opened = DayRef(date: LocalTime.addingDays(-1, to: LocalTime.startOfDay(Date())))
+                }
+            }
+            #endif
     }
 
     private func month(_ range: TimeRange, at date: Date) -> some View {
@@ -117,7 +118,7 @@ struct CalendarView: View {
         if onDay.isEmpty {
             return [.adding(shift: { adding = DayRef(date: day) }, dayOff: { type in
                 withAnimation { _ = store.addDayOff(day, type: type) }
-                added += 1
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
             })]
         }
         var items = [LiftItem(title: "פתיחת היום", systemImage: "calendar") { opened = DayRef(date: day) }]

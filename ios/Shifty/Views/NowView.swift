@@ -25,11 +25,12 @@ struct NowView: View {
         let running = store.active != nil
         ScrollView {
             VStack(spacing: 14) {
-                TimelineView(.periodic(from: .now, by: running ? 1 : 30)) { context in
+                // schedules that stay the same as the screen is drawn again, so that each draw does not restart them
+                TimelineView(.periodic(from: Self.anchor, by: running ? 1 : 30)) { context in
                     shift(at: context.date)
                 }
                 actions()
-                TimelineView(.periodic(from: .now, by: 60)) { context in
+                TimelineView(.everyMinute) { context in
                     cards(at: context.date)
                 }
             }
@@ -66,6 +67,9 @@ struct NowView: View {
             #endif
         }
     }
+
+    /// The clocks' schedules start here, a whole second as the app opened: the same each time a screen is drawn.
+    static let anchor = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded(.down))
 
     /// The plan's quarter of an hour: the iPhone ticks as the flag passes each.
     private var planQuarter: Int {

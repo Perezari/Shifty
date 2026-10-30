@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // A long press, as ios/preview has it: the screen blurs, what was pressed lifts (a shift or a day as a card of
 // its pay, a button as itself), and its menu opens under it, or over it when it is low on the screen. Quicker
@@ -33,14 +34,19 @@ struct Lift {
 @MainActor @Observable
 final class Lifter {
     private(set) var lift: Lift?
-    /// The lifts so far, for the iPhone to tap at each.
-    private(set) var count = 0
+    /// The iPhone's tap at each lift, readied as a finger presses: a generator of UIKit's, and not a
+    /// sensoryFeedback over the tabs, which drew the whole of them again for each tap.
+    private let tap = UIImpactFeedbackGenerator(style: .medium)
 
     var isShowing: Bool { lift != nil }
 
+    func ready() {
+        tap.prepare()
+    }
+
     func show(_ lift: Lift) {
         guard self.lift == nil else { return }
-        count += 1
+        tap.impactOccurred()
         withAnimation(.spring(duration: 0.22, bounce: 0.15)) { self.lift = lift }
     }
 
@@ -101,7 +107,6 @@ private struct LiftHost: ViewModifier {
             .overlay {
                 LiftOverlay(lifter: lifter)
             }
-            .sensoryFeedback(.impact(weight: .medium), trigger: lifter.count)
     }
 }
 
@@ -128,10 +133,14 @@ private struct Liftable: ViewModifier {
                     .updating($pressing) { held, state, _ in state = held }
                     .onEnded { _ in lift() }
             )
+            .onChange(of: pressing) { _, held in
+                if held { lifter?.ready() }
+            }
             .accessibilityAction(named: "אפשרויות") { lift() }
     }
 
     private func lift() {
+        Perf.event("הרמה")
         let menu = sections()
         guard let lifter, !menu.isEmpty else { return }
         lifter.show(Lift(source: place.frame, card: card, preview: preview(), sections: menu))

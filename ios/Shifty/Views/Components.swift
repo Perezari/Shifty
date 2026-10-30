@@ -3,6 +3,35 @@ import UIKit
 
 // The pieces the Shifts, Calendar and Settings screens share.
 
+extension View {
+    /// `now`, set again at each minute while the view is on screen, and at once when it comes back: instead of a
+    /// TimelineView around a List or in its rows, which made the Shifts tab stall with a shift running, and which
+    /// kept drawing a tab not shown.
+    func minutes(_ now: Binding<Date>) -> some View {
+        modifier(MinuteClock(now: now))
+    }
+}
+
+private struct MinuteClock: ViewModifier {
+    @Binding var now: Date
+
+    func body(content: Content) -> some View {
+        content.task {
+            await tick()
+        }
+    }
+
+    private func tick() async {
+        now = Date()
+        while !Task.isCancelled {
+            let wait = 60 - Date().timeIntervalSince1970.truncatingRemainder(dividingBy: 60)
+            try? await Task.sleep(for: .seconds(wait))
+            guard !Task.isCancelled else { return }
+            now = Date()
+        }
+    }
+}
+
 /// The pay period on screen, between the earlier one and the later (app.js .period-bar): right to left, the
 /// earlier on the right. Its name opens the period picker.
 struct PeriodBar: View {
@@ -668,7 +697,7 @@ struct ShiftPreview: View {
 
     var body: some View {
         if shift.type == .work && shift.end == nil {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
+            TimelineView(.periodic(from: NowView.anchor, by: 1)) { context in
                 card(Calc.breakdown(shift, settings, asOf: context.date.ms))
             }
         } else {

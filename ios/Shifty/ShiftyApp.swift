@@ -33,6 +33,16 @@ struct ShiftyApp: App {
 /// The app's tabs.
 enum AppTab: Hashable {
     case now, shifts, calendar, settings
+
+    /// Its name on the tab bar, and on the speed's strip.
+    var name: String {
+        switch self {
+        case .now: "עכשיו"
+        case .shifts: "משמרות"
+        case .calendar: "לוח"
+        case .settings: "הגדרות"
+        }
+    }
 }
 
 /// The tabs: the running shift, the shifts by period, the period's calendar, and settings. Built with
@@ -63,8 +73,18 @@ struct RootView: View {
         #endif
     }
 
+    /// The tab chosen, timed on the speed's strip from the tap to its first frame.
+    private var selection: Binding<AppTab> {
+        Binding {
+            tab
+        } set: { chosen in
+            Perf.event(chosen.name)
+            tab = chosen
+        }
+    }
+
     var body: some View {
-        TabView(selection: $tab) {
+        TabView(selection: selection) {
             Tab("עכשיו", systemImage: "timer", value: AppTab.now) {
                 NowView()
             }
