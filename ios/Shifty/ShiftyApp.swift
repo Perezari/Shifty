@@ -83,6 +83,8 @@ struct RootView: View {
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)
+        // a long press lifts a shift, a day or a button over the tabs, the tab bar blurred too (Lift.swift)
+        .liftHost()
         .preferredColorScheme(scheme)
         .modifier(LockGate())
         .task {

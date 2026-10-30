@@ -12,14 +12,6 @@ extension View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
-
-    /// A screen's cards of glass drawn together, which is lighter than each on its own (Apple's advice for
-    /// many). Apart as they are, none of them merge.
-    func glassGroup() -> some View {
-        GlassEffectContainer(spacing: 0) {
-            self
-        }
-    }
 }
 
 #if DEBUG

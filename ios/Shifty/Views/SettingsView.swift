@@ -245,7 +245,6 @@ struct SettingsView: View {
             .padding(.horizontal, 16)
             .padding(.top, 4)
             .padding(.bottom, 24)
-            .glassGroup()
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color.appBackground.ignoresSafeArea())

@@ -6,6 +6,7 @@ import SwiftUI
 /// The list is drawn again each minute, the running shift's row each second.
 struct ShiftsView: View {
     @Environment(ShiftStore.self) private var store
+    @Environment(\.lifter) private var lifter
     @State private var offset = 0
     @State private var adding = false
     @State private var editing: Shift?
@@ -80,7 +81,8 @@ struct ShiftsView: View {
             ForEach(summary.shifts) { shift in
                 if let breakdown = summary.breakdowns[shift.id] {
                     Button {
-                        editing = shift
+                        // not the finger lifted after a long press
+                        if lifter?.isShowing != true { editing = shift }
                     } label: {
                         row(shift, breakdown, settings,
                             short: summary.days[LocalTime.dayKey(shift.start)]?.short == true && shift.type == .work)

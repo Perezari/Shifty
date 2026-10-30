@@ -576,7 +576,8 @@ extension ShiftStore {
     }
 }
 
-/// What a plus adds, its menu on a long press: a shift by hand, or a paid vacation or sick day.
+/// What a plus adds, its menu on a long press: a shift by hand, or a paid vacation or sick day (the toolbar's
+/// plus, a menu of iOS's; LiftSection.adding for the others).
 struct AddMenu: View {
     let shift: () -> Void
     let dayOff: (ShiftType) -> Void
@@ -589,8 +590,8 @@ struct AddMenu: View {
 }
 
 extension View {
-    /// A shift's menu on a long press, the shift lifted with how its pay adds up: editing it, its hours again
-    /// today (in the editor, `copy`), its summary copied, and deleting it.
+    /// A shift's menu on a long press (Lift.swift), the shift lifted with how its pay adds up: editing it, its
+    /// hours again today (in the editor, `copy`), its summary copied, and deleting it.
     func shiftMenu(_ shift: Shift, _ breakdown: Breakdown, _ settings: Settings, edit: @escaping () -> Void,
                    copy: @escaping () -> Void) -> some View {
         modifier(ShiftMenu(shift: shift, breakdown: breakdown, settings: settings, edit: edit, copy: copy))
@@ -604,31 +605,34 @@ private struct ShiftMenu: ViewModifier {
     let edit: () -> Void
     let copy: () -> Void
     @Environment(ShiftStore.self) private var store
-    @State private var copied = 0
 
     func body(content: Content) -> some View {
-        content
-            .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .contextMenu {
-                // a day off has no hours to edit (ShiftEditor)
-                if shift.type == .work {
-                    Button("עריכה", systemImage: "pencil", action: edit)
-                }
-                if store.canCopyToToday(shift) {
-                    Button("שכפול להיום", systemImage: "plus.square.on.square", action: copy)
-                }
-                Button("העתקת הסיכום", systemImage: "doc.on.doc") {
-                    UIPasteboard.general.string = shift.summary(breakdown, settings)
-                    copied += 1
-                }
-                Divider()
-                Button("מחיקה", systemImage: "trash", role: .destructive) {
-                    withAnimation { store.delete(shift.id) }
-                }
-            } preview: {
-                ShiftPreview(shift: shift, breakdown: breakdown, settings: settings)
-            }
-            .sensoryFeedback(.success, trigger: copied)
+        content.liftable(card: true) {
+            ShiftPreview(shift: shift, breakdown: breakdown, settings: settings)
+        } sections: {
+            sections()
+        }
+    }
+
+    private func sections() -> [LiftSection] {
+        var items: [LiftItem] = []
+        // a day off has no hours to edit (ShiftEditor)
+        if shift.type == .work {
+            items.append(LiftItem(title: "עריכה", systemImage: "pencil", action: edit))
+        }
+        if store.canCopyToToday(shift) {
+            items.append(LiftItem(title: "שכפול להיום", systemImage: "plus.square.on.square", action: copy))
+        }
+        items.append(LiftItem(title: "העתקת הסיכום", systemImage: "doc.on.doc") {
+            // a running shift's as it is now
+            let now = shift.end == nil ? Calc.breakdown(shift, settings, asOf: Date().ms) : breakdown
+            UIPasteboard.general.string = shift.summary(now, settings)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        })
+        let delete = LiftItem(title: "מחיקה", systemImage: "trash", destructive: true) {
+            withAnimation { store.delete(shift.id) }
+        }
+        return [LiftSection(items: items), LiftSection(items: [delete])]
     }
 }
 
@@ -709,9 +713,7 @@ struct ShiftPreview: View {
                     .foregroundStyle(Color.accentColor)
             }
         }
-        .padding(16)
-        .frame(width: 340)
-        .background(Color.appBackground)
+        .liftedCard()
     }
 
     /// The hours by rate and what each pays (Calc.breakdown), then the break.
@@ -809,9 +811,7 @@ struct DayPreview: View {
                 }
             }
         }
-        .padding(16)
-        .frame(width: 340)
-        .background(Color.appBackground)
+        .liftedCard()
     }
 
     /// "ערב פסח · יום מקוצר", or the holiday's name.

@@ -5,6 +5,7 @@ import SwiftUI
 /// ringed. A day opens with its shifts, to add one or a day off; a long press lifts it with its menu.
 struct CalendarView: View {
     @Environment(ShiftStore.self) private var store
+    @Environment(\.lifter) private var lifter
     @State private var offset = 0
     @State private var picking = false
     @State private var opened: DayRef?
@@ -21,8 +22,10 @@ struct CalendarView: View {
         .navigationTitle("לוח")
         .sensoryFeedback(.success, trigger: added)
         .sheet(item: $opened) { day in
+            // its own place to lift a shift over, as a sheet is drawn over the tabs
             DayDetail(date: day.date)
                 .environment(store)
+                .liftHost()
         }
         .sheet(item: $adding) { day in
             ShiftEditor(shift: nil, day: day.date)
@@ -80,14 +83,18 @@ struct CalendarView: View {
                                                sum: inPeriod ? summary.days[key] : nil, settings: settings)
                             if inPeriod {
                                 let onDay = (records[key] ?? []).sorted { $0.start < $1.start }
-                                cell
-                                    .onTapGesture { opened = DayRef(date: day) }
-                                    .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                    .contextMenu {
-                                        dayMenu(day, onDay)
-                                    } preview: {
-                                        DayPreview(date: day, shifts: onDay, settings: settings, sickDates: sick)
-                                    }
+                                Button {
+                                    // not the finger lifted after a long press
+                                    if lifter?.isShowing != true { opened = DayRef(date: day) }
+                                } label: {
+                                    cell
+                                }
+                                .buttonStyle(.plain)
+                                .liftable(card: true) {
+                                    DayPreview(date: day, shifts: onDay, settings: settings, sickDates: sick)
+                                } sections: {
+                                    daySections(day, onDay)
+                                }
                             } else {
                                 cell
                             }
@@ -105,25 +112,23 @@ struct CalendarView: View {
 
     /// A day's menu: an empty day takes a shift or a day off; a day with any opens, is copied to today, or is
     /// emptied.
-    @ViewBuilder
-    private func dayMenu(_ day: Date, _ onDay: [Shift]) -> some View {
+    private func daySections(_ day: Date, _ onDay: [Shift]) -> [LiftSection] {
         if onDay.isEmpty {
-            AddMenu(shift: { adding = DayRef(date: day) }, dayOff: { type in
+            return [.adding(shift: { adding = DayRef(date: day) }, dayOff: { type in
                 withAnimation { _ = store.addDayOff(day, type: type) }
                 added += 1
-            })
-        } else {
-            Button("פתיחת היום", systemImage: "calendar") { opened = DayRef(date: day) }
-            if onDay.count == 1, let only = onDay.first, store.canCopyToToday(only) {
-                Button("שכפול להיום", systemImage: "plus.square.on.square") { copying = only }
-            }
-            Divider()
-            Button(onDay.count > 1 ? "מחיקת המשמרות" : "מחיקה", systemImage: "trash", role: .destructive) {
-                withAnimation {
-                    for shift in onDay { store.delete(shift.id) }
-                }
+            })]
+        }
+        var items = [LiftItem(title: "פתיחת היום", systemImage: "calendar") { opened = DayRef(date: day) }]
+        if onDay.count == 1, let only = onDay.first, store.canCopyToToday(only) {
+            items.append(LiftItem(title: "שכפול להיום", systemImage: "plus.square.on.square") { copying = only })
+        }
+        let delete = LiftItem(title: onDay.count > 1 ? "מחיקת המשמרות" : "מחיקה", systemImage: "trash", destructive: true) {
+            withAnimation {
+                for shift in onDay { store.delete(shift.id) }
             }
         }
+        return [LiftSection(items: items), LiftSection(items: [delete])]
     }
 }
 
@@ -231,6 +236,7 @@ struct DayDetail: View {
     let date: Date
     @Environment(ShiftStore.self) private var store
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.lifter) private var lifter
     @State private var adding = false
     @State private var editing: Shift?
     @State private var copying: Shift?
@@ -263,7 +269,8 @@ struct DayDetail: View {
                 ForEach(shifts) { shift in
                     let breakdown = Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick)
                     Button {
-                        editing = shift
+                        // not the finger lifted after a long press
+                        if lifter?.isShowing != true { editing = shift }
                     } label: {
                         ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency, showsDate: false)
                     }

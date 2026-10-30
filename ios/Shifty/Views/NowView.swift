@@ -7,9 +7,10 @@ import SwiftUI
 /// the goal and the wage at it, the buttons, then the week, the pay period and a holiday coming. With no shift
 /// running, today's work and a button to start (app.js renderNow). A long press on a button makes its press
 /// minutes back, or at another time, for a press made too late. Designed in ios/preview first. While a shift
-/// runs the dial and its numbers are drawn again each second, the buttons and the cards under them each minute.
+/// runs the dial and its numbers are drawn again each second, the cards under them each minute.
 struct NowView: View {
     @Environment(ShiftStore.self) private var store
+    @Environment(\.lifter) private var lifter
     @State private var adding = false
     @State private var dayOff: ShiftType?
     /// A press made too late, its time picked on the wheels.
@@ -27,10 +28,7 @@ struct NowView: View {
                 TimelineView(.periodic(from: .now, by: running ? 1 : 30)) { context in
                     shift(at: context.date)
                 }
-                // the buttons' glass on its own, so that pressed they never merge with a card's
-                TimelineView(.everyMinute) { context in
-                    actions(at: context.date)
-                }
+                actions()
                 TimelineView(.periodic(from: .now, by: 60)) { context in
                     cards(at: context.date)
                 }
@@ -88,7 +86,6 @@ struct NowView: View {
             dial(status, settings, shifts, at: date, reached: reached)
             NowFacts(cells: facts(status, settings, totals: periodTotals, at: date))
         }
-        .glassGroup()
         .onChange(of: reached) { was, now in
             if now && !was { celebrate() }
         }
@@ -117,7 +114,6 @@ struct NowView: View {
                 LeaveCard(balance: leave, since: since)
             }
         }
-        .glassGroup()
     }
 
     // MARK: The dial
@@ -257,105 +253,98 @@ struct NowView: View {
     }
 
     /// Start, or add by hand; while working, a break and the end; on a break, back to work and the end. Their
-    /// corners are the cards' (Theme.swift), not a capsule's. A long press on one makes its press minutes back,
-    /// the time each makes under it, for a press made too late; on the plus, it adds a day off.
-    private func actions(at now: Date) -> some View {
-        actionButtons(at: now)
+    /// corners are the cards' (Theme.swift), not a capsule's. A long press lifts one (Lift.swift) with its press
+    /// made minutes back, the time each makes under it, for a press made too late; the plus, with a day off.
+    private func actions() -> some View {
+        actionButtons()
             .controlSize(.large)
             .buttonBorderShape(.roundedRectangle(radius: 24))
     }
 
-    private static let corners = RoundedRectangle(cornerRadius: 24, style: .continuous)
-
     @ViewBuilder
-    private func actionButtons(at now: Date) -> some View {
+    private func actionButtons() -> some View {
         if let active = store.active {
             if store.activeBreak(of: active) != nil {
                 HStack(spacing: 10) {
-                    Button(action: endBreak) {
-                        Label("חזרה לעבודה", systemImage: "play.fill")
-                            .frame(maxWidth: .infinity)
+                    lifting(ShiftButton(title: "חזרה לעבודה", systemImage: "play.fill", prominent: true, action: endBreak)) {
+                        late("חזרתי מההפסקה", .endBreak, minutes: [5, 10])
                     }
-                    .buttonStyle(.glassProminent)
-                    .contentShape(.contextMenuPreview, Self.corners)
-                    .contextMenu { late("חזרתי מההפסקה", .endBreak, minutes: [5, 10], at: now) }
-                    endButton(at: now)
+                    endButton()
                 }
                 .controlSize(.large)
             } else {
                 HStack(spacing: 10) {
-                    Button(action: startBreak) {
-                        Label("הפסקה", systemImage: "pause.fill")
-                            .foregroundStyle(.orange)
-                            .frame(maxWidth: .infinity)
+                    lifting(ShiftButton(title: "הפסקה", systemImage: "pause.fill", color: .orange, action: startBreak)) {
+                        late("יצאתי להפסקה", .startBreak, minutes: [10, 20, 30])
                     }
-                    .buttonStyle(.glass)
-                    .contentShape(.contextMenuPreview, Self.corners)
-                    .contextMenu { late("יצאתי להפסקה", .startBreak, minutes: [10, 20, 30], at: now) }
-                    endButton(at: now)
+                    endButton()
                 }
                 .controlSize(.large)
             }
         } else {
             HStack(spacing: 10) {
-                Button(action: start) {
-                    Label("התחל משמרת", systemImage: "play.fill")
-                        .frame(maxWidth: .infinity)
+                lifting(ShiftButton(title: "התחל משמרת", systemImage: "play.fill", prominent: true, action: start)) {
+                    late("התחלתי כבר", .start, minutes: [15, 30, 60], other: true)
                 }
-                .buttonStyle(.glassProminent)
-                .contentShape(.contextMenuPreview, Self.corners)
-                .contextMenu { late("התחלתי כבר", .start, minutes: [15, 30, 60], at: now, other: true) }
                 Button {
-                    adding = true
+                    if lifter?.isShowing != true { adding = true }
                 } label: {
                     Image(systemName: "plus")
                         .frame(width: 24)
                 }
                 .buttonStyle(.glass)
                 .accessibilityLabel("הוספה ידנית")
-                .contentShape(.contextMenuPreview, Self.corners)
-                .contextMenu {
-                    AddMenu(shift: { adding = true }, dayOff: { dayOff = $0 })
+                .liftable(card: false) {
+                    Button {} label: {
+                        Image(systemName: "plus")
+                            .frame(width: 24)
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
+                    .buttonBorderShape(.roundedRectangle(radius: 24))
+                } sections: {
+                    [.adding(shift: { adding = true }, dayOff: { dayOff = $0 })]
                 }
             }
             .controlSize(.large)
         }
     }
 
-    private func endButton(at now: Date) -> some View {
-        Button(action: end) {
-            Label("סיום משמרת", systemImage: "stop.fill")
-                .foregroundStyle(.red)
-                .frame(maxWidth: .infinity)
+    private func endButton() -> some View {
+        lifting(ShiftButton(title: "סיום משמרת", systemImage: "stop.fill", color: .red, action: end)) {
+            late("סיימתי כבר", .end, minutes: [15, 30], other: true)
         }
-        .buttonStyle(.glass)
-        .contentShape(.contextMenuPreview, Self.corners)
-        .contextMenu { late("סיימתי כבר", .end, minutes: [15, 30], at: now, other: true) }
     }
 
-    /// A press made too late, for a long press: minutes back, each with the time it makes, and another time on
-    /// the wheels. None before the shift's start or its last break, or for a new shift, the last one's end.
-    @ViewBuilder
-    private func late(_ title: String, _ kind: Press, minutes: [Int], at now: Date, other: Bool = false) -> some View {
+    /// A button of the shift that a long press lifts as it is, with its menu.
+    private func lifting(_ button: ShiftButton, sections: @escaping () -> [LiftSection]) -> some View {
+        button.liftable(card: false, preview: {
+            button
+                .controlSize(.large)
+                .buttonBorderShape(.roundedRectangle(radius: 24))
+        }, sections: sections)
+    }
+
+    /// A press made too late: minutes back, each with the time it makes, and another time on the wheels. None
+    /// before the shift's start or its last break, or for a new shift, the last one's end. Made when pressed.
+    private func late(_ title: String, _ kind: Press, minutes: [Int], other: Bool = false) -> [LiftSection] {
+        let now = ShiftStore.now()
         let after = earliest(now: now)
-        let choices = minutes.filter { now.addingTimeInterval(-Double($0) * 60) > after }
-        if !choices.isEmpty {
-            Section(title) {
-                ForEach(choices, id: \.self) { m in
-                    let moment = now.addingTimeInterval(-Double(m) * 60)
-                    let label = m == 60 ? "לפני שעה" : "לפני \(m) דקות"
-                    Button {
-                        press(kind, at: moment)
-                    } label: {
-                        Text(label)
-                        Text(Format.clock(moment))
-                    }
-                }
+        let items = minutes.compactMap { m -> LiftItem? in
+            let moment = now.addingTimeInterval(-Double(m) * 60)
+            guard moment > after else { return nil }
+            return LiftItem(title: m == 60 ? "לפני שעה" : "לפני \(m) דקות", subtitle: Format.clock(moment)) {
+                press(kind, at: moment)
             }
         }
-        if other {
-            Button("בשעה אחרת…", systemImage: "clock") { picking = kind }
+        var sections: [LiftSection] = []
+        if !items.isEmpty {
+            sections.append(LiftSection(header: title, items: items))
         }
+        if other {
+            sections.append(LiftSection(items: [LiftItem(title: "בשעה אחרת…", systemImage: "clock") { picking = kind }]))
+        }
+        return sections
     }
 
     /// A press of the buttons, at a moment of its own when it was made too late.
@@ -391,24 +380,62 @@ struct NowView: View {
         return moment
     }
 
+    // the buttons' taps; not the finger lifted after a long press
+
     private func start() {
+        guard lifter?.isShowing != true else { return }
         withAnimation { _ = store.startShift() }
         tapped += 1
     }
 
     private func end() {
+        guard lifter?.isShowing != true else { return }
         withAnimation { _ = store.endShift() }
         tapped += 1
     }
 
     private func startBreak() {
+        guard lifter?.isShowing != true else { return }
         withAnimation { store.startBreak() }
         tapped += 1
     }
 
     private func endBreak() {
+        guard lifter?.isShowing != true else { return }
         withAnimation { store.endBreak() }
         tapped += 1
+    }
+}
+
+/// A button of the shift: its icon and word in its color on glass, or on the accent; the size and the corners
+/// are its row's (NowView.actions).
+private struct ShiftButton: View {
+    let title: String
+    let systemImage: String
+    var color: Color? = nil
+    var prominent = false
+    let action: () -> Void
+
+    var body: some View {
+        if prominent {
+            Button(action: action) { label }
+                .buttonStyle(.glassProminent)
+        } else {
+            Button(action: action) { label }
+                .buttonStyle(.glass)
+        }
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        if let color {
+            Label(title, systemImage: systemImage)
+                .foregroundStyle(color)
+                .frame(maxWidth: .infinity)
+        } else {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
+        }
     }
 }
 
