@@ -57,6 +57,7 @@ struct ShiftsView: View {
     }
 
     private func list(_ range: TimeRange, at date: Date) -> some View {
+        Perf.drew("משמרות")
         let settings = store.settings
         let summary = Calc.summary(store.shifts, settings, range: range, asOf: date.ms)
         let cells = [

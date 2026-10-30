@@ -41,6 +41,8 @@ struct RootView: View {
     @Environment(ShiftStore.self) private var store
     @Environment(\.scenePhase) private var phase
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(CardLook.key) private var glassCards = false
+    @AppStorage(Perf.key) private var measuring = false
     @State private var tab: AppTab = .now
 
     /// The look chosen in the settings: the iPhone's, light or dark.
@@ -85,6 +87,15 @@ struct RootView: View {
         .tabBarMinimizeBehavior(.onScrollDown)
         // a long press lifts a shift, a day or a button over the tabs, the tab bar blurred too (Lift.swift)
         .liftHost()
+        .environment(\.glassCards, glassCards)
+        .overlay(alignment: .top) {
+            if measuring {
+                PerfStrip()
+            }
+        }
+        .onChange(of: measuring, initial: true) { _, on in
+            Perf.shared.run(on)
+        }
         .preferredColorScheme(scheme)
         .modifier(LockGate())
         .task {

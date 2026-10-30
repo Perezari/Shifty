@@ -148,7 +148,7 @@ struct SummaryCell: Hashable {
     let value: String
 }
 
-/// The period's numbers on the accent's glass (app.js .summary-card).
+/// The period's numbers on the accent (app.js .summary-card).
 struct SummaryCard: View {
     let cells: [SummaryCell]
 
@@ -177,7 +177,7 @@ struct SummaryCard: View {
         .foregroundStyle(.white)
         .padding(.vertical, 14)
         .padding(.horizontal, 6)
-        .glassEffect(.regular.tint(.accentColor), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .surface(in: RoundedRectangle(cornerRadius: 24, style: .continuous), tint: .accentColor)
     }
 }
 
@@ -193,6 +193,7 @@ struct ShiftRow: View {
     var showsDate = true
 
     var body: some View {
+        let _ = Perf.drew("שורה")
         HStack(spacing: 14) {
             if showsDate {
                 DateBadge(date: shift.start, short: short, dayOff: shift.type != .work)

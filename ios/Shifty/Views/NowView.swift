@@ -75,6 +75,7 @@ struct NowView: View {
 
     /// The state, the dial and its numbers.
     private func shift(at date: Date) -> some View {
+        Perf.drew("עכשיו")
         let settings = store.settings
         let shifts = store.shifts
         let status = Calc.nowStatus(shifts, settings, active: store.active, at: date.ms)
@@ -93,6 +94,7 @@ struct NowView: View {
 
     /// The week, the pay period, a holiday coming and the days off left.
     private func cards(at date: Date) -> some View {
+        Perf.drew("כרטיסים")
         let settings = store.settings
         let shifts = store.shifts
         let period = Calc.period(around: date, monthStartDay: settings.monthStartDay)
@@ -439,7 +441,7 @@ private struct ShiftButton: View {
     }
 }
 
-/// The state on a capsule of glass: "במשמרת · סטודיו גל", a break's time, or none running.
+/// The state on a capsule: "במשמרת · סטודיו גל", a break's time, or none running.
 private struct NowCapsule: View {
     let status: NowStatus
     let settings: Settings
@@ -464,7 +466,7 @@ private struct NowCapsule: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
-        .glassEffect(.regular, in: Capsule())
+        .surface(in: Capsule())
     }
 
     private var title: String {
@@ -519,22 +521,7 @@ private struct ShiftDial<Center: View>: View {
         let r = size * 160 / 350
         let w = size * 22 / 350
         return ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.06), lineWidth: w)
-                .frame(width: r * 2, height: r * 2)
-            ForEach(0..<60, id: \.self) { i in
-                Capsule()
-                    .fill(i % 5 == 0 ? Color.secondary : Color.secondary.opacity(0.45))
-                    .frame(width: i % 5 == 0 ? 2 : 1.5, height: i % 5 == 0 ? 9 : 4)
-                    .offset(y: -(r - w / 2 - (i % 5 == 0 ? 11.5 : 9)))
-                    .rotationEffect(.degrees(Double(i) * 6))
-            }
-            ForEach([12, 3, 6, 9], id: \.self) { hour in
-                Text(verbatim: String(hour))
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.tertiary)
-                    .position(Self.point(Double(hour % 12) * 30, size * 120 / 350, c))
-            }
+            DialFace(size: size)
             ZStack {
                 ForEach(layout.pieces, id: \.self) { piece in
                     Circle()
@@ -633,6 +620,37 @@ private struct ShiftDial<Center: View>: View {
     }
 }
 
+/// The dial's track, its minutes' ticks and its four hours: the same for its size, so drawn once and not with
+/// each second of the shift.
+private struct DialFace: View {
+    let size: CGFloat
+
+    var body: some View {
+        let c = size / 2
+        let r = size * 160 / 350
+        let w = size * 22 / 350
+        ZStack {
+            Circle()
+                .stroke(Color.primary.opacity(0.06), lineWidth: w)
+                .frame(width: r * 2, height: r * 2)
+            ForEach(0..<60, id: \.self) { i in
+                Capsule()
+                    .fill(i % 5 == 0 ? Color.secondary : Color.secondary.opacity(0.45))
+                    .frame(width: i % 5 == 0 ? 2 : 1.5, height: i % 5 == 0 ? 9 : 4)
+                    .offset(y: -(r - w / 2 - (i % 5 == 0 ? 11.5 : 9)))
+                    .rotationEffect(.degrees(Double(i) * 6))
+            }
+            ForEach([12, 3, 6, 9], id: \.self) { hour in
+                Text(verbatim: String(hour))
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.tertiary)
+                    .position(ShiftDial<EmptyView>.point(Double(hour % 12) * 30, size * 120 / 350, c))
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 /// A number of the card under the dial, in a color of its own if it has one.
 private struct FactCell: Hashable {
     let title: String
@@ -640,7 +658,7 @@ private struct FactCell: Hashable {
     var color: Color? = nil
 }
 
-/// The numbers under the dial, on one card of glass.
+/// The numbers under the dial, on one card.
 private struct NowFacts: View {
     let cells: [FactCell]
 

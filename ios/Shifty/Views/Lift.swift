@@ -40,13 +40,13 @@ final class Lifter {
 
     func show(_ lift: Lift) {
         guard self.lift == nil else { return }
-        withAnimation(.spring(duration: 0.32, bounce: 0.2)) { self.lift = lift }
         count += 1
+        withAnimation(.spring(duration: 0.22, bounce: 0.15)) { self.lift = lift }
     }
 
     /// Puts the thing down, then does what was chosen.
     func dismiss(then action: (() -> Void)? = nil) {
-        withAnimation(.easeOut(duration: 0.18)) { lift = nil }
+        withAnimation(.easeOut(duration: 0.15)) { lift = nil }
         action?()
     }
 }
@@ -111,16 +111,21 @@ private struct Liftable: ViewModifier {
     let sections: () -> [LiftSection]
     @Environment(\.lifter) private var lifter
     @State private var place = LiftSpot()
+    /// Held down, before it lifts: it gives a little under the finger, as iOS's do.
+    @GestureState private var pressing = false
 
     func body(content: Content) -> some View {
         content
+            .scaleEffect(pressing ? 0.96 : 1)
+            .animation(.easeOut(duration: 0.18), value: pressing)
             .onGeometryChange(for: CGRect.self) { proxy in
                 proxy.frame(in: .global)
             } action: { frame in
                 place.frame = frame
             }
             .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.35, maximumDistance: 12)
+                LongPressGesture(minimumDuration: 0.25, maximumDistance: 12)
+                    .updating($pressing) { held, state, _ in state = held }
                     .onEnded { _ in lift() }
             )
             .accessibilityAction(named: "אפשרויות") { lift() }
@@ -189,12 +194,12 @@ private struct LiftStage: View {
                 .scaleEffect(shown ? 1 : 0.94)
             LiftMenu(sections: lift.sections, pick: pick)
                 .environment(\.layoutDirection, .rightToLeft)
-                .scaleEffect(shown ? 1 : 0.4, anchor: UnitPoint(x: right ? 1 : 0, y: above ? 1 : 0))
+                .scaleEffect(shown ? 1 : 0.6, anchor: UnitPoint(x: right ? 1 : 0, y: above ? 1 : 0))
                 .opacity(shown ? 1 : 0)
         }
         .environment(\.layoutDirection, .leftToRight)
         .onAppear {
-            withAnimation(.spring(duration: 0.34, bounce: 0.25)) { shown = true }
+            withAnimation(.spring(duration: 0.24, bounce: 0.2)) { shown = true }
         }
     }
 }

@@ -52,6 +52,7 @@ struct CalendarView: View {
     }
 
     private func month(_ range: TimeRange, at date: Date) -> some View {
+        Perf.drew("לוח")
         let settings = store.settings
         let summary = Calc.summary(store.shifts, settings, range: range, asOf: date.ms)
         let days = Calc.gridDays(range)
@@ -147,6 +148,7 @@ private struct DayCell: View {
     let settings: Settings
 
     var body: some View {
+        let _ = Perf.drew("יום")
         let holiday = holidayInfo
         VStack(spacing: 2) {
             Text(verbatim: String(LocalTime.parts(date).day))

@@ -14,6 +14,8 @@ struct SettingsView: View {
     @AppStorage(Alerts.summaryKey) private var periodSummary = true
     @AppStorage(Place.enabledKey) private var placeOn = false
     @AppStorage(Place.radiusKey) private var placeRadius = 150.0
+    @AppStorage(CardLook.key) private var glassCards = false
+    @AppStorage(Perf.key) private var measuring = false
     @State private var placeSet = Place.coordinate != nil
     @State private var placeBusy = false
     @State private var hoursEdit: HoursEdit?
@@ -32,6 +34,7 @@ struct SettingsView: View {
 
     var body: some View {
         let s = store.settings
+        let _ = Perf.drew("הגדרות")
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 SettingsSection(title: "שכר ומקום עבודה") {
@@ -140,7 +143,8 @@ struct SettingsView: View {
                     NumberRow(title: "הפרשה לפנסיה", value: setting(\.pensionPercent), unit: "%")
                 }
 
-                SettingsSection(title: "תצוגה") {
+                SettingsSection(title: "תצוגה",
+                                note: "כרטיסי זכוכית כבדים יותר לציור. מדידת המהירות מראה בראש המסך, בכל שנייה, כמה פריימים הוצגו, כמה מהם איטיים, וכמה פעמים כל מסך צויר מחדש.") {
                     Picker("מראה", selection: setting(\.theme)) {
                         Text("כמו באייפון").tag("system")
                         Text("בהיר").tag("light")
@@ -148,6 +152,12 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     .padding(.vertical, 12)
+                    Divider()
+                    Toggle("כרטיסי זכוכית", isOn: $glassCards)
+                        .settingsRow()
+                    Divider()
+                    Toggle("מדידת מהירות", isOn: $measuring)
+                        .settingsRow()
                 }
 
                 SettingsSection(title: "מסך הנעילה והתראות",
