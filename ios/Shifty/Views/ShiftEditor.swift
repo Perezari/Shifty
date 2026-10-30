@@ -7,6 +7,8 @@ struct ShiftEditor: View {
     let shift: Shift?
     /// A new shift's day; today without one.
     let day: Date?
+    /// A shift whose hours and break a new one takes on its day, as "שכפול להיום" asks.
+    var from: Shift? = nil
 
     @Environment(ShiftStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -118,26 +120,38 @@ struct ShiftEditor: View {
         guard !loaded else { return }
         loaded = true
         guard let shift else {
-            // a new shift: 9:00 to 17:00 of its day
+            // a new shift: 9:00 to 17:00 of its day, or the hours and the break of the one copied
             let base = day ?? Date()
             date = base
-            start = Self.time(9, 0, on: base)
-            end = Self.time(17, 0, on: base)
+            if let from, let fromEnd = from.end {
+                let s = LocalTime.parts(from.start)
+                let e = LocalTime.parts(fromEnd)
+                start = Self.time(s.hour, s.minute, on: base)
+                end = Self.time(e.hour, e.minute, on: base)
+                breakMinutes = Self.breakMinutes(of: from)
+            } else {
+                start = Self.time(9, 0, on: base)
+                end = Self.time(17, 0, on: base)
+            }
             return
         }
         date = shift.start
         start = shift.start
         end = shift.end ?? Self.time(17, 0, on: shift.start)
         hasEnd = shift.end != nil
-        // the breaks as minutes, an open one up to now
+        breakMinutes = Self.breakMinutes(of: shift)
+        isHoliday = shift.isHoliday
+        note = shift.note
+    }
+
+    /// A shift's breaks in minutes, an open one up to now.
+    private static func breakMinutes(of shift: Shift) -> Int {
         let now = Date().ms
         var ms = 0.0
         for b in shift.breaks {
             ms += max(0, (b.end?.ms ?? now) - b.start.ms)
         }
-        breakMinutes = Int(jsRound(ms / 60000))
-        isHoliday = shift.isHoliday
-        note = shift.note
+        return Int(jsRound(ms / 60000))
     }
 
     private func save() {

@@ -1,13 +1,16 @@
 import SwiftUI
 
 /// The shifts of a pay period, the newest first: the period's hours, hours missing, shifts and income, and
-/// each shift's hours and pay, a running one's live (app.js renderShifts). A shift opens in the editor, and
-/// a swipe deletes it. The list is drawn again each minute, the running shift's row each second.
+/// each shift's hours and pay, a running one's live (app.js renderShifts). A shift opens in the editor, a swipe
+/// deletes it, and a long press lifts it with its menu; the plus adds a shift, and on a long press a day off.
+/// The list is drawn again each minute, the running shift's row each second.
 struct ShiftsView: View {
     @Environment(ShiftStore.self) private var store
     @State private var offset = 0
     @State private var adding = false
     @State private var editing: Shift?
+    @State private var copying: Shift?
+    @State private var dayOff: ShiftType?
     @State private var picking = false
 
     var body: some View {
@@ -19,10 +22,12 @@ struct ShiftsView: View {
         .navigationTitle("משמרות")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    adding = true
+                Menu {
+                    AddMenu(shift: { adding = true }, dayOff: { dayOff = $0 })
                 } label: {
                     Image(systemName: "plus")
+                } primaryAction: {
+                    adding = true
                 }
                 .accessibilityLabel("הוספת משמרת")
             }
@@ -33,6 +38,14 @@ struct ShiftsView: View {
         }
         .sheet(item: $editing) { shift in
             ShiftEditor(shift: shift, day: nil)
+                .environment(store)
+        }
+        .sheet(item: $copying) { shift in
+            ShiftEditor(shift: nil, day: Date(), from: shift)
+                .environment(store)
+        }
+        .sheet(item: $dayOff) { type in
+            DayOffSheet(type: type)
                 .environment(store)
         }
         .sheet(isPresented: $picking) {
@@ -80,6 +93,7 @@ struct ShiftsView: View {
                             Label("מחיקה", systemImage: "trash")
                         }
                     }
+                    .shiftMenu(shift, breakdown, settings, edit: { editing = shift }, copy: { copying = shift })
                     .cardRow()
                 }
             }

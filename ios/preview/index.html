@@ -199,40 +199,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   font: 600 10.5px/1 var(--font-text); color: var(--ink); cursor: pointer; }
 .tabs .t.on { color: var(--accent); }
 .tabs svg { width: 24px; height: 24px; overflow: visible; }
-/* (proposal 1) each tab's symbol moves as the tab is chosen, as SF Symbols' effects do: bounce, its layers one after another,
-   wiggle, rotate */
-.tabs .t.fx[data-fx="bounce"] svg { animation: fx-bounce .5s cubic-bezier(.3, .6, .4, 1); }
-.tabs .t.fx[data-fx="layers"] svg .l { animation: fx-layer .42s ease-out both; }
-.tabs .t.fx[data-fx="layers"] svg .l:nth-child(2) { animation-delay: .07s; }
-.tabs .t.fx[data-fx="layers"] svg .l:nth-child(3) { animation-delay: .14s; }
-.tabs .t.fx[data-fx="wiggle"] svg { animation: fx-wiggle .6s ease-in-out; }
-.tabs .t.fx[data-fx="rotate"] svg { animation: fx-rotate .7s cubic-bezier(.45, 0, .2, 1); }
-@keyframes fx-bounce { 30% { transform: scale(.8); } 65% { transform: scale(1.12); } }
-@keyframes fx-layer { 45% { transform: translateY(-3.5px); } }
-@keyframes fx-wiggle { 20% { transform: rotate(-14deg); } 45% { transform: rotate(10deg); } 70% { transform: rotate(-5deg); } }
-@keyframes fx-rotate { to { transform: rotate(90deg); } }
 .tab-mini { position: absolute; bottom: 28px; right: 16px; width: 56px; height: 56px; border-radius: 50%; border: 0; padding: 0; display: flex;
   align-items: center; justify-content: center; color: var(--accent); cursor: pointer; opacity: 0; transform: scale(.5); pointer-events: none;
   transition: transform .38s cubic-bezier(.3, 1.2, .4, 1), opacity .2s; }
 .tab-mini svg { width: 24px; height: 24px; }
 .device.mini .tabs { opacity: 0; transform: scale(.3, .8); pointer-events: none; }
 .device.mini .tab-mini { opacity: 1; transform: none; pointer-events: auto; }
-/* (proposal 5) the running shift over the tab bar on the other tabs (tabViewBottomAccessory), beside it when it shrinks */
-.acc { position: absolute; left: 16px; right: 16px; bottom: 96px; height: 50px; border-radius: 25px; display: flex; align-items: center;
-  opacity: 0; transform: translateY(14px); pointer-events: none;
-  transition: bottom .38s cubic-bezier(.3, 1.15, .4, 1), right .38s cubic-bezier(.3, 1.15, .4, 1), opacity .25s, transform .3s; }
-.device.has-acc .acc { opacity: 1; transform: none; pointer-events: auto; }
-.device.mini .acc { bottom: 31px; right: 80px; }
-.acc-main { flex: 1; min-width: 0; height: 100%; border: 0; background: none; display: flex; align-items: center; gap: 9px; padding: 0 18px 0 8px;
-  color: var(--ink); cursor: pointer; font: inherit; }
-.acc-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.acc-clock { font: 600 18px/1 var(--font-round); }
-.acc-label { font-size: 13px; color: var(--ink-2); font-weight: 500; white-space: nowrap; }
-.device.mini .acc-label { display: none; }
-.acc-pay { margin-inline-start: auto; font: 600 15px/1 var(--font-round); color: var(--accent); white-space: nowrap; }
-.acc-btn { width: 38px; height: 38px; flex: none; margin-inline-end: 6px; border-radius: 50%; border: 0; padding: 0; display: flex; align-items: center;
-  justify-content: center; cursor: pointer; color: var(--tint); background: color-mix(in srgb, var(--tint) 16%, transparent); }
-.acc-btn svg { width: 16px; height: 16px; }
 
 /* ---- the Lock Screen and the home screen ---- */
 .wall { position: absolute; inset: 0; background:
@@ -352,7 +324,6 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .circle { width: 44px; height: 44px; border-radius: 50%; border: 0; padding: 0; display: flex; align-items: center; justify-content: center; color: var(--ink); cursor: pointer; }
 .circle svg { width: 19px; height: 19px; }
 .scr { display: flex; flex-direction: column; gap: 10px; padding: 102px 16px 130px; }
-.device.has-acc .scr { padding-bottom: 190px; }
 .large { margin: 0 4px 2px; font: 700 34px/1.15 var(--font-text); letter-spacing: -.4px; }
 .pbar { display: flex; align-items: center; gap: 8px; }
 .pbar .pb { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; }
@@ -392,7 +363,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .setrow + .setrow { border-top: .5px solid var(--sep); }
 .setrow .val { color: var(--ink-2); font-size: 16px; }
 
-/* ---- (proposals 2 to 4) a long press: the rest blurs, what was pressed lifts, and its menu opens, as iOS's context menus ---- */
+/* ---- a long press: the rest blurs, what was pressed lifts, and its menu opens, as iOS's context menus ---- */
 .pressing { transform: scale(.965); transition: transform .45s ease-out; }
 .cm { position: absolute; inset: 0; z-index: 20; }
 .cm-dim { position: absolute; inset: 0; border: 0; padding: 0; cursor: pointer; background: var(--cm-dim);
@@ -551,7 +522,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   // ---- icons, as the SF Symbols the app uses ----
   const icon = {
     timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>',
-    // list.bullet as iOS draws it right to left, each line a layer of its own
+    // list.bullet as iOS draws it right to left
     list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><g class="l"><path d="M4 6h11"/><circle cx="19.5" cy="6" r="1.2" fill="currentColor"/></g><g class="l"><path d="M4 12h11"/><circle cx="19.5" cy="12" r="1.2" fill="currentColor"/></g><g class="l"><path d="M4 18h11"/><circle cx="19.5" cy="18" r="1.2" fill="currentColor"/></g></svg>',
     calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>',
@@ -886,18 +857,18 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       </div></div><div class="home-ind"></div></div>`;
   }
 
-  // ---- (proposals 2 to 4) the menus of a long press: what was pressed lifted, with what can be done to it ----
+  // ---- the menus of a long press: what was pressed lifted, with what can be done to it ----
   const line = (a, b, c) => `<div><span>${a}</span><span class="num">${b}</span><span class="num"><span class="ltr">${c}</span></span></div>`;
   /** A shift lifted: its day and hours, its pay by rate, its break and its note. */
   function shiftPreview(e) {
     let lines;
     if (e.type === "work") {
       const regular = Math.min(e.net, e.std), extra = Math.max(0, e.net - e.std), a = Math.min(extra, 2), b = Math.max(0, extra - 2);
-      lines = line(e.running ? "עבודה עד עכשיו" : "שעות רגילות", hm(regular), money(regular * WAGE))
+      lines = line("שעות רגילות", hm(regular), money(regular * WAGE))
         + (a > 0.01 ? line("נוספות 125%", hm(a), money(a * WAGE * 1.25)) : "") + (b > 0.01 ? line("נוספות 150%", hm(b), money(b * WAGE * 1.5)) : "")
         + (e.breakMin ? line("הפסקה", hm(e.breakMin / 60), "") : "");
     } else {
-      lines = e.type === "vacation" ? line("חופשה בתשלום", hm(e.net), money(e.pay)) : line("יום מחלה ראשון", "0%", money(0));
+      lines = e.type === "vacation" ? line("חופשה בתשלום", hm(e.net), money(e.pay)) : line("יום מחלה 1", "0%", money(0));
     }
     const when = e.type !== "work" ? "" : e.end == null ? `מ־${clock(new Date(e.start))}` : range(e);
     return `<div class="pv"><div class="pv-head"><b>${dayLine(e.day)}</b><span class="num">${when}</span></div><div class="pv-lines">${lines}</div>
@@ -907,7 +878,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   function dayPreview(date, entries) {
     const worked = entries.filter((e) => e.type === "work"), hours = worked.reduce((a, e) => a + e.net, 0);
     const lines = entries.map((e) => e.type !== "work" ? line(e.type === "vacation" ? "חופשה בתשלום" : "יום מחלה", "", money(e.pay))
-      : line(e.end == null ? `מ־${clock(new Date(e.start))} · פעילה` : `<span class="num">${range(e)}</span>`, hm(e.net), money(e.pay))).join("");
+      : line(e.end == null ? `מ־${clock(new Date(e.start))}` : `<span class="num">${range(e)}</span>`, hm(e.net), money(e.pay))).join("");
     return `<div class="pv"><div class="pv-head"><b>${dayLine(date)}</b><span class="num">${worked.length ? hm(hours) + " שע׳" : ""}</span></div>
       ${entries.length ? `<div class="pv-lines">${lines}</div><div class="pv-total"><span>סה״כ</span><b class="num"><span class="ltr">${money(entries.reduce((a, e) => a + e.pay, 0))}</span></b></div>`
         : `<div class="pv-empty">אין משמרת ביום זה</div>`}</div>`;
@@ -920,16 +891,16 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     if (kind === "shift") {
       const e = periodShifts(s)[+arg];
       if (!e) return null;
-      const sections = e.type !== "work" ? [{ items: [item("עריכה", icon.pencil)] }, remove()]
+      const sections = e.type !== "work" ? [{ items: [item("העתקת הסיכום", icon.copy)] }, remove()]
         : [{ items: [item("עריכה", icon.pencil)].concat(e.running ? [] : [item("שכפול להיום", icon.dup)], [item("העתקת הסיכום", icon.copy)]) }, remove()];
       return { preview: shiftPreview(e), sections };
     }
     if (kind === "day") {
       const today = midnight(), date = new Date(today.getFullYear(), today.getMonth(), +arg), sum = byDay(periodShifts(s)).get(+arg);
       const entries = sum ? sum.entries : [];
-      const sections = !entries.length ? [{ items: [item("הוספת משמרת", icon.plus), item("יום חופש", icon.sun), item("יום מחלה", icon.sick)] }]
-        : sum.off ? [{ items: [item("עריכה", icon.pencil)] }, remove()]
-        : [{ items: [item("פתיחת היום", icon.calendar)].concat(+date === +today ? [] : [item("שכפול להיום", icon.dup)]) }, remove(entries.length > 1 ? "מחיקת המשמרות" : "")];
+      const sections = !entries.length ? [{ items: [item("משמרת", icon.timer), item("יום חופש", icon.sun), item("יום מחלה", icon.sick)] }]
+        : sum.off ? [{ items: [item("פתיחת היום", icon.calendar)] }, remove()]
+        : [{ items: [item("פתיחת היום", icon.calendar)].concat(+date === +today || entries.length !== 1 ? [] : [item("שכפול להיום", icon.dup)]) }, remove(entries.length > 1 ? "מחיקת המשמרות" : "")];
       return { preview: dayPreview(date, entries), sections };
     }
     if (kind === "act") {
@@ -1100,24 +1071,22 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     ask: '<span class="tag built">כמו שבבנייה</span>Siri עונה בלי לפתוח את Shifty. מתחת: הסיכום שמגיע בבוקר שאחרי סוף התקופה, והתזכורת אחרי 6 שעות בלי הפסקה, עם כפתור להפסקה. כל אחד מהם נכבה בהגדרות.',
     icon: '<span class="tag built">כמו שבבנייה</span>הסמל של Shifty במסך הבית: בהיר, כהה, וצבוע בגוון שבוחרים באייפון.',
   };
-  // the app's tabs, and the proposals to try on each (none of them built yet)
+  // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag">הצעה 1</span>במעבר בין הלשוניות, לכל אייקון בסרגל תנועה משלו.<br><span class="tag">הצעה 3</span>לחיצה ארוכה על כפתורי המשמרת, למי ששכח ללחוץ בזמן.<br><span class="tag">הצעה 4</span>לחיצה ארוכה על הפלוס, במצב "לא במשמרת".',
-    shifts: '<span class="tag">הצעה 2</span>לחיצה ארוכה על משמרת: הפירוט שלה ותפריט.<br><span class="tag">הצעה 4</span>לחיצה ארוכה על הפלוס למעלה.<br><span class="tag">הצעה 5</span>בזמן משמרת, השעון מעל הסרגל. בגלילה למטה הסרגל מתכווץ והשעון עובר לצדו.',
-    calendar: '<span class="tag">הצעה 2</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. ביום ריק: משמרת, חופש או מחלה.<br><span class="tag">הצעה 5</span>בזמן משמרת, השעון מעל הסרגל.',
-    settings: '<span class="tag">הצעה 5</span>בזמן משמרת, השעון מעל הסרגל, ולחיצה עליו חוזרת ל"עכשיו". ההגדרות כאן מקוצרות.',
+    now: '<span class="tag">חדש</span>לחיצה ארוכה על כפתורי המשמרת, למי ששכח ללחוץ בזמן: לפני כמה דקות, או בשעה אחרת.<br><span class="tag">חדש</span>לחיצה ארוכה על הפלוס, במצב "לא במשמרת": משמרת, יום חופש או יום מחלה.',
+    shifts: '<span class="tag">חדש</span>לחיצה ארוכה על משמרת: הפירוט שלה ותפריט.<br><span class="tag">חדש</span>לחיצה ארוכה על הפלוס למעלה: משמרת, יום חופש או יום מחלה.',
+    calendar: '<span class="tag">חדש</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. ביום ריק: משמרת, יום חופש או יום מחלה.',
+    settings: '<span class="tag built">כמו שבבנייה</span>ההגדרות, מקוצרות.',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
   const dark = () => state.theme === "dark" || (state.theme == null && matchMedia("(prefers-color-scheme: dark)").matches);
   let scale = 1;
 
-  // ---- the tab bar, built once: its lens slides to the tab chosen, and that tab's symbol moves (proposal 1) ----
+  // ---- the tab bar, built once: its lens slides to the tab chosen ----
   const tabIcons = { now: icon.timer, shifts: icon.list, calendar: icon.calendar, settings: icon.gear };
   const tabNames = { now: "עכשיו", shifts: "משמרות", calendar: "לוח", settings: "הגדרות" };
-  const tabFx = { now: "bounce", shifts: "layers", calendar: "wiggle", settings: "rotate" };
-  chrome.innerHTML = `<div class="acc glass"><button class="acc-main" type="button" data-acc></button><button class="acc-btn" type="button" data-acc-toggle></button></div>
-    <nav class="tabs glass"><span class="lens"></span>${TABS.map((t) => `<button class="t" type="button" data-tab="${t}" data-fx="${tabFx[t]}">${tabIcons[t]}<span>${tabNames[t]}</span></button>`).join("")}</nav>
+  chrome.innerHTML = `<nav class="tabs glass"><span class="lens"></span>${TABS.map((t) => `<button class="t" type="button" data-tab="${t}">${tabIcons[t]}<span>${tabNames[t]}</span></button>`).join("")}</nav>
     <button class="tab-mini glass" type="button" data-expand aria-label="הצגת הלשוניות"></button>`;
   const replay = (el, name) => { el.classList.remove(name); void el.offsetWidth; el.classList.add(name); };
   function switchTab(tab) {
@@ -1127,28 +1096,19 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     state.sheet = null;
     closeMenu();
     replay(chrome.querySelector(".lens"), "moving");
-    replay(chrome.querySelector(`[data-tab="${tab}"]`), "fx");
     save(); render();
   }
-  /** The tab bar on the app's screens, and the running shift over it on the tabs other than Now (proposal 5). */
+
+  /** The tab bar, on the app's screens. */
   function updateChrome() {
-    const app = state.screen === "now", s = shift(), acc = app && s.running && state.tab !== "now";
+    const app = state.screen === "now";
     chrome.hidden = !app;
     device.classList.toggle("mini", app && mini);
-    device.classList.toggle("has-acc", acc);
     if (!app) return;
     chrome.style.setProperty("--i", TABS.indexOf(state.tab));
     for (const b of chrome.querySelectorAll("[data-tab]")) b.classList.toggle("on", b.dataset.tab === state.tab);
     const small = chrome.querySelector(".tab-mini");
     if (small.dataset.shows !== state.tab) { small.dataset.shows = state.tab; small.innerHTML = tabIcons[state.tab]; }
-    if (!acc) return;
-    const onBreak = s.open != null, button = chrome.querySelector(".acc-btn");
-    chrome.querySelector(".acc-main").innerHTML = `<span class="acc-dot pulse" style="background:${onBreak ? "var(--orange)" : "var(--green)"}"></span>
-      <b class="acc-clock num"><span class="ltr">${onBreak ? timer(s.now - s.open) : timer(s.netMs)}</span></b><span class="acc-label">${onBreak ? "בהפסקה" : "במשמרת"}</span>
-      <span class="acc-pay num"><span class="ltr">${money(s.pay)}</span></span>`;
-    button.style.setProperty("--tint", onBreak ? "var(--accent)" : "var(--orange)");
-    button.innerHTML = onBreak ? icon.play : icon.pause;
-    button.setAttribute("aria-label", onBreak ? "חזרה לעבודה" : "הפסקה");
   }
 
   // ---- the screen, drawn again each second: each tab keeps its scroll, and it waits while a finger scrolls, drags or holds ----
@@ -1216,7 +1176,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   document.addEventListener("pointerup", () => { dragging = false; });
   document.addEventListener("pointercancel", () => { dragging = false; });
 
-  // ---- a long press (proposals 2 to 4): what was pressed shrinks a little, then lifts with its menu ----
+  // ---- a long press: what was pressed shrinks a little, then lifts with its menu ----
   let press = null, suppress = 0;
   device.addEventListener("pointerdown", (e) => {
     const el = e.target.closest("[data-menu]");
@@ -1294,9 +1254,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     if (b.dataset.tab) return switchTab(b.dataset.tab);
     if ("expand" in b.dataset) return setMini(false);
     if ("cmClose" in b.dataset) return closeMenu();
-    if ("acc" in b.dataset) { setMini(false); return switchTab("now"); }
-    if ("accToggle" in b.dataset) state.state = state.state === "break" ? "work" : "break";
-    else if (b.dataset.reset) state.plan = null;
+    if (b.dataset.reset) state.plan = null;
     else if ("sheet" in b.dataset) state.sheet = b.dataset.sheet || null;
     else if (b.dataset.screen) { state.screen = b.dataset.screen; state.plan = null; state.sheet = null; closeMenu(); setMini(false); }
     else if (b.dataset.state) { state.state = b.dataset.state; state.plan = null; state.sheet = null; closeMenu(); }

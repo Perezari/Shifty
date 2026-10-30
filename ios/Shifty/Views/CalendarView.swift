@@ -2,12 +2,15 @@ import SwiftUI
 
 /// The pay period as a month of days (app.js renderCalendar), a heat map of the work: each day worked filled
 /// by its hours against its standard, red when it fell short, a day off and a holiday marked, and today
-/// ringed. A day opens with its shifts, to add one or a day off.
+/// ringed. A day opens with its shifts, to add one or a day off; a long press lifts it with its menu.
 struct CalendarView: View {
     @Environment(ShiftStore.self) private var store
     @State private var offset = 0
     @State private var picking = false
     @State private var opened: DayRef?
+    @State private var adding: DayRef?
+    @State private var copying: Shift?
+    @State private var added = 0
 
     var body: some View {
         let range = Calc.period(around: Date(), monthStartDay: store.settings.monthStartDay, offset: offset)
@@ -16,8 +19,17 @@ struct CalendarView: View {
         }
         .background(Color.appBackground.ignoresSafeArea())
         .navigationTitle("לוח")
+        .sensoryFeedback(.success, trigger: added)
         .sheet(item: $opened) { day in
             DayDetail(date: day.date)
+                .environment(store)
+        }
+        .sheet(item: $adding) { day in
+            ShiftEditor(shift: nil, day: day.date)
+                .environment(store)
+        }
+        .sheet(item: $copying) { shift in
+            ShiftEditor(shift: nil, day: Date(), from: shift)
                 .environment(store)
         }
         .sheet(isPresented: $picking) {
@@ -41,6 +53,10 @@ struct CalendarView: View {
         let summary = Calc.summary(store.shifts, settings, range: range, asOf: date.ms)
         let days = Calc.gridDays(range)
         let today = LocalTime.dayKey(date)
+        // each day's shifts or day off, for its menu and its lifted card
+        let records = Dictionary(grouping: store.shifts.filter { $0.start >= range.start && $0.start < range.end },
+                                 by: { LocalTime.dayKey($0.start) })
+        let sick = Calc.sickDates(of: store.shifts)
         let cells = [
             SummaryCell(title: "ימי עבודה", value: String(summary.totals.workedDays)),
             SummaryCell(title: "שעות", value: Format.hoursToHM(summary.totals.netHours)),
@@ -60,11 +76,21 @@ struct CalendarView: View {
                         ForEach(days, id: \.self) { day in
                             let key = LocalTime.dayKey(day)
                             let inPeriod = day >= range.start && day < range.end
-                            DayCell(date: day, inPeriod: inPeriod, today: key == today,
-                                    sum: inPeriod ? summary.days[key] : nil, settings: settings)
-                                .onTapGesture {
-                                    if inPeriod { opened = DayRef(date: day) }
-                                }
+                            let cell = DayCell(date: day, inPeriod: inPeriod, today: key == today,
+                                               sum: inPeriod ? summary.days[key] : nil, settings: settings)
+                            if inPeriod {
+                                let onDay = (records[key] ?? []).sorted { $0.start < $1.start }
+                                cell
+                                    .onTapGesture { opened = DayRef(date: day) }
+                                    .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                    .contextMenu {
+                                        dayMenu(day, onDay)
+                                    } preview: {
+                                        DayPreview(date: day, shifts: onDay, settings: settings, sickDates: sick)
+                                    }
+                            } else {
+                                cell
+                            }
                         }
                     }
                 }
@@ -75,6 +101,29 @@ struct CalendarView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+    }
+
+    /// A day's menu: an empty day takes a shift or a day off; a day with any opens, is copied to today, or is
+    /// emptied.
+    @ViewBuilder
+    private func dayMenu(_ day: Date, _ onDay: [Shift]) -> some View {
+        if onDay.isEmpty {
+            AddMenu(shift: { adding = DayRef(date: day) }, dayOff: { type in
+                withAnimation { _ = store.addDayOff(day, type: type) }
+                added += 1
+            })
+        } else {
+            Button("פתיחת היום", systemImage: "calendar") { opened = DayRef(date: day) }
+            if onDay.count == 1, let only = onDay.first, store.canCopyToToday(only) {
+                Button("שכפול להיום", systemImage: "plus.square.on.square") { copying = only }
+            }
+            Divider()
+            Button(onDay.count > 1 ? "מחיקת המשמרות" : "מחיקה", systemImage: "trash", role: .destructive) {
+                withAnimation {
+                    for shift in onDay { store.delete(shift.id) }
+                }
+            }
+        }
     }
 }
 
@@ -184,6 +233,7 @@ struct DayDetail: View {
     @Environment(\.dismiss) private var dismiss
     @State private var adding = false
     @State private var editing: Shift?
+    @State private var copying: Shift?
 
     var body: some View {
         let settings = store.settings
@@ -211,11 +261,11 @@ struct DayDetail: View {
                         .cardRow()
                 }
                 ForEach(shifts) { shift in
+                    let breakdown = Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick)
                     Button {
                         editing = shift
                     } label: {
-                        ShiftRow(shift: shift, breakdown: Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick),
-                                 currency: settings.currency, showsDate: false)
+                        ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency, showsDate: false)
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -225,6 +275,7 @@ struct DayDetail: View {
                             Label("מחיקה", systemImage: "trash")
                         }
                     }
+                    .shiftMenu(shift, breakdown, settings, edit: { editing = shift }, copy: { copying = shift })
                     .cardRow()
                 }
                 if !hasDayOff {
@@ -280,6 +331,10 @@ struct DayDetail: View {
             }
             .sheet(item: $editing) { shift in
                 ShiftEditor(shift: shift, day: nil)
+                    .environment(store)
+            }
+            .sheet(item: $copying) { shift in
+                ShiftEditor(shift: nil, day: Date(), from: shift)
                     .environment(store)
             }
         }
