@@ -399,6 +399,47 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .pv-total b { font: 700 22px/1 var(--font-round); color: var(--accent); }
 .pv-empty { color: var(--ink-2); text-align: center; padding: 10px 0 4px; }
 
+/* ---- (proposed) Shifty Pro, bought once: its sheet, its card at the top of Settings, and what it opens, marked Pro ---- */
+.pro-badge { font: 700 11px/1 var(--font-text); color: var(--accent); background: var(--accent-soft); padding: 4px 8px; border-radius: 999px;
+  letter-spacing: .02em; }
+.net-row .pro-badge { margin-inline-start: auto; }
+.pro-sheet { top: 58px; padding: 10px 22px 34px; gap: 18px; overflow-y: auto; scrollbar-width: none; }
+.pro-sheet .x { position: absolute; top: 16px; inset-inline-start: 18px; width: 34px; height: 34px; border-radius: 50%; border: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center; color: var(--ink-2); background: var(--track); cursor: pointer; }
+.pro-sheet .x svg { width: 15px; height: 15px; }
+.pro-head { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; margin-top: 10px; }
+.pro-head .mini-icon { width: 72px; height: 72px; border-radius: 17px; margin-bottom: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, .18); }
+.pro-head b { font-size: 28px; font-weight: 700; letter-spacing: -.3px; }
+.pro-head span { font-size: 15px; color: var(--ink-2); }
+.pro-list { display: flex; flex-direction: column; gap: 15px; }
+.pro-row { display: flex; gap: 13px; align-items: flex-start; }
+.pro-row .ic { width: 36px; height: 36px; border-radius: 11px; flex: none; display: flex; align-items: center; justify-content: center;
+  color: var(--accent); background: var(--accent-soft); }
+.pro-row .ic svg { width: 19px; height: 19px; }
+.pro-row b { display: block; font-size: 15.5px; margin-bottom: 2px; }
+.pro-row span { font-size: 13px; color: var(--ink-2); line-height: 1.35; }
+.pro-buy { flex: none; width: 100%; }
+.pro-note { margin-top: -8px; text-align: center; font-size: 12.5px; color: var(--ink-2); }
+.pro-link { align-self: center; border: 0; background: none; padding: 4px 8px; color: var(--accent); font: 500 15px/1 var(--font-text); cursor: pointer; }
+.pro-card { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 24px; }
+.pro-card .top { display: flex; gap: 12px; align-items: center; }
+.pro-card .mini-icon { width: 46px; height: 46px; border-radius: 11px; }
+.pro-card b { display: block; font-size: 17px; }
+.pro-card .top span { font-size: 13px; color: var(--ink-2); line-height: 1.35; }
+.pro-card .capsule { height: 48px; flex: none; width: 100%; font-size: 16px; }
+.pro-card .pro-link { margin-top: -4px; }
+.pro-on { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 24px; }
+.pro-on .mini-icon { width: 40px; height: 40px; }
+.pro-on b { font-size: 16px; }
+.pro-on span { font-size: 13px; color: var(--ink-2); }
+.pro-on .ok { margin-inline-start: auto; color: var(--accent); display: flex; }
+.locked { display: block; width: 100%; border: 0; padding: 0; background: none; text-align: start; font: inherit; color: inherit; cursor: pointer; }
+.locked .sec-card .setrow { opacity: .42; }
+.sec-title { display: flex; align-items: center; gap: 8px; }
+.w-lock { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; color: var(--ink-2);
+  font-size: 13px; font-weight: 600; }
+.w-lock svg { width: 26px; height: 26px; color: var(--accent); }
+
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 </style>
 
@@ -413,6 +454,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         <button type="button" id="screen-place" data-screen="place">התראות</button>
         <button type="button" id="screen-ask" data-screen="ask">Siri וסיכום</button>
         <button type="button" id="screen-icon" data-screen="icon">סמל</button>
+        <button type="button" id="screen-pro" data-screen="pro">Shifty Pro</button>
       </div>
     </div>
     <div class="row">
@@ -425,6 +467,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div class="seg" role="group" aria-label="מראה">
         <button type="button" id="theme-light" data-theme-set="light">בהיר</button>
         <button type="button" id="theme-dark" data-theme-set="dark">כהה</button>
+      </div>
+      <div class="seg" role="group" aria-label="גרסה">
+        <button type="button" id="pro-free" data-pro="0">חינם</button>
+        <button type="button" id="pro-on" data-pro="1">Pro</button>
       </div>
     </div>
     <p class="note" id="note"></p>
@@ -449,7 +495,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     idle: { now: at(17, 5), today: [[at(7, 15), at(11, 0)], [at(11, 30), at(15, 15)]] },               // after a shift of 7:30
   };
   const TABS = ["now", "shifts", "calendar", "settings"];
-  const state = { screen: "now", state: "work", theme: null, tab: "now", plan: null, sheet: null };
+  const state = { screen: "now", state: "work", theme: null, tab: "now", pro: false, plan: null, sheet: null };
   try { Object.assign(state, JSON.parse(localStorage.getItem("shifty-preview") || "{}")); } catch (e) {}
   state.plan = null;
   state.sheet = null;
@@ -545,7 +591,25 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg>',
     clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
     sick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7.5V6a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 15 6v1.5"/><rect x="3.5" y="7.5" width="17" height="12.5" rx="2.5"/><path d="M12 10.8v6M9 13.8h6"/></svg>',
+    // Shifty Pro's: the net pay, the Lock Screen and the widgets, Siri, iCloud, the place, a lock, a close
+    money: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.8"/><rect x="8.6" y="12.5" width="6.8" height="4.5" rx="1.2"/><path d="M10.5 5.3h3"/></svg>',
+    mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>',
+    cloud: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18.5h10.5a4 4 0 0 0 .4-8 6 6 0 0 0-11.6 1.5A3.3 3.3 0 0 0 7 18.5z"/></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
+    lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   };
+  /** What Shifty Pro opens, each with its line (ProFeature in Pro.swift, once built). */
+  const PRO = [
+    ["money", "נטו משוער", "כמה ייכנס לחשבון בסוף התקופה, אחרי מס, ביטוח לאומי ופנסיה."],
+    ["sun", "יתרות חופשה ומחלה", "לפי התלוש האחרון, ומתעדכנות כל חודש."],
+    ["phone", "מסך הנעילה וווידג'טים", "המשמרת שרצה ב-Live Activity, ב-Dynamic Island ובמסך הבית."],
+    ["mic", "Siri ומרכז הבקרה", "להתחיל ולסיים משמרת, ולשאול כמה הרווחת, בלי לפתוח את Shifty."],
+    ["cloud", "סנכרון ב-iCloud", "אותן משמרות והגדרות בכל מכשיר עם אותו Apple ID."],
+    ["pin", "תזכורת לפי מיקום", "שאלה כשמגיעים לעבודה וכשיוצאים ממנה."],
+  ];
+  const PRO_PRICE = "₪24.90";
   // the app's icon in its three looks (ios/AppIcon.svg, AppIcon-dark.svg, AppIcon-tinted.svg); the tinted one as iOS colors it, here amber
   const appIcon = {
     light: '<svg viewBox="0 0 512 512"><defs><linearGradient id="ai-l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16b8a8"/><stop offset="1" stop-color="#0b7d72"/></linearGradient></defs><rect width="512" height="512" fill="url(#ai-l)"/><circle cx="256" cy="256" r="138" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="34"/><path d="M256 118 a138 138 0 0 1 119.5 207" fill="none" stroke="#fff" stroke-width="34" stroke-linecap="round"/><path d="M228 206 l78 50 -78 50 z" fill="#fff"/></svg>',
@@ -666,7 +730,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     }
     return `<div class="now">${statusBar(s.now)}
       <div class="now-scroll scroll" data-scroll="now"><div class="stack">${top}${dial(s, center, plan)}<div class="facts glass">${facts}</div>
-        <div class="actions">${actions}</div>${weekCard(s)}${monthCard()}${holidayBanner()}${leaveCard()}</div></div>
+        <div class="actions">${actions}</div>${weekCard(s)}${monthCard()}${holidayBanner()}${state.pro ? leaveCard() : ""}</div></div>
       <div class="home-ind"></div>${state.sheet === "net" ? netSheet() : ""}</div>`;
   }
   const fact = (value, label, color) => `<div><b style="${color ? "color:" + color : ""}"><span class="ltr">${value}</span></b><span>${label}</span></div>`;
@@ -696,8 +760,23 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     return `<section class="card glass"><div class="card-head"><span class="title">אוקטובר</span><span class="meta">נסגר בעוד 2 ימים</span></div>
       <div class="money-line"><b class="num"><span class="ltr">${moneyShort(6075.4)}</span></b><span>צפי לסוף החודש <b class="ltr num">${moneyShort(8640)}</b></span></div>
       <div class="mini"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num" style="color:var(--amber)">6:30</b><span>נוספות</span></div><div><b class="num" style="color:var(--red)">2:10</b><span>חוסר</span></div></div>
-      <button class="net-row" type="button" data-sheet="net">נטו משוער לסוף התקופה<b class="ltr">${moneyShort(NET.net)}</b><span class="chev">${sized(icon.chevron, 14)}</span></button>
+      ${state.pro ? `<button class="net-row" type="button" data-sheet="net">נטו משוער לסוף התקופה<b class="ltr">${moneyShort(NET.net)}</b><span class="chev">${sized(icon.chevron, 14)}</span></button>`
+        : `<button class="net-row" type="button" data-sheet="pro">נטו משוער לסוף התקופה<span class="pro-badge">Pro</span><span class="chev">${sized(icon.chevron, 14)}</span></button>`}
       </section>`;
+  }
+
+  /** Shifty Pro, on a sheet (ProSheet, once built): what it opens, and the purchase, once, at the App Store's price. */
+  function proSheet() {
+    const rows = PRO.map(([svg, title, text]) => `<div class="pro-row"><span class="ic">${icon[svg]}</span><div><b>${title}</b><span>${text}</span></div></div>`).join("");
+    return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
+      <div class="sheet pro-sheet"><span class="grab"></span>
+        <button class="x" type="button" data-sheet="" aria-label="סגירה">${icon.close}</button>
+        <div class="pro-head"><span class="mini-icon">${appIcon[dark() ? "dark" : "light"]}</span><b>Shifty Pro</b><span>תשלום אחד, ושלך לתמיד</span></div>
+        <div class="pro-list">${rows}</div>
+        <button class="capsule prominent pro-buy" type="button" data-buy="1"><span>שדרוג ב־<span class="ltr">${PRO_PRICE}</span></span></button>
+        <div class="pro-note">בלי מנוי ובלי חיובים נוספים.</div>
+        <button class="pro-link" type="button" data-buy="1">שחזור רכישה</button>
+      </div>`;
   }
 
   /** The period's net pay line by line, on a sheet (NowView's NetSheet). */
@@ -842,18 +921,30 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       </div></div><div class="home-ind"></div></div>`;
   }
 
-  // ---- the Settings tab (SettingsView.swift), shortened: a few of its sections ----
+  // ---- the Settings tab (SettingsView.swift), shortened: Shifty Pro on top, then a few of its sections, Pro's marked ----
   function settingsScreen() {
     const s = shift();
     const row = (title, value) => `<div class="setrow"><span>${title}</span><span class="val">${value}</span></div>`;
     const sec = (title, rows) => `<section class="sec"><div class="sec-title">${title}</div><div class="sec-card glass">${rows}</div></section>`;
+    // Pro's sections: as they are once bought, before it dimmed and marked, a tap opening Shifty Pro
+    const proSec = (title, rows) => state.pro ? sec(title, rows)
+      : `<button class="locked" type="button" data-sheet="pro"><section class="sec"><div class="sec-title">${title}<span class="pro-badge">Pro</span></div><div class="sec-card glass">${rows}</div></section></button>`;
+    const icon46 = appIcon[dark() ? "dark" : "light"];
+    const pro = state.pro
+      ? `<div class="pro-on glass"><span class="mini-icon">${icon46}</span><div><b>Shifty Pro</b><br><span>פעיל. תודה!</span></div><span class="ok">${sized(icon.check, 20)}</span></div>`
+      : `<div class="pro-card glass"><div class="top"><span class="mini-icon">${icon46}</span><div><b>Shifty Pro</b><span>נטו משוער, יתרות, מסך הנעילה וווידג'טים, Siri וסנכרון. בתשלום אחד.</span></div></div>
+          <button class="capsule prominent" type="button" data-sheet="pro"><span>שדרוג ב־<span class="ltr">${PRO_PRICE}</span></span></button>
+          <button class="pro-link" type="button" data-buy="1">שחזור רכישה</button></div>`;
     return `<div class="app">${statusBar(s.now)}<div class="edge"></div>
       <div class="scroll" data-scroll="settings"><div class="scr"><h1 class="large">הגדרות</h1>
+        ${pro}
         ${sec("שכר ומקום עבודה", row("מקום עבודה", PLACE) + row("שכר לשעה", `<span class="ltr num">${CUR} ${WAGE}</span>`))}
         ${sec("שעות תקן ליום", row("א׳–ד׳", `<span class="num">9:06</span>`) + row("ה׳", `<span class="num">8:06</span>`))}
-        ${sec("נסיעות ותקופה", row("נסיעות ליום", `<span class="ltr num">${CUR} 22.60</span>`) + row("יום תחילת החודש", "1"))}
+        ${proSec("יתרת חופשה ומחלה", row("מעקב יתרות", "כבוי"))}
+        ${proSec("נטו משוער", row("נקודות זיכוי", `<span class="num">2.25</span>`) + row("הפרשה לפנסיה", `<span class="num">6%</span>`))}
         ${sec("תצוגה", row("מראה", "כמו האייפון"))}
-        ${sec("תזכורת לפי מיקום", row("מקום העבודה", PLACE) + row("טווח", "150 מ׳"))}
+        ${proSec("תזכורת לפי מיקום", row("כשמגיעים לעבודה ויוצאים ממנה", "כבוי"))}
+        ${proSec("iCloud", row("גיבוי ב-iCloud", "כבוי"))}
       </div></div><div class="home-ind"></div></div>`;
   }
 
@@ -944,6 +1035,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   function lockScreen() {
     const s = shift();
+    // without Shifty Pro, nothing of the shift on the Lock Screen
+    if (!state.pro) return lockWall(s);
     if (!s.running) return lockWall(s) + `<div class="activity" style="align-items:center;color:var(--ink-2);font-size:14px">אין משמרת שרצה, ואין Live Activity</div>`;
     return lockWall(s) + activityCard(s);
   }
@@ -1007,6 +1100,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   function islandScreen() {
     const s = shift();
     const wall = `<div class="wall dark-wall"></div>${statusBar(s.now, true)}`;
+    if (!state.pro) return wall + `<div class="widgets" style="top:120px"><div class="w-label" style="font-size:14px">ה-Dynamic Island ב-Shifty Pro</div></div>`;
     if (!s.running) return wall + `<div class="widgets" style="top:120px"><div class="w-label" style="font-size:14px">אין משמרת שרצה</div></div>`;
     const onBreak = s.open != null, tint = onBreak ? "var(--orange)" : "var(--accent)";
     const t = onBreak ? timer(s.now - s.open) : timer(s.netMs);
@@ -1027,6 +1121,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   function widgetsScreen() {
     const s = shift();
+    // without Shifty Pro, the widgets ask for it, a tap opening Shifty
+    if (!state.pro) {
+      const locked = (cls, label) => `<div><div class="w ${cls}"><div class="w-lock">${icon.lock}<span>Shifty Pro</span></div></div>
+        <div class="w-label" style="margin-top:6px">${label}</div></div>`;
+      return `<div class="wall ${dark() ? "dark-wall" : ""}"></div>${statusBar(s.now, true)}
+        <div class="widgets">${locked("w-small", "קטן")}${locked("w-medium", "בינוני")}</div><div class="home-ind" style="background:#fff"></div>`;
+    }
     const running = s.running, onBreak = running && s.open != null;
     const tint = !running ? "var(--ink)" : onBreak ? "var(--orange)" : "var(--accent)";
     const title = !running ? "היום" : onBreak ? "בהפסקה" : "במשמרת";
@@ -1064,19 +1165,19 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- the page ----
   const notes = {
-    lock: '<span class="tag built">כמו שבבנייה</span>מסך הנעילה, עם הרקע שמתחלף לכהה יחד עם האייפון.',
-    island: '<span class="tag built">אחרי התיקון</span>השעון ב-Dynamic Island ברוחב שמספיק לשעות, דקות ושניות.',
-    widgets: '<span class="tag built">כמו שבבנייה</span>הווידג\'טים למסך הבית.',
+    lock: '<span class="tag built">כמו שבבנייה</span>מסך הנעילה, עם הרקע שמתחלף לכהה יחד עם האייפון. <span class="tag">הצעה</span>ב-Shifty Pro בלבד; בחינם אין Live Activity.',
+    island: '<span class="tag built">אחרי התיקון</span>השעון ב-Dynamic Island ברוחב שמספיק לשעות, דקות ושניות. <span class="tag">הצעה</span>ב-Shifty Pro בלבד.',
+    widgets: '<span class="tag built">כמו שבבנייה</span>הווידג\'טים למסך הבית. <span class="tag">הצעה</span>בחינם הם מציעים את Shifty Pro, ולחיצה פותחת את האפליקציה.',
     place: '<span class="tag built">כמו שבבנייה</span>ההתראות מגיעות גם כשהאפליקציה סגורה. כשמגיעים לעבודה וכשיוצאים ממנה, לפי מקום העבודה שנקבע בהגדרות. כשמגיעים ליעד, לפי שעה שנקבעת מראש.',
     ask: '<span class="tag built">כמו שבבנייה</span>Siri עונה בלי לפתוח את Shifty. מתחת: הסיכום שמגיע בבוקר שאחרי סוף התקופה, והתזכורת אחרי 6 שעות בלי הפסקה, עם כפתור להפסקה. כל אחד מהם נכבה בהגדרות.',
     icon: '<span class="tag built">כמו שבבנייה</span>הסמל של Shifty במסך הבית: בהיר, כהה, וצבוע בגוון שבוחרים באייפון.',
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag">חדש</span>לחיצה ארוכה על כפתורי המשמרת, למי ששכח ללחוץ בזמן: לפני כמה דקות, או בשעה אחרת.<br><span class="tag">חדש</span>לחיצה ארוכה על הפלוס, במצב "לא במשמרת": משמרת, יום חופש או יום מחלה.',
-    shifts: '<span class="tag">חדש</span>לחיצה ארוכה על משמרת: הפירוט שלה ותפריט.<br><span class="tag">חדש</span>לחיצה ארוכה על הפלוס למעלה: משמרת, יום חופש או יום מחלה.',
-    calendar: '<span class="tag">חדש</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. ביום ריק: משמרת, יום חופש או יום מחלה.',
-    settings: '<span class="tag built">כמו שבבנייה</span>ההגדרות, מקוצרות.',
+    now: '<span class="tag">הצעה</span>בחינם, "נטו משוער" בכרטיס התקופה מסומן Pro, ולחיצה פותחת את Shifty Pro. כרטיס החופשה והמחלה מופיע רק ב-Pro.',
+    shifts: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על משמרת: הפירוט שלה ותפריט. לחיצה ארוכה על הפלוס: משמרת, יום חופש או יום מחלה.',
+    calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט.',
+    settings: '<span class="tag">הצעה</span>Shifty Pro בראש ההגדרות, עם שחזור רכישה. בחינם, הקטעים של Pro מעומעמים ומסומנים, ולחיצה עליהם פותחת את Shifty Pro.',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
@@ -1139,6 +1240,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     view.innerHTML = state.screen === "now"
       ? { now: nowScreen, shifts: shiftsScreen, calendar: calendarScreen, settings: settingsScreen }[state.tab]()
       : { lock: lockScreen, island: islandScreen, widgets: widgetsScreen, place: placeScreen, ask: askScreen, icon: iconScreen }[state.screen]();
+    if (state.screen === "now" && state.sheet === "pro") view.insertAdjacentHTML("beforeend", proSheet());
     const again = view.querySelector(".scroll");
     if (again) {
       again.scrollTop = scrolls[again.dataset.scroll] || 0;
@@ -1147,9 +1249,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     }
     updateChrome();
     document.getElementById("note").innerHTML = state.screen === "now" ? appNotes[state.tab] : notes[state.screen];
-    for (const b of document.querySelectorAll("[data-screen]")) b.setAttribute("aria-pressed", String(b.dataset.screen === state.screen));
+    for (const b of document.querySelectorAll("[data-screen]")) {
+      b.setAttribute("aria-pressed", String(b.dataset.screen === "pro" ? state.sheet === "pro" : b.dataset.screen === state.screen && state.sheet !== "pro"));
+    }
     for (const b of document.querySelectorAll("[data-state]")) b.setAttribute("aria-pressed", String(b.dataset.state === state.state));
     for (const b of document.querySelectorAll("[data-theme-set]")) b.setAttribute("aria-pressed", String(b.dataset.themeSet === (dark() ? "dark" : "light")));
+    for (const b of document.querySelectorAll("[data-pro]")) b.setAttribute("aria-pressed", String((b.dataset.pro === "1") === state.pro));
   }
 
   // dragging the flag along the dial: the time is the angle's on the twelve hours after the start, by five minutes
@@ -1244,7 +1349,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     device.style.setProperty("--s", String(scale));
   }
   function save() {
-    try { localStorage.setItem("shifty-preview", JSON.stringify({ screen: state.screen, state: state.state, theme: state.theme, tab: state.tab })); } catch (e) {}
+    try { localStorage.setItem("shifty-preview", JSON.stringify({ screen: state.screen, state: state.state, theme: state.theme, tab: state.tab, pro: state.pro })); } catch (e) {}
   }
 
   document.addEventListener("click", (e) => {
@@ -1256,6 +1361,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     if ("cmClose" in b.dataset) return closeMenu();
     if (b.dataset.reset) state.plan = null;
     else if ("sheet" in b.dataset) state.sheet = b.dataset.sheet || null;
+    // the purchase and its restoring, pretended: Pro opens, the sheet closes
+    else if (b.dataset.buy) { state.pro = true; state.sheet = null; }
+    else if (b.dataset.pro) { state.pro = b.dataset.pro === "1"; if (state.pro && state.sheet === "pro") state.sheet = null; }
+    else if (b.dataset.screen === "pro") { state.screen = "now"; state.plan = null; state.sheet = "pro"; closeMenu(); setMini(false); }
     else if (b.dataset.screen) { state.screen = b.dataset.screen; state.plan = null; state.sheet = null; closeMenu(); setMini(false); }
     else if (b.dataset.state) { state.state = b.dataset.state; state.plan = null; state.sheet = null; closeMenu(); }
     else if (b.dataset.themeSet) { state.theme = b.dataset.themeSet; document.documentElement.dataset.theme = state.theme; }
