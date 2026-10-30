@@ -46,8 +46,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 - `Shifty/Assets.xcassets`: the icon (`AppIcon.svg` at 1024 px, and `AppIcon-dark.svg` and
   `AppIcon-tinted.svg` for the iPhone's dark and tinted home screen), the accent color and the
   background, in light and dark.
-- `scripts/`: the builds (`testflight.sh`, `screenshots.sh`) and the check of the Swift without a Mac
-  (`check-swift.sh`).
+- `scripts/`: the builds (`testflight.sh`, `screenshots.sh`, and `codemagic.py` to run them from the
+  computer) and the check of the Swift without a Mac (`check-swift.sh`).
 - `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).
 
 ## Checking the Swift without a Mac
@@ -72,8 +72,10 @@ bash ios/scripts/check-calc.sh
 
 ## Building
 
-Builds run on Codemagic, only when started there by hand (Start new build); a personal account has
-500 free Mac minutes a month.
+Builds run on Codemagic, only when started there by hand (Start new build) or from the computer; a
+personal account has 500 free Mac minutes a month. `scripts/codemagic.py` reaches them through
+Codemagic's API, with the token in `~/.codemagic-token`: the latest builds, starting one, following it,
+a failed step's errors, and the screenshots downloaded into `build/screenshots`.
 
 - "Shifty · TestFlight" signs the app and uploads it to TestFlight. It reads the variable group
   `app_store`: `APPLE_API_ISSUER`, `APPLE_API_KEY` (the Key ID), `APPLE_API_KEY_P8` (the text of the

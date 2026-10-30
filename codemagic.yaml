@@ -1,6 +1,6 @@
 # The native iPhone app (ios/README.md) on Codemagic's Mac minis: a personal account has 500 free
 # minutes a month on them. Nothing starts on its own: a build runs when it is started in Codemagic
-# (Start new build).
+# (Start new build) or through its API (ios/scripts/codemagic.py).
 #
 # The TestFlight workflow reads the variable group "app_store", set in the app's Environment
 # variables, each variable Secret: APPLE_API_ISSUER, APPLE_API_KEY (the Key ID), APPLE_API_KEY_P8 (the
