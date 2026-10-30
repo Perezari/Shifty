@@ -7,7 +7,8 @@ import SwiftUI
 /// the goal and the wage at it, the buttons, then the week, the pay period and a holiday coming. With no shift
 /// running, today's work and a button to start (app.js renderNow). A long press on a button makes its press
 /// minutes back, or at another time, for a press made too late. Designed in ios/preview first. While a shift
-/// runs the dial and its numbers are drawn again each second, the cards under them each minute.
+/// runs and the screen is shown, the dial and its numbers are drawn again each second, the cards under them each
+/// minute; out of sight, the dial waits.
 struct NowView: View {
     @Environment(ShiftStore.self) private var store
     @Environment(\.lifter) private var lifter
@@ -20,13 +21,16 @@ struct NowView: View {
     @State private var plan: Date?
     @State private var glow = false
     @State private var celebrations = 0
+    /// The screen on screen, for the dial's clock to count.
+    @State private var shown = false
 
     var body: some View {
         let running = store.active != nil
         ScrollView {
             VStack(spacing: 14) {
-                // schedules that stay the same as the screen is drawn again, so that each draw does not restart them
-                TimelineView(.periodic(from: Self.anchor, by: running ? 1 : 30)) { context in
+                // schedules that stay the same as the screen is drawn again, so that each draw does not restart
+                // them; an hour's while another tab is shown
+                TimelineView(.periodic(from: Self.anchor, by: !shown ? 3600 : running ? 1 : 30)) { context in
                     shift(at: context.date)
                 }
                 actions()
@@ -62,10 +66,12 @@ struct NowView: View {
             plan = nil
         }
         .onAppear {
+            shown = true
             #if DEBUG
             if Screenshot.current == .editor { adding = true }
             #endif
         }
+        .onDisappear { shown = false }
     }
 
     /// The clocks' schedules start here, a whole second as the app opened: the same each time a screen is drawn.

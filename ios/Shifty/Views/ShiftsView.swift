@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// The shifts of a pay period, the newest first: the period's hours, hours missing, shifts and income, and
-/// each shift's hours and pay, a running one's as of the minute (app.js renderShifts). A shift opens in the
+/// each shift's hours and pay, a running one's going up each second (app.js renderShifts). A shift opens in the
 /// editor, a swipe deletes it, and a long press lifts it with its menu; the plus adds a shift, and on a long press
-/// a day off. The list is drawn again each minute while it is on screen; its rows hold no clock of their own.
+/// a day off. The list is drawn again each minute while it is on screen, and of the running shift only its pay
+/// each second (ShiftRow.live); out of sight, neither.
 struct ShiftsView: View {
     @Environment(ShiftStore.self) private var store
     @Environment(\.lifter) private var lifter
@@ -15,6 +16,8 @@ struct ShiftsView: View {
     @State private var picking = false
     /// The minute the list shows.
     @State private var now = Date()
+    /// The list on screen, for the running shift's pay to count.
+    @State private var shown = false
 
     var body: some View {
         let range = Calc.period(around: now, monthStartDay: store.settings.monthStartDay, offset: offset)
@@ -22,6 +25,8 @@ struct ShiftsView: View {
             .background(Color.appBackground.ignoresSafeArea())
             .navigationTitle("משמרות")
             .minutes($now)
+            .onAppear { shown = true }
+            .onDisappear { shown = false }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -87,7 +92,8 @@ struct ShiftsView: View {
                         if lifter?.isShowing != true { editing = shift }
                     } label: {
                         ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency,
-                                 short: summary.days[LocalTime.dayKey(shift.start)]?.short == true && shift.type == .work)
+                                 short: summary.days[LocalTime.dayKey(shift.start)]?.short == true && shift.type == .work,
+                                 live: shown ? settings : nil)
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {

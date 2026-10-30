@@ -220,6 +220,9 @@ struct ShiftRow: View {
     var short = false
     /// The day's date on the side; a day's own list has none.
     var showsDate = true
+    /// The settings to count a running shift's pay by, each second, while its list is on screen; nil shows it
+    /// as of the list's minute.
+    var live: Settings? = nil
 
     var body: some View {
         let _ = Perf.drew("שורה")
@@ -236,7 +239,7 @@ struct ShiftRow: View {
                         RunningTag(onBreak: shift.breaks.contains { $0.end == nil })
                     }
                     Spacer(minLength: 0)
-                    Text(Format.money(breakdown.pay, currency))
+                    pay
                         .font(.body.weight(.semibold))
                         .monospacedDigit()
                 }
@@ -254,6 +257,19 @@ struct ShiftRow: View {
         }
         .card(padding: 14)
         .contentShape(Rectangle())
+    }
+
+    /// The pay; a running shift's going up each second when `live`. Only this number is drawn again, by a clock
+    /// whose seconds stay the same as the list is drawn (NowView.anchor): the row and the list are not.
+    @ViewBuilder
+    private var pay: some View {
+        if let live, shift.type == .work, shift.end == nil {
+            TimelineView(.periodic(from: NowView.anchor, by: 1)) { context in
+                Text(Format.money(Calc.breakdown(shift, live, asOf: context.date.ms).pay, currency))
+            }
+        } else {
+            Text(Format.money(breakdown.pay, currency))
+        }
     }
 
     /// "07:12 – 16:40", "התחלה 07:12" while it runs, or the kind of day off (app.js entryLabel). The mark
