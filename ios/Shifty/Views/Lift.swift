@@ -110,7 +110,7 @@ private struct Liftable: ViewModifier {
     let preview: () -> AnyView
     let sections: () -> [LiftSection]
     @Environment(\.lifter) private var lifter
-    @State private var place = Place()
+    @State private var place = LiftSpot()
 
     func body(content: Content) -> some View {
         content
@@ -134,8 +134,8 @@ private struct Liftable: ViewModifier {
 }
 
 /// Where a liftable thing is on the screen, kept out of its view's state: it changes as the screen scrolls, and
-/// should draw nothing again.
-private final class Place {
+/// should draw nothing again. (Place is the workplace's, Live/Place.swift.)
+private final class LiftSpot {
     var frame: CGRect = .zero
 }
 
