@@ -157,11 +157,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .capsule svg { width: 17px; height: 17px; }
 .capsule.prominent { background: var(--accent); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 8px 22px color-mix(in srgb, var(--accent) 32%, transparent); }
 .square { flex: none; width: 56px; padding: 0; }
-/* the shift's end held three seconds until its button fills from its start, against a tap by mistake; let go before, it empties */
+/* the shift's end held a second and a half until its button fills from its start, against a tap by mistake; let go before, it
+   empties */
 .capsule.hold { position: relative; overflow: hidden; touch-action: none; }
 .capsule.hold .fill { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
   background: var(--red); color: #fff; clip-path: inset(0 0 0 100%); transition: clip-path .25s ease-out; pointer-events: none; }
-.capsule.hold.holding .fill { clip-path: inset(0); transition: clip-path 3s linear; }
+.capsule.hold.holding .fill { clip-path: inset(0); transition: clip-path 1.5s linear; }
 
 .card { width: 100%; border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -617,7 +618,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   /** "בונוס ב־20 וב־40 שעות", "עד 30 שעות בחודש": what the pay does with overtime, in a row. */
   const coverText = () => ({ all: "כלולות בשכר", upTo: `עד ${OT_IN} שעות בחודש`, none: "משולמות כולן",
     tiers: `בונוס ב־${TIERS.map(([h]) => h).join(" וב־")} שעות` })[state.cover];
-  const SECOND = { name: "קפה אגם", wage: 42 };
+  const SECOND = { name: "קפה אגם", wage: 42, start: 10 };
   const isGlobal = () => state.pay === "global";
   const NET_GLOBAL = netPay(SALARY, SALARY);
   const netNow = () => isGlobal() ? NET_GLOBAL : NET;
@@ -1076,9 +1077,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div class="scroll" data-scroll="settings"><div class="scr"><h1 class="large">הגדרות</h1>
         ${pro}
         ${sec("מקומות עבודה", places)}
-        <p class="sec-note" style="margin-top:-2px">השכר, השעות, השעות הנוספות, החופשה, הפנסיה והתזכורת של כל מעסיק נמצאים בדף שלו.</p>
+        <p class="sec-note" style="margin-top:-2px">השכר ותקופת השכר, השעות, השעות הנוספות, החופשה, הפנסיה והתזכורת של כל מעסיק נמצאים בדף שלו.</p>
         ${sec("חגי ישראל", row("זיהוי חגים אוטומטי", "פועל"))}
-        ${sec("תקופת השכר", row("יום תחילת החודש", `<span class="num">1</span>`) + row("יעד הכנסה חודשי", "אין"))}
+        ${sec("יעד הכנסה", row("יעד הכנסה חודשי", "אין"))}
+        <p class="sec-note" style="margin-top:-2px">היעד שלך, מכל מקומות העבודה יחד. יעד של 0 הוא בלי יעד. תקופת השכר נקבעת בדף של מקום העבודה.</p>
         ${proSec("נטו משוער", row("נקודות זיכוי", `<span class="num">2.25</span>`))}
         ${sec("תצוגה", row("מראה", "כמו האייפון"))}
         ${sec("התראות", row("התראות על המשמרת", "פועל"))}
@@ -1112,6 +1114,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
           + (state.cover === "upTo" || state.cover === "none" ? row("ערך שעה", `<span class="ltr num">${money(HOUR_VALUE)}</span>`) : "")
           + row("בונוס שנתי", `<span class="ltr num">${moneyShort(BONUS)}</span> במרץ`),
           state.cover === "tiers" ? "כל יעד שמגיעים אליו בחודש מוסיף את הבונוס שלו." : "ערך שעה הוא השכר החודשי חלקי 182.") : ""}
+        ${sec("תקופת השכר", row("יום תחילת החודש", `<span class="num">${second ? SECOND.start : 1}</span>`),
+          second ? "החודש שבתלוש של המעסיק הזה. לפיו נספרים השעות הנוספות והיעדים שלו."
+            : "החודש שבתלוש של המעסיק. לפיו מקובצות המשמרות, ונספרים השעות הנוספות והיעדים.")}
         ${sec("שעות תקן ליום", second ? row("ו׳", `<span class="num">5:30</span>`) : row("א׳–ד׳", `<span class="num">9:06</span>`) + row("ה׳", `<span class="num">8:06</span>`))}
         ${sec("שעות נוספות", row("שעתיים ראשונות", pct(125)) + row("מעבר לכך", pct(150)))}
         ${sec("הפסקות, שבת ולילה", row("הפסקה אוטומטית", second || !state.autoBreak ? "אין" : `<span class="num">30</span> דק׳`) + row("תוספת שבת וחג", pct(150))
@@ -1394,10 +1399,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשלוש שניות, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
+    now: '<span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
     shifts: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
     calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
-    settings: '<span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, תקופת השכר, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
+    settings: '<span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
@@ -1527,7 +1532,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   device.addEventListener("pointerup", release);
   device.addEventListener("pointercancel", release);
 
-  // held to end: the button fills from its start in three seconds, and then the shift ends; let go before, it empties.
+  // held to end: the button fills from its start in a second and a half, and then the shift ends; let go before, it empties.
   // A tap opens its menu (data-tap-menu); a hold let go is no tap
   let hold = null;
   device.addEventListener("pointerdown", (e) => {
@@ -1542,7 +1547,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       state.state = "idle";
       state.plan = null;
       save(); render();
-    }, 3000);
+    }, 1500);
   });
   function letGo() {
     if (!hold) return;

@@ -269,5 +269,34 @@ expect(older.workplaces[0].rules.autoBreakMinutes == 30 && older.workplaces[0].r
 let kept = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(ruled))
 expect(kept.workplaces[0].rules.autoBreakMinutes == 0 && kept.workplaces == ruled.workplaces, "a workplace's own rules stay its own")
 
+// each workplace's own pay month: the café's from the 10th, its target counted by it, and a month November holds in
+// part for its share of the days. 1:30 over on Thursday 5 November (the month from 10 October), 1:30 and 0:36 over on
+// 15 and 16 November (the month from 10 November): only the second month reaches the target of 2 hours
+var tenth = s
+tenth.workplaces = [Workplace(id: "cafe", name: "קפה",
+                              pay: [PayTerms(id: "cafe-global", from: PayTerms.start, kind: .monthly, monthlySalary: 6_000,
+                                             overtimeCover: .tiers, overtimeTiers: [OvertimeTier(hours: 2, amount: 300)])],
+                              monthStartDay: 10)]
+func atCafe(_ id: String, _ day: Int, _ endHour: Int, _ endMinute: Int) -> Shift {
+    var shift = Shift(id: id, start: LocalTime.date(2026, 10, day, 8), end: LocalTime.date(2026, 10, day, endHour, endMinute))
+    shift.workplaceId = "cafe"
+    return shift
+}
+let cafeMonths = [atCafe("c5", 5, 18, 6), atCafe("c15", 15, 18, 6), atCafe("c16", 16, 17, 12)]
+expect(tenth.monthStartDay(of: "cafe") == 10 && tenth.monthStartDay(of: nil) == 1 && two.monthStartDay(of: "cafe") == 1,
+       "a workplace's month, or else the own one's")
+expect(near(Calc.extraOvertime(cafeMonths, tenth, range: november, asOf: now.ms), 300 * 21.0 / 30),
+       "the target of the month from 10 November, for its 21 days in November")
+tenth.workplaces[0].monthStartDay = nil
+expect(near(Calc.extraOvertime(cafeMonths, tenth, range: november, asOf: now.ms), 300), "by the own month: all of it in November")
+var ownMonth = s
+var ownPlace = ownMonth.place(nil)
+ownPlace.monthStartDay = 25
+ownMonth.setPlace(nil, ownPlace)
+expect(ownMonth.monthStartDay == 25 && ownMonth.place(nil).monthStartDay == 25, "the own workplace's month is the settings'")
+tenth.workplaces[0].monthStartDay = 10
+let tenthBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(tenth))
+expect(tenthBack.workplaces[0].monthStartDay == 10 && twoBack.workplaces[0].monthStartDay == nil, "in JSON, and none until chosen")
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

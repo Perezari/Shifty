@@ -40,20 +40,9 @@ struct SettingsView: View {
                         .settingsRow()
                 }
 
-                SettingsSection(title: "תקופת השכר",
-                                note: "התקופה מתחילה ביום שבחרת בכל חודש. יעד של 0 הוא בלי יעד.") {
-                    HStack {
-                        Text("יום תחילת החודש")
-                        Spacer()
-                        Picker("יום תחילת החודש", selection: setting(\.monthStartDay)) {
-                            ForEach(1...28, id: \.self) { day in
-                                Text(verbatim: String(day)).tag(day)
-                            }
-                        }
-                        .labelsHidden()
-                    }
-                    .settingsRow()
-                    Divider()
+                // the pay period is each workplace's, on its page
+                SettingsSection(title: "יעד הכנסה",
+                                note: "היעד שלך, מכל מקומות העבודה יחד. יעד של 0 הוא בלי יעד. תקופת השכר נקבעת בדף של מקום העבודה.") {
                     NumberRow(title: "יעד הכנסה חודשי", value: setting(\.monthlyIncomeGoal), unit: s.currency)
                 }
 

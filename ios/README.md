@@ -15,14 +15,15 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   and `Demo.swift` the made-up shifts the screenshots show (debug builds only).
 - `Shifty/Views/`: the screens. `NowView` (the running shift on a twelve-hour dial, `Core/Dial.swift`: its
   goal's flag dragged to see the wage of leaving later, a global pay's overtime and the hours left to its
-  next bonus; its end held three seconds until the button fills, and no break button where the workplace
-  takes an automatic break; then the week, the pay period, a holiday coming and each workplace's days off
-  left), `ShiftsView`
+  next bonus; its end held a second and a half until the button fills, and no break button where the
+  workplace takes an automatic break; then the week, the pay period, a holiday coming and each workplace's
+  days off left), `ShiftsView`
   (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
   of the work, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (the user's own
-  settings: the holidays, the pay period, the credit points, the look, the notifications, the lock, iCloud,
+  settings: the holidays, the income goal, the credit points, the look, the notifications, the lock, iCloud,
   and the backup to a file and back), `WorkplaceViews` (the workplaces in the settings, each on its page
-  with what its employer sets: its pay from each date, standard hours, overtime, breaks, Shabbat and night,
+  with what its employer sets: its pay from each date, its pay month (the own one's is the app's pay
+  period), standard hours, overtime, breaks, Shabbat and night,
   a holiday's eve, vacation and sick days and the days left of them, the pension, travel and the place's
   reminder; and the sheet of a pay: by the hour or global, what a global pay does with the overtime, all
   of it covered, some hours, none, or a bonus at each target of hours a month, and an annual bonus) and
@@ -64,7 +65,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   over 182; its overtime covered, paid beyond some hours or all, or a bonus at each target of hours
   reached) with an annual bonus; each shift is counted by its workplace's rules, standard hours and the
   wage of its day's pay (`Settings.effective`), and a period's income adds the months' pay, the overtime
-  they do not cover, the bonuses of the targets reached and a bonus due in it. `Leave` and `Net` keep the
+  they do not cover, the bonuses of the targets reached (each workplace's by its own pay month, a month the
+  period holds in part for its share of the days) and a bonus due in it. `Leave` and `Net` keep the
   days off left and the pension by workplace. With one workplace and one pay, the settings are as the web
   app's and the engine gives its results.
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,

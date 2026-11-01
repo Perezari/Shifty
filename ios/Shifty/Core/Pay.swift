@@ -83,8 +83,8 @@ struct EmployerRules: Hashable {
 }
 
 /// A workplace besides the settings' own (Shifty Pro): its name, its pay from each date, the standard hours of
-/// each weekday, its travel and its employer's rules. The settings' own workplace keeps them in the settings, as
-/// the web app does.
+/// each weekday, its travel, its employer's rules and the day its pay month starts. The settings' own workplace
+/// keeps them in the settings, as the web app does.
 struct Workplace: Hashable, Identifiable {
     var id: String
     var name: String
@@ -94,6 +94,8 @@ struct Workplace: Hashable, Identifiable {
     var travelPerDay = 0.0
     var travelMonthlyCap = 0.0
     var rules = EmployerRules()
+    /// The day its payslip's month starts; nil as the own workplace's. The own one's is the app's pay period.
+    var monthStartDay: Int?
 }
 
 extension Settings {
@@ -192,7 +194,13 @@ extension Settings {
     func place(_ id: String?) -> Workplace {
         if let id, let place = workplaces.first(where: { $0.id == id }) { return place }
         return Workplace(id: "", name: workplaceName, pay: ownPay, standardByDay: standardByDay,
-                         travelPerDay: travelPerDay, travelMonthlyCap: travelMonthlyCap, rules: rules)
+                         travelPerDay: travelPerDay, travelMonthlyCap: travelMonthlyCap, rules: rules,
+                         monthStartDay: monthStartDay)
+    }
+
+    /// The day a workplace's pay month starts: its own, or the own workplace's, which is the app's pay period.
+    func monthStartDay(of id: String?) -> Int {
+        id.flatMap { id in workplaces.first { $0.id == id }?.monthStartDay } ?? monthStartDay
     }
 
     /// A workplace changed on its page. The own one's pay is kept as `hourlyWage` alone while it is one wage from
@@ -211,6 +219,7 @@ extension Settings {
         travelPerDay = place.travelPerDay
         travelMonthlyCap = place.travelMonthlyCap
         rules = place.rules
+        if let day = place.monthStartDay { monthStartDay = day }
         if pay.count == 1 && pay[0].kind == .hourly && pay[0].bonus == 0 {
             payTerms = []
             hourlyWage = pay[0].hourlyWage
@@ -274,9 +283,35 @@ extension Calc {
     }
 
     /// The overtime of the shifts paid by a month's fixed pay that the pay does not cover: worth its tiers at the
-    /// pay's hour, all of it or past the hours covered (its share of the period's overtime past them); or the bonuses
-    /// of the targets reached.
+    /// pay's hour, all of it or past the hours covered (its share of the month's overtime past them); or the bonuses
+    /// of the targets reached. Each workplace's by its own pay months: a month the period holds in part counts for
+    /// its share of the days, as its pay does.
     static func extraOvertime(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double? = nil) -> Double {
+        var places: [String?] = []
+        for shift in shifts where shift.type == .work && !shift.deleted && inRange(shift, range) && s.isMonthly(shift) {
+            let place = s.workplace(of: shift)?.id
+            if !places.contains(place) { places.append(place) }
+        }
+        var extra = 0.0
+        for place in places {
+            let day = s.monthStartDay(of: place)
+            let there = shifts.filter { s.workplace(of: $0)?.id == place }
+            var month = period(around: range.start, monthStartDay: day)
+            while month.start < range.end {
+                let from = max(month.start, range.start)
+                let to = min(month.end, range.end)
+                if to > from {
+                    let share = Double(daysBetween(from, to)) / Double(max(1, daysBetween(month.start, month.end)))
+                    extra += share * monthExtra(there, s, range: month, asOf: asOf)
+                }
+                month = period(around: month.end, monthStartDay: day)
+            }
+        }
+        return extra
+    }
+
+    /// A pay month's overtime that its pay does not cover, of the shifts given.
+    private static func monthExtra(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double?) -> Double {
         struct Overtime {
             var terms: PayTerms
             var hours = 0.0
@@ -427,7 +462,7 @@ extension EmployerRules: Codable {
 
 extension Workplace: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules
+        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules, monthStartDay
     }
 
     init(from decoder: Decoder) throws {
@@ -441,6 +476,7 @@ extension Workplace: Codable {
         travelPerDay = (try? c.decodeIfPresent(Double.self, forKey: .travelPerDay)) ?? d.travelPerDay
         travelMonthlyCap = (try? c.decodeIfPresent(Double.self, forKey: .travelMonthlyCap)) ?? d.travelMonthlyCap
         rules = (try? c.decodeIfPresent(EmployerRules.self, forKey: .rules)) ?? d.rules
+        monthStartDay = (try? c.decodeIfPresent(Int.self, forKey: .monthStartDay)) ?? nil
     }
 
     func encode(to encoder: Encoder) throws {
@@ -452,5 +488,6 @@ extension Workplace: Codable {
         try c.encode(travelPerDay, forKey: .travelPerDay)
         try c.encode(travelMonthlyCap, forKey: .travelMonthlyCap)
         try c.encode(rules, forKey: .rules)
+        try c.encodeIfPresent(monthStartDay, forKey: .monthStartDay)
     }
 }

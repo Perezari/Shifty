@@ -11,7 +11,7 @@ struct WorkplacesSection: View {
     var body: some View {
         let s = store.settings
         SettingsSection(title: "מקומות עבודה",
-                        note: "השכר, השעות, השעות הנוספות, החופשה, הפנסיה והתזכורת של כל מעסיק נמצאים בדף שלו.") {
+                        note: "השכר ותקופת השכר, השעות, השעות הנוספות, החופשה, הפנסיה והתזכורת של כל מעסיק נמצאים בדף שלו.") {
             NavigationLink {
                 WorkplacePage(placeID: nil)
             } label: {
@@ -84,9 +84,10 @@ struct WorkplacesSection: View {
 }
 
 /// A workplace's page: its name, its pay from each date, the newest first (a sheet changes one or adds one from a
-/// date), its pay now when it is global or has a bonus, its standard hours, and what its employer sets: overtime,
-/// breaks, Shabbat and night, a holiday's eve, vacation and sick days and the days left of them, the pension and
-/// travel; and the reminder of its place. Another workplace can be deleted, its shifts then counted as the own one's.
+/// date), its pay now when it is global or has a bonus, its pay month, its standard hours, and what its employer
+/// sets: overtime, breaks, Shabbat and night, a holiday's eve, vacation and sick days and the days left of them, the
+/// pension and travel; and the reminder of its place. Another workplace can be deleted, its shifts then counted as
+/// the own one's.
 struct WorkplacePage: View {
     /// nil for the settings' own workplace.
     let placeID: String?
@@ -165,6 +166,23 @@ struct WorkplacePage: View {
                             valueRow("בונוס שנתי", PayText.amount(now.bonus, s.currency) + " ב" + Format.monthName(now.bonusMonth))
                         }
                     }
+                }
+
+                SettingsSection(title: "תקופת השכר",
+                                note: placeID == nil
+                                    ? "החודש שבתלוש של המעסיק. לפיו מקובצות המשמרות, ונספרים השעות הנוספות והיעדים."
+                                    : "החודש שבתלוש של המעסיק הזה. לפיו נספרים השעות הנוספות והיעדים שלו.") {
+                    HStack {
+                        Text("יום תחילת החודש")
+                        Spacer()
+                        Picker("יום תחילת החודש", selection: monthStartDay) {
+                            ForEach(1...28, id: \.self) { day in
+                                Text(verbatim: String(day)).tag(day)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                    .settingsRow()
                 }
 
                 SettingsSection(title: "שעות תקן ליום",
@@ -502,6 +520,17 @@ struct WorkplacePage: View {
                 let value = percent / 100
                 guard store.settings.place(placeID).rules[keyPath: key] != value else { return }
                 change { $0.rules[keyPath: key] = value }
+            }
+        )
+    }
+
+    /// The day its pay month starts; the own workplace's is the app's pay period.
+    private var monthStartDay: Binding<Int> {
+        Binding(
+            get: { store.settings.monthStartDay(of: placeID) },
+            set: { day in
+                guard store.settings.monthStartDay(of: placeID) != day else { return }
+                change { $0.monthStartDay = day }
             }
         )
     }

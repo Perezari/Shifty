@@ -99,8 +99,7 @@ struct NowView: View {
         // left to the next
         let current = terms(settings, at: date)
         let overtime: MonthOvertime? = current.kind == .monthly
-            ? MonthOvertime(hours: Calc.monthlyOvertime(shifts, settings, range: period, asOf: date.ms)?.hours ?? 0, terms: current)
-            : nil
+            ? MonthOvertime(hours: overtimeOfMonth(shifts, settings, at: date), terms: current) : nil
         return VStack(spacing: 14) {
             NowCapsule(status: status, place: placeName(settings), choices: placeChoices(settings), now: date)
             dial(status, settings, shifts, at: date, reached: reached, overtime: overtime)
@@ -123,13 +122,15 @@ struct NowView: View {
         let weekStart = days.first?.date ?? today
         let weekMissing = Calc.shortfall(shifts, settings, range: TimeRange(start: weekStart, end: today), asOf: date.ms).total
         let current = terms(settings, at: date)
+        // the overtime held against a month's pay: of the workplaces whose pay month is the period
+        let aligned = shifts.filter { settings.monthStartDay(of: settings.workplace(of: $0)?.id) == settings.monthStartDay }
         return VStack(spacing: 14) {
             WeekCard(days: days, missing: weekMissing, today: date)
             PeriodCard(range: period, totals: Calc.periodTotals(shifts, settings, range: period, asOf: date.ms),
                        projected: Calc.projectedIncome(shifts, settings, range: period, asOf: date.ms),
                        missing: Calc.shortfall(shifts, settings, range: period, asOf: date.ms).total,
                        net: Calc.periodNet(shifts, settings, range: period, asOf: date.ms, projected: true),
-                       overtime: Calc.monthlyOvertime(shifts, settings, range: period, asOf: date.ms)
+                       overtime: Calc.monthlyOvertime(aligned, settings, range: period, asOf: date.ms)
                            .map { (hours: $0.hours, target: $0.terms.target(after: $0.hours)) },
                        hourValue: current.kind == .monthly ? current.hourValue : nil,
                        settings: settings, now: date)
@@ -155,6 +156,21 @@ struct NowView: View {
     }
 
     // MARK: The workplace
+
+    /// The workplace the screen is about: the running shift's, or the next one's; nil for the own.
+    private func workplaceID(_ settings: Settings) -> String? {
+        if let active = store.active { return settings.workplace(of: active)?.id }
+        return store.nextWorkplace
+    }
+
+    /// The overtime of the workplace the screen is about, in its own pay month, of its shifts paid by a month's
+    /// fixed pay: what a bonus's target is held against.
+    private func overtimeOfMonth(_ shifts: [Shift], _ settings: Settings, at date: Date) -> Double {
+        let place = workplaceID(settings)
+        let month = Calc.period(around: date, monthStartDay: settings.monthStartDay(of: place))
+        let there = shifts.filter { settings.workplace(of: $0)?.id == place }
+        return Calc.monthlyOvertime(there, settings, range: month, asOf: date.ms)?.hours ?? 0
+    }
 
     /// The pay the screen is about: the running shift's, or that of the workplace the next one starts at.
     private func terms(_ settings: Settings, at date: Date) -> PayTerms {
@@ -535,9 +551,10 @@ private struct ShiftButton: View {
     }
 }
 
-/// The shift's end, held three seconds until it fills from its start, against a tap by mistake: let go before, it
-/// empties (designed in ios/preview). The fill is the same button, prominent in red, shown as far as the hold has
-/// come. A tap lifts it with its menu (Lift.swift), as a long press lifts the other buttons.
+/// The shift's end, held a second and a half until it fills from its start, against a tap by mistake: let go
+/// before, it empties (designed in ios/preview). Drawn at the size of a button of its row (a hidden one's), its
+/// glass, the red fill and the words in one frame, so that the fill starts at the glass's very edge and its white
+/// words lie over the red ones. A tap lifts it with its menu (Lift.swift), as a long press lifts the other buttons.
 private struct HoldToEnd: View {
     let menu: () -> [LiftSection]
     let end: () -> Void
@@ -550,48 +567,49 @@ private struct HoldToEnd: View {
     @State private var lastPress: (at: Date, held: Double)?
     @State private var spot = LiftSpot()
 
-    private static let seconds = 3.0
+    private static let seconds = 1.5
 
     var body: some View {
-        ZStack {
-            button(filled: false)
-            button(filled: true)
-                .mask {
-                    GeometryReader { proxy in
-                        Rectangle()
-                            .frame(width: proxy.size.width * filled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-        }
-        .allowsHitTesting(false)
-        .overlay {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture(perform: tap)
-                .onLongPressGesture(minimumDuration: Self.seconds, maximumDistance: 30, perform: finish, onPressingChanged: press)
-        }
-        .onGeometryChange(for: CGRect.self) { proxy in
-            proxy.frame(in: .global)
-        } action: { frame in
-            spot.frame = frame
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("סיום משמרת")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { lift() }
-        .accessibilityAction(named: "סיום עכשיו", end)
+        Self.look(filled: filled)
+            .contentShape(Rectangle())
+            .onTapGesture(perform: tap)
+            .onLongPressGesture(minimumDuration: Self.seconds, maximumDistance: 30, perform: finish, onPressingChanged: press)
+            .onGeometryChange(for: CGRect.self) { proxy in
+                proxy.frame(in: .global)
+            } action: { frame in
+                spot.frame = frame
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("סיום משמרת")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { lift() }
+            .accessibilityAction(named: "סיום עכשיו", end)
     }
 
-    /// Red on glass; filled, white on red.
-    @ViewBuilder
-    private func button(filled: Bool) -> some View {
-        if filled {
-            ShiftButton(title: "סיום משמרת", systemImage: "stop.fill", prominent: true) {}
-                .tint(.red)
-        } else {
-            ShiftButton(title: "סיום משמרת", systemImage: "stop.fill", color: .red) {}
-        }
+    /// Red words on glass, the red filling it from its start as far as `filled`, the words white over it.
+    private static func look(filled: Double) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        return ShiftButton(title: "סיום משמרת", systemImage: "stop.fill", color: .red) {}
+            .hidden()
+            .overlay {
+                ZStack {
+                    words
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .glassEffect(.regular, in: shape)
+                    shape
+                        .fill(.red)
+                        .mask { HoldFill(share: filled) }
+                    words
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .mask { HoldFill(share: filled) }
+                }
+            }
+    }
+
+    private static var words: some View {
+        Label("סיום משמרת", systemImage: "stop.fill")
     }
 
     private func press(_ pressing: Bool) {
@@ -630,9 +648,22 @@ private struct HoldToEnd: View {
 
     /// As it looks lifted, over the blur.
     private var lifted: some View {
-        button(filled: false)
+        Self.look(filled: 0)
             .controlSize(.large)
             .buttonBorderShape(.roundedRectangle(radius: 24))
+    }
+}
+
+/// As far as a hold has come: a share of the width, from the start.
+private struct HoldFill: View {
+    let share: Double
+
+    var body: some View {
+        GeometryReader { proxy in
+            Rectangle()
+                .frame(width: proxy.size.width * share)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 
