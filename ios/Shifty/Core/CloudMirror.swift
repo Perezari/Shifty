@@ -176,6 +176,8 @@ extension Settings {
         take(\.monthlyIncomeGoal)
         take(\.monthStartDay)
         take(\.weekStartsOn)
+        take(\.payTerms)
+        take(\.workplaces)
         out.updatedAt = nil
         return out
     }

@@ -42,13 +42,18 @@ struct Totals {
     var overtimeHours: Double
     var nightHours: Double
     var holidayHours: Double
-    /// The wages, without travel.
+    /// The wages, without travel; nothing for a shift paid by a month's fixed pay.
     var pay: Double
     var travel: Double
-    /// The income: the wages and the travel.
+    /// The income: the wages and the travel, and in a pay period, the rest that follows.
     var total: Double
     var workedDays: Int
     var avgShiftHours: Double
+    /// A pay period's (Calc.periodTotals): the fixed pay of the months paid so, for the part of the period
+    /// their terms hold; the overtime that pay does not cover; and an annual bonus due in it.
+    var salary = 0.0
+    var extraOvertime = 0.0
+    var bonus = 0.0
 }
 
 /// The hours missing ("שעות חוסר"): each day's net hours against the standard it is expected to meet.
@@ -159,6 +164,8 @@ enum Calc {
     /// A shift's hours and pay, an ongoing shift up to `asOf`. `sickDates` (sickDates(of:) of all the
     /// shifts) gives a sick day its place in its run; without it, every sick day is the first.
     static func breakdown(_ shift: Shift, _ s: Settings, asOf: Double? = nil, sickDates: Set<String>? = nil) -> Breakdown {
+        // its workplace's standard hours and the wage of its day's pay (Pay.swift)
+        let s = s.effective(for: shift)
         let wage = s.hourlyWage
         let startMs = shift.start.ms
 
@@ -271,16 +278,19 @@ enum Calc {
 
     // MARK: Sums
 
-    /// The hours and wages of the shifts that start in `range` (all of them without one), travel included.
+    /// The hours and wages of the shifts that start in `range` (all of them without one), travel included. A
+    /// shift paid by a month's fixed pay earns no wage of its own (periodTotals adds the month's).
     static func aggregate(_ shifts: [Shift], _ s: Settings, range: TimeRange?, asOf: Double? = nil) -> Totals {
         let sick = sickDates(of: shifts)
         let list = range.map { r in shifts.filter { inRange($0, r) } } ?? shifts
         var days = Set<String>()
+        // the days worked at each workplace, for its travel (the settings' own under "")
+        var daysAt: [String: Set<String>] = [:]
         var netHours = 0.0, overtimeHours = 0.0, nightHours = 0.0, pay = 0.0, holidayHours = 0.0
         var count = 0
         for shift in list {
             let b = breakdown(shift, s, asOf: asOf, sickDates: sick)
-            pay += b.pay // vacation and sick days are paid…
+            if !s.isMonthly(shift) { pay += b.pay } // vacation and sick days are paid…
             if b.type == .vacation || b.type == .sick { continue } // …but not hours or days worked
             netHours += b.netHours
             overtimeHours += b.overtimeHours
@@ -288,11 +298,18 @@ enum Calc {
             if b.isHoliday { holidayHours += b.netHours }
             count += 1
             days.insert(LocalTime.dayKey(shift.start))
+            daysAt[s.workplace(of: shift)?.id ?? "", default: []].insert(LocalTime.dayKey(shift.start))
         }
 
-        // travel for each day worked, up to the period's cap
-        var travel = s.travelPerDay * Double(days.count)
-        if s.travelMonthlyCap > 0 { travel = min(travel, s.travelMonthlyCap) }
+        // travel for each day worked, up to the period's cap, each workplace's own
+        var travel = 0.0
+        for (id, worked) in daysAt {
+            let place = s.workplaces.first { $0.id == id }
+            var amount = (place?.travelPerDay ?? s.travelPerDay) * Double(worked.count)
+            let cap = place?.travelMonthlyCap ?? s.travelMonthlyCap
+            if cap > 0 { amount = min(amount, cap) }
+            travel += amount
+        }
 
         return Totals(count: count, netHours: netHours, overtimeHours: overtimeHours, nightHours: nightHours,
                       holidayHours: holidayHours, pay: pay, travel: travel, total: pay + travel,

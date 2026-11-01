@@ -581,7 +581,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- (proposed) workplaces, each with its pay from a date: the main one by the hour since January or, from the first of
   //      this month, global; a second one by the hour, on Fridays. Made up, as the rest ----
-  const SALARY = 12000, OT_IN = 30, HOUR_VALUE = SALARY / 182, MONTH_OT = 6.5, MONTH_HOURS = 118.5;
+  const SALARY = 12000, OT_IN = 30, HOUR_VALUE = SALARY / 182, MONTH_OT = 6.5, MONTH_HOURS = 118.5, BONUS = 5000;
   const SECOND = { name: "קפה אגם", wage: 42 };
   const isGlobal = () => state.pay === "global";
   const NET_GLOBAL = netPay(SALARY, SALARY);
@@ -1055,8 +1055,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div class="scroll" data-scroll="place${i}"><div class="scr"><h1 class="large">${name}</h1>
         ${sec("", row("שם", name))}
         ${sec("שכר", terms + add, "משמרות שלפני כל תאריך נשארות בשכר שהיה אז.")}
-        ${global ? sec("שכר גלובלי", row("שעות נוספות כלולות", `עד <span class="num">${OT_IN}</span> בחודש`)
-          + row("ערך שעה", `<span class="ltr num">${money(HOUR_VALUE)}</span>`),
+        ${global ? sec("השכר עכשיו", row("שעות נוספות כלולות", `עד <span class="num">${OT_IN}</span> שעות בחודש`)
+          + row("ערך שעה", `<span class="ltr num">${money(HOUR_VALUE)}</span>`) + row("בונוס שנתי", `<span class="ltr num">${moneyShort(BONUS)}</span> במרץ`),
           "ערך שעה הוא השכר החודשי חלקי 182. לפיו מחושבות שעות נוספות שמעבר לכלולות, ב־125% וב־150%.") : ""}
         ${sec("שעות תקן ליום", second ? row("ו׳", `<span class="num">5:30</span>`) : row("א׳–ד׳", `<span class="num">9:06</span>`) + row("ה׳", `<span class="num">8:06</span>`))}
         ${sec("נסיעות", row("החזר נסיעות ליום", second ? "אין" : `<span class="ltr num">${CUR} 22.60</span>`))}
@@ -1080,11 +1080,14 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const note = global
       ? "ההחתמה נשארת כמו שהיא: השעות, היעד והנוספות נספרים. השכר של התקופה הוא השכר החודשי, ונוספות שמעבר לכלולות מתווספות לפי ערך שעה, השכר חלקי 182."
       : "משמרות שלפני התאריך נשארות בשכר הקודם. השכר החדש חל מהיום הזה והלאה.";
+    // an annual bonus, with the pay of its month: in that month's income and net
+    const bonus = row("בונוס שנתי", chip(`<span class="ltr">${moneyShort(global ? BONUS : 0)}</span>`)) + (global ? row("בחודש", chip("מרץ")) : "");
     return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
       <div class="sheet"><span class="grab"></span>
         <div class="sheet-bar"><button class="circle glass" type="button" data-sheet="" aria-label="ביטול">${icon.close}</button><b>שינוי בשכר</b>
           <button class="circle prominent" type="button" data-sheet="" aria-label="שמירה">${icon.check}</button></div>
-        <div class="sec-card glass">${rows}</div><p>${note}</p></div>`;
+        <div class="sec-card glass">${rows}</div><p>${note}</p><div class="sec-card glass">${bonus}</div>
+        <p>סכום קבוע שמגיע פעם בשנה, עם השכר של החודש שבחרת. הוא נכנס להכנסה ולנטו המשוער של אותו חודש.</p></div>`;
   }
 
   // ---- the menus of a long press: what was pressed lifted, with what can be done to it ----
@@ -1320,10 +1323,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag">הצעה</span>בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה, ובכרטיס התקופה השכר החודשי, ערך השעה והנוספות מתוך הכלולות. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה.',
-    shifts: '<span class="tag">הצעה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
-    calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. <span class="tag">הצעה</span>בשכר גלובלי, הסה״כ הוא השכר החודשי.',
-    settings: '<span class="tag">הצעה</span>מקומות עבודה, כמה שרוצים, כל אחד בדף משלו: השכר מכל תאריך, לפי שעה או גלובלי, שעות התקן והנסיעות. "שינוי בשכר מתאריך" שומר את המשמרות הישנות בשכר שהיה. מקום עבודה נוסף ב-Pro.',
+    now: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה, ובכרטיס התקופה השכר החודשי, ערך השעה והנוספות מתוך הכלולות (בחודש של הבונוס: הבונוס). עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה.',
+    shifts: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
+    calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
+    settings: '<span class="tag built">כמו שבבנייה</span>מקומות עבודה, כמה שרוצים, כל אחד בדף משלו: השכר מכל תאריך, לפי שעה או גלובלי, עם בונוס שנתי, שעות התקן והנסיעות. "שינוי בשכר מתאריך" שומר את המשמרות הישנות בשכר שהיה. מקום עבודה נוסף ב-Pro.',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");

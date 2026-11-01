@@ -39,7 +39,7 @@ extension Calc {
             breakdowns[shift.id] = b
             let key = LocalTime.dayKey(shift.start)
             var day = days[key] ?? DaySum(date: shift.start)
-            day.pay += b.pay
+            if !s.isMonthly(shift) { day.pay += b.pay }
             if b.type == .vacation || b.type == .sick {
                 day.dayOff = b.type
             } else {
@@ -53,7 +53,7 @@ extension Calc {
             days[key]?.short = true
         }
         return PeriodSummary(range: range, shifts: list, breakdowns: breakdowns,
-                             totals: aggregate(shifts, s, range: range, asOf: now), shortfall: missing, days: days)
+                             totals: periodTotals(shifts, s, range: range, asOf: now), shortfall: missing, days: days)
     }
 
     /// The calendar's days for a period: whole weeks from the Sunday before its first day to the Shabbat
@@ -115,17 +115,19 @@ extension Calc {
     }
 
     /// Where the pay period's income is heading: what it has, and its average day worked for each day left in
-    /// it, from tomorrow, that has a standard.
+    /// it, from tomorrow, that has a standard. A month's fixed pay and a bonus stay as they are.
     static func projectedIncome(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> Double {
-        let totals = aggregate(shifts, s, range: range, asOf: now)
+        let totals = periodTotals(shifts, s, range: range, asOf: now)
         guard totals.workedDays > 0 else { return totals.total }
+        let fixed = totals.salary + totals.bonus
+        let variable = totals.total - fixed
         var day = LocalTime.addingDays(1, to: LocalTime.startOfDay(Date(ms: now)))
         var left = 0
         while day < range.end {
             if expectedStandard(day, s) != nil { left += 1 }
             day = LocalTime.addingDays(1, to: day)
         }
-        return totals.total + totals.total / Double(totals.workedDays) * Double(left)
+        return fixed + variable + variable / Double(totals.workedDays) * Double(left)
     }
 
     /// The next shortened day or holiday after `date`, within `days` days.

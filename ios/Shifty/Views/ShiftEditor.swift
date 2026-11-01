@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A shift by hand, new or edited: its day, its hours in 24-hour time, its break in minutes, Shabbat or
-/// holiday and a note; and deleting it (app.js openShiftEditor).
+/// A shift by hand, new or edited: its workplace, with more than one; its day, its hours in 24-hour time, its
+/// break in minutes, Shabbat or holiday and a note; and deleting it (app.js openShiftEditor).
 struct ShiftEditor: View {
     /// The shift edited; nil for a new one.
     let shift: Shift?
@@ -19,12 +19,25 @@ struct ShiftEditor: View {
     @State private var breakMinutes = 0
     @State private var isHoliday = false
     @State private var note = ""
+    /// nil for the settings' own workplace.
+    @State private var workplace: String?
     @State private var loaded = false
     @State private var deleting = false
 
     var body: some View {
+        let settings = store.settings
         NavigationStack {
             Form {
+                if dayOff == nil && !settings.workplaces.isEmpty {
+                    Section {
+                        Picker("מקום עבודה", selection: $workplace) {
+                            Text(settings.workplaceName).tag(String?.none)
+                            ForEach(settings.workplaces) { place in
+                                Text(place.name).tag(Optional(place.id))
+                            }
+                        }
+                    }
+                }
                 if let dayOff {
                     // a paid day off has no hours to edit: it is deleted, and added again on its day
                     Section {
@@ -123,6 +136,7 @@ struct ShiftEditor: View {
             // a new shift: 9:00 to 17:00 of its day, or the hours and the break of the one copied
             let base = day ?? Date()
             date = base
+            workplace = from.map { $0.workplaceId } ?? store.nextWorkplace
             if let from, let fromEnd = from.end {
                 let s = LocalTime.parts(from.start)
                 let e = LocalTime.parts(fromEnd)
@@ -142,6 +156,7 @@ struct ShiftEditor: View {
         breakMinutes = Self.breakMinutes(of: shift)
         isHoliday = shift.isHoliday
         note = shift.note
+        workplace = shift.workplaceId
     }
 
     /// A shift's breaks in minutes, an open one up to now.
@@ -170,6 +185,7 @@ struct ShiftEditor: View {
         edited.end = endDate
         edited.isHoliday = isHoliday
         edited.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        edited.workplaceId = store.settings.workplaces.contains { $0.id == workplace } ? workplace : nil
         // the break as one span, from a minute after the start, as the web app keeps an edited break
         if breakMinutes > 0 {
             let breakStart = startDate.addingTimeInterval(60)

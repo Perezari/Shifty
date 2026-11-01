@@ -30,6 +30,8 @@ enum ShiftActions {
         case .end:
             guard let ended = store.endShift() else { return "אין משמרת פעילה." }
             let b = Calc.breakdown(ended, store.settings)
+            // a month's fixed pay's shift has no pay of its own
+            guard !store.settings.isMonthly(ended) else { return "המשמרת הסתיימה: " + Format.hoursToHM(b.netHours) + " שעות." }
             return "המשמרת הסתיימה: " + Format.hoursToHM(b.netHours) + " שעות, " + Format.money(b.pay, store.settings.currency) + "."
         case .startBreak:
             guard let running = store.active else { return "אין משמרת פעילה." }
@@ -91,7 +93,7 @@ enum LiveShift {
         return ShiftActivityAttributes.ContentState(workingSince: Date(ms: now.ms - status.netMs), goalAt: goalAt,
                                                     breakSince: status.activeBreak?.start, worked: status.netMs / 1000,
                                                     goalHours: status.goal, start: shift.start,
-                                                    workplace: store.settings.workplaceName, dark: dark(store.settings))
+                                                    workplace: store.settings.effective(for: shift).workplaceName, dark: dark(store.settings))
     }
 
     /// Whether the Lock Screen's activity is dark: as Shifty looks, by its setting or by the iPhone's. iOS
@@ -131,7 +133,8 @@ enum LiveShift {
         if let current = activities.first(where: { $0.attributes.shiftID == shift.id }) {
             await current.update(content)
         } else if ActivityAuthorizationInfo().areActivitiesEnabled {
-            let attributes = ShiftActivityAttributes(shiftID: shift.id, start: shift.start, workplace: store.settings.workplaceName)
+            let attributes = ShiftActivityAttributes(shiftID: shift.id, start: shift.start,
+                                                     workplace: store.settings.effective(for: shift).workplaceName)
             _ = try? Activity.request(attributes: attributes, content: content, pushType: nil)
         }
         for other in activities where other.attributes.shiftID != shift.id {
@@ -197,7 +200,7 @@ enum Alerts {
             let range = Calc.period(around: now, monthStartDay: s.monthStartDay, offset: offset)
             let next = LocalTime.parts(range.end)
             let morning = LocalTime.date(next.year, next.month0, next.day, 9)
-            let totals = Calc.aggregate(store.shifts, s, range: range, asOf: now.ms)
+            let totals = Calc.periodTotals(store.shifts, s, range: range, asOf: now.ms)
             guard morning > now, totals.total > 0 else { return nil }
             let hours = Format.hoursToHM(totals.netHours)
             var body = "\(hours) שעות · \(Format.moneyShort(totals.total, s.currency)) ברוטו"
@@ -216,8 +219,10 @@ enum Alerts {
         // the goal and the overtime move with a break: they are planned again when it ends
         if status.activeBreak == nil, let finish = status.finishMs {
             let b = Calc.breakdown(shift, s, asOf: finish)
+            // a month's fixed pay's shift has no pay of its own
+            let pay = s.isMonthly(shift) ? "" : Format.money(b.pay, s.currency) + " · "
             planned.append(Planned(id: "shifty.goal", date: Date(ms: finish), title: "🎯 הגעת ליעד היומי",
-                                   body: Format.hoursToHM(b.netHours) + " שעות · " + Format.money(b.pay, s.currency) + " · מעכשיו שעות נוספות"))
+                                   body: Format.hoursToHM(b.netHours) + " שעות · " + pay + "מעכשיו שעות נוספות"))
             if !shift.isHoliday && s.overtime1Hours > 0 && s.overtime2Mult != s.overtime1Mult {
                 let percent = Int(jsRound(s.overtime2Mult * 100))
                 planned.append(Planned(id: "shifty.overtime", date: Date(ms: finish + s.overtime1Hours * Calc.hour),

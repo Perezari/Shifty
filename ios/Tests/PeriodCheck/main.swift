@@ -156,5 +156,74 @@ expect(Calc.leave(daysOff, leaveSettings, asOf: LocalTime.date(2026, 11, 2, 9)).
 expect(Calc.monthsBetween(LocalTime.date(2026, 8, 30), LocalTime.date(2026, 9, 30)) == 1
        && Calc.monthsBetween(LocalTime.date(2026, 8, 30), LocalTime.date(2026, 9, 29, 23, 59)) == 0, "a month on its day")
 
+// the pay from a date (Pay.swift): a raise from Monday 16 November; shifts before it keep 50 an hour
+let beforeRaise = work(9, 8, 16) // Monday 9 November: 8 hours
+let afterRaise = Shift(id: "after", start: LocalTime.date(2026, 10, 16, 8), end: LocalTime.date(2026, 10, 16, 16))
+expect(s.effective(for: beforeRaise) == s, "one workplace and one pay: the settings themselves")
+var raised = s
+raised.payTerms = [PayTerms(id: "base", from: PayTerms.start, hourlyWage: 50),
+                   PayTerms(id: "raise", from: LocalTime.date(2026, 10, 16), hourlyWage: 60)]
+expect(near(Calc.breakdown(beforeRaise, raised).pay, 8 * 50) && near(Calc.breakdown(afterRaise, raised).pay, 8 * 60),
+       "each shift at the wage of its day")
+
+// a global pay from the 16th: 12,000 a month, an hour of overtime covered; Tuesday 17th, 12 hours: 9:36, 2 and 0:24 over
+var global = s
+global.payTerms = [PayTerms(id: "base", from: PayTerms.start, hourlyWage: 50),
+                   PayTerms(id: "global", from: LocalTime.date(2026, 10, 16), kind: .monthly, monthlySalary: 12_000,
+                            overtimeCover: .upTo, overtimeHours: 1)]
+let long = Shift(id: "long", start: LocalTime.date(2026, 10, 17, 8), end: LocalTime.date(2026, 10, 17, 20))
+let mixed = [long, afterRaise, beforeRaise]
+let mixedTotals = Calc.periodTotals(mixed, global, range: november, asOf: now.ms)
+expect(near(mixedTotals.pay, 8 * 50), "the shift before the global pay at its wage; those after it earn none of their own")
+expect(near(mixedTotals.salary, 12_000.0 * 15 / 30), "the month's pay from the 16th: 15 of November's 30 days")
+let hourWorth = 12_000.0 / 182
+expect(near(mixedTotals.extraOvertime, (2 * 1.25 + 0.4 * 1.5) * hourWorth * 1.4 / 2.4), "the overtime past the hour covered")
+expect(near(mixedTotals.total, mixedTotals.pay + mixedTotals.salary + mixedTotals.extraOvertime), "the period's income")
+expect(Calc.monthlyOvertime(mixed, global, range: november, asOf: now.ms).map { near($0.hours, 2.4) && $0.covered == 1 } == true,
+       "2:24 of overtime, of an hour covered")
+expect(near(Calc.periodNet(mixed, global, range: november, asOf: now.ms, projected: false).pension, (8 * 50 + 6_000) * 0.06),
+       "the pension from the wages and the month's pay, not from its overtime")
+global.payTerms[1].overtimeCover = .all
+expect(Calc.periodTotals(mixed, global, range: november, asOf: now.ms).extraOvertime == 0, "all of it covered")
+global.payTerms[1].overtimeCover = .none
+expect(near(Calc.periodTotals(mixed, global, range: november, asOf: now.ms).extraOvertime, (2 * 1.25 + 0.4 * 1.5) * hourWorth),
+       "none of it covered")
+
+// an annual bonus of 5,000 with December's pay, while the global pay holds on 1 December
+global.payTerms[1].bonus = 5_000
+global.payTerms[1].bonusMonth = 11
+let december = Calc.period(around: LocalTime.date(2026, 11, 15), monthStartDay: 1)
+let decemberTotals = Calc.periodTotals([], global, range: december, asOf: now.ms)
+expect(near(decemberTotals.bonus, 5_000) && near(decemberTotals.salary, 12_000) && near(decemberTotals.total, 17_000),
+       "December: a whole month's pay with no shifts, and the bonus")
+expect(Calc.periodTotals(mixed, global, range: november, asOf: now.ms).bonus == 0, "no bonus in November")
+let decemberWork = [Shift(id: "d1", start: LocalTime.date(2026, 11, 1, 8), end: LocalTime.date(2026, 11, 1, 16))]
+expect(near(Calc.projectedIncome(decemberWork, global, range: december, asOf: LocalTime.date(2026, 11, 1, 20).ms), 17_000),
+       "heading on, the month's pay and the bonus stay as they are")
+
+// a second workplace by the hour on Fridays, with its own wage, standard and travel
+var two = s
+two.travelPerDay = 20
+two.workplaces = [Workplace(id: "cafe", name: "קפה", pay: [PayTerms(id: "cafe-pay", from: PayTerms.start, hourlyWage: 40)],
+                            standardByDay: [nil, nil, nil, nil, nil, 5, nil], travelPerDay: 10)]
+var friday = Shift(id: "fri", start: LocalTime.date(2026, 10, 6, 8), end: LocalTime.date(2026, 10, 6, 14)) // 6 hours of 5
+friday.workplaceId = "cafe"
+let fridayPay = Calc.breakdown(friday, two)
+expect(near(fridayPay.regularHours, 5) && near(fridayPay.ot1Hours, 1) && near(fridayPay.pay, 5 * 40 + 40 * 1.25),
+       "its own wage and standard")
+let twoTotals = Calc.periodTotals([friday, beforeRaise], two, range: november, asOf: now.ms)
+expect(near(twoTotals.travel, 20 + 10) && near(twoTotals.pay, 8 * 50 + fridayPay.pay), "each workplace's wages and travel")
+var gone = friday
+gone.workplaceId = "deleted"
+expect(near(Calc.breakdown(gone, two).pay, 6 * 50), "a shift of a workplace that is gone counts as the own one's")
+
+// in JSON and back
+let twoBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(two))
+let globalBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(global))
+let fridayBack = try! JSONDecoder().decode(Shift.self, from: try! JSONEncoder().encode(friday))
+expect(twoBack.workplaces == two.workplaces && globalBack.payTerms == global.payTerms && fridayBack.workplaceId == "cafe",
+       "the workplaces, the pay's terms and a shift's workplace")
+expect((try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(s))).payTerms.isEmpty, "none by default")
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

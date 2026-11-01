@@ -14,6 +14,8 @@ struct Shift: Identifiable, Hashable {
     /// A deletion, kept so that the sync deletes the shift on the other devices too.
     var deleted = false
     var updatedAt: Date?
+    /// The workplace it is at (Settings.workplaces); nil for the settings' own. The app's alone.
+    var workplaceId: String?
 }
 
 struct Break: Hashable {
@@ -91,6 +93,11 @@ struct Settings: Hashable {
     var sickBalance = 0.0
     var balanceDate: Date?
     var vacationDaysPerYear = 12.0
+
+    /// The own workplace's pay from each date, the oldest first (Pay.swift); empty: by the hour at
+    /// `hourlyWage`, from the start. And the other workplaces, with Shifty Pro. The app's alone.
+    var payTerms: [PayTerms] = []
+    var workplaces: [Workplace] = []
 
     var updatedAt: Date?
 
@@ -202,7 +209,7 @@ enum ISODate {
 
 extension Shift: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, start, end, breaks, isHoliday, note, type, deleted, updatedAt
+        case id, start, end, breaks, isHoliday, note, type, deleted, updatedAt, workplaceId
     }
 
     /// As the web app reads a shift: a missing or unknown type is work, a missing flag is false.
@@ -217,6 +224,7 @@ extension Shift: Codable {
         type = ((try? c.decodeIfPresent(String.self, forKey: .type)) ?? nil).flatMap(ShiftType.init(rawValue:)) ?? .work
         deleted = (try? c.decodeIfPresent(Bool.self, forKey: .deleted)) ?? false
         updatedAt = ISODate.decodeIfPresent(c, .updatedAt)
+        workplaceId = (try? c.decodeIfPresent(String.self, forKey: .workplaceId)) ?? nil
     }
 
     func encode(to encoder: Encoder) throws {
@@ -230,6 +238,7 @@ extension Shift: Codable {
         try c.encode(type.rawValue, forKey: .type)
         if deleted { try c.encode(true, forKey: .deleted) }
         try c.encodeIfPresent(updatedAt.map(ISODate.string), forKey: .updatedAt)
+        try c.encodeIfPresent(workplaceId, forKey: .workplaceId)
     }
 }
 
@@ -258,7 +267,8 @@ extension Settings: Codable {
              holidayMult, holidaysEnabled, holidayEveHours, vacationHours,
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, autoBreakMinutes, autoBreakAfterHours,
              travelPerDay, travelMonthlyCap, monthlyIncomeGoal, monthStartDay, weekStartsOn,
-             creditPoints, pensionPercent, vacationBalance, sickBalance, balanceDate, vacationDaysPerYear, updatedAt
+             creditPoints, pensionPercent, vacationBalance, sickBalance, balanceDate, vacationDaysPerYear,
+             payTerms, workplaces, updatedAt
     }
 
     /// As the web app reads its settings (store.getSettings): a missing key, or a null, takes the default.
@@ -308,6 +318,8 @@ extension Settings: Codable {
         sickBalance = value(.sickBalance, d.sickBalance)
         balanceDate = ISODate.decodeIfPresent(c, .balanceDate)
         vacationDaysPerYear = value(.vacationDaysPerYear, d.vacationDaysPerYear)
+        payTerms = value(.payTerms, d.payTerms)
+        workplaces = value(.workplaces, d.workplaces)
         updatedAt = ISODate.decodeIfPresent(c, .updatedAt)
     }
 
@@ -348,6 +360,8 @@ extension Settings: Codable {
         try c.encode(sickBalance, forKey: .sickBalance)
         try c.encodeIfPresent(balanceDate.map(ISODate.string), forKey: .balanceDate)
         try c.encode(vacationDaysPerYear, forKey: .vacationDaysPerYear)
+        if !payTerms.isEmpty { try c.encode(payTerms, forKey: .payTerms) }
+        if !workplaces.isEmpty { try c.encode(workplaces, forKey: .workplaces) }
         try c.encodeIfPresent(updatedAt.map(ISODate.string), forKey: .updatedAt)
     }
 }

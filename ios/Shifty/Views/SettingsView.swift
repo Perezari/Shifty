@@ -2,11 +2,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
-/// The settings (app.js renderSettings): the wage and the workplace, each weekday's standard hours, the
-/// holidays, vacation and sick days and the days left of them, overtime, breaks, Shabbat and night, travel
-/// and the pay period, the net pay's estimate, the look, the notifications, the lock, iCloud and the
-/// backup; Shifty Pro on top, and its sections marked without it. Each change is saved as it is made, and goes
-/// to iCloud.
+/// The settings (app.js renderSettings): the workplaces, each with its pay from each date, standard hours and
+/// travel on its page (WorkplaceViews.swift), the holidays, vacation and sick days and the days left of them,
+/// overtime, breaks, Shabbat and night, the pay period, the net pay's estimate, the look, the notifications, the
+/// lock, iCloud and the backup; Shifty Pro on top, and its sections marked without it. Each change is saved as
+/// it is made, and goes to iCloud.
 struct SettingsView: View {
     @Environment(ShiftStore.self) private var store
     @Environment(Pro.self) private var pro
@@ -30,7 +30,6 @@ struct SettingsView: View {
     @State private var lockSwitch = false
     @State private var lockProblem = false
 
-    private static let dayNames = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"]
     /// How far around the workplace counts as there, in meters.
     private static let radii: [Double] = [100, 150, 250, 400]
 
@@ -41,19 +40,8 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 26) {
                 ProCard()
 
-                SettingsSection(title: "שכר ומקום עבודה") {
-                    TextRow(title: "שם מקום העבודה", text: setting(\.workplaceName), fallback: Settings().workplaceName)
-                    Divider()
-                    NumberRow(title: "שכר לשעה", value: setting(\.hourlyWage), unit: s.currency)
-                }
-
-                SettingsSection(title: "שעות תקן ליום",
-                                note: "השעות הרגילות של כל יום. מעבר להן נספרות שעות נוספות, והן גם היעד בטבעת של מסך עכשיו.") {
-                    ForEach(0..<7, id: \.self) { day in
-                        if day > 0 { Divider() }
-                        standardRow(day, s)
-                    }
-                }
+                // each workplace's name, pay from each date, standard hours and travel, on its page
+                WorkplacesSection()
 
                 SettingsSection(title: "חגי ישראל",
                                 note: "חגים, ערבי חג ויום הזיכרון מזוהים לבד, בכל שנה. בערב חג וביום מקוצר התקן הוא השעות שכאן.") {
@@ -120,12 +108,8 @@ struct SettingsView: View {
                     }
                 }
 
-                SettingsSection(title: "נסיעות ותקופה",
-                                note: "תקרה של 0 היא בלי תקרה, ויעד של 0 הוא בלי יעד. התקופה מתחילה ביום שבחרת בכל חודש.") {
-                    NumberRow(title: "החזר נסיעות ליום", value: setting(\.travelPerDay), unit: s.currency)
-                    Divider()
-                    NumberRow(title: "תקרת נסיעות חודשית", value: setting(\.travelMonthlyCap), unit: s.currency)
-                    Divider()
+                SettingsSection(title: "תקופת השכר",
+                                note: "התקופה מתחילה ביום שבחרת בכל חודש. יעד של 0 הוא בלי יעד.") {
                     HStack {
                         Text("יום תחילת החודש")
                         Spacer()
@@ -320,51 +304,6 @@ struct SettingsView: View {
     }
 
     // MARK: Rows
-
-    /// A weekday's standard hours, or a day off (app.js dayHoursRow).
-    private func standardRow(_ day: Int, _ s: Settings) -> some View {
-        let value = s.standard(onWeekday: day)
-        let on = Binding<Bool>(
-            get: { store.settings.standard(onWeekday: day) != nil },
-            set: { working in
-                store.updateSettings { settings in
-                    var days = settings.standardByDay
-                    while days.count < 7 { days.append(nil) }
-                    if !working {
-                        days[day] = nil
-                    } else if days[day] == nil {
-                        // a day turned on starts at the regular day's hours
-                        let regular = settings.regularDailyHours
-                        days[day] = regular != 0 ? regular : 8.6
-                    }
-                    settings.standardByDay = days
-                }
-            }
-        )
-        return HStack(spacing: 12) {
-            Text(Self.dayNames[day])
-            Spacer()
-            if let value {
-                Button {
-                    hoursEdit = HoursEdit(title: Self.dayNames[day], hours: value) { settings, hours in
-                        var days = settings.standardByDay
-                        while days.count < 7 { days.append(nil) }
-                        days[day] = hours
-                        settings.standardByDay = days
-                    }
-                } label: {
-                    ValueChip(text: Format.hoursToHM(value))
-                }
-                .buttonStyle(.plain)
-            } else {
-                Text("חופש")
-                    .foregroundStyle(.secondary)
-            }
-            Toggle("יום עבודה", isOn: on)
-                .labelsHidden()
-        }
-        .settingsRow()
-    }
 
     /// Hours and minutes of a setting, on the wheel.
     private func hoursRow(_ title: String, _ key: WritableKeyPath<Settings, Double>, _ s: Settings) -> some View {
@@ -598,7 +537,7 @@ struct BackupFile: FileDocument {
 }
 
 /// A value to tap, as a list's: hours and minutes.
-private struct ValueChip: View {
+struct ValueChip: View {
     let text: String
 
     var body: some View {
@@ -613,7 +552,7 @@ private struct ValueChip: View {
 }
 
 /// A name typed in; an empty one goes back to the default (app.js textRow).
-private struct TextRow: View {
+struct TextRow: View {
     let title: String
     @Binding var text: String
     let fallback: String
@@ -649,7 +588,7 @@ private struct TextRow: View {
 
 /// A number typed on the decimal keypad, saved as it is typed: a field left empty or half-typed keeps the
 /// last number (app.js numRow).
-private struct NumberRow: View {
+struct NumberRow: View {
     let title: String
     @Binding var value: Double
     let unit: String

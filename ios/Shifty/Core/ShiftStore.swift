@@ -14,6 +14,9 @@ final class ShiftStore {
     /// Called after a change made here (not after one applied from the cloud), for the sync to push it.
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private let folder: URL
+    /// The workplace chosen for the next shift (nextWorkplace), this device's, as UserDefaults keeps it.
+    private(set) var chosenWorkplace: String?
+    nonisolated static let nextWorkplaceKey = "nextWorkplace"
 
     /// The app's store: its screens', and the one that Siri, the widgets' buttons and the Live Activity's
     /// change (Live/LiveShift.swift), so that a change from any of them is on screen at once.
@@ -23,6 +26,7 @@ final class ShiftStore {
         self.folder = folder
         settings = Self.read(Settings.self, from: folder.appendingPathComponent("settings.json")) ?? Settings()
         records = Self.read([Shift].self, from: folder.appendingPathComponent("shifts.json")) ?? []
+        chosenWorkplace = UserDefaults.standard.string(forKey: Self.nextWorkplaceKey)
     }
 
     /// The settings and the shifts on screen as the files hold them, without a store: for the widgets,
@@ -77,6 +81,18 @@ final class ShiftStore {
         shift.breaks.first { $0.end == nil }
     }
 
+    /// The workplace the next shift starts at, and a day off is taken at: the one chosen, while the settings
+    /// have it; nil for the settings' own.
+    var nextWorkplace: String? {
+        guard let id = chosenWorkplace, settings.workplaces.contains(where: { $0.id == id }) else { return nil }
+        return id
+    }
+
+    func chooseNextWorkplace(_ id: String?) {
+        chosenWorkplace = id
+        UserDefaults.standard.set(id, forKey: Self.nextWorkplaceKey)
+    }
+
     // MARK: Changes
 
     func updateSettings(_ change: (inout Settings) -> Void) {
@@ -110,7 +126,8 @@ final class ShiftStore {
     @discardableResult
     func startShift(at date: Date = ShiftStore.now()) -> Shift {
         if let active { return active }
-        let shift = Shift(id: Self.newID(), start: date)
+        var shift = Shift(id: Self.newID(), start: date)
+        shift.workplaceId = nextWorkplace
         upsert(shift)
         return shift
     }
@@ -146,7 +163,8 @@ final class ShiftStore {
     func addDayOff(_ date: Date, type: ShiftType) -> Shift {
         let p = LocalTime.parts(date)
         let noon = LocalTime.date(p.year, p.month0, p.day, 12)
-        let shift = Shift(id: Self.newID(), start: noon, end: noon, type: type)
+        var shift = Shift(id: Self.newID(), start: noon, end: noon, type: type)
+        shift.workplaceId = nextWorkplace
         upsert(shift)
         return shift
     }

@@ -56,11 +56,18 @@ extension Calc {
     /// to its end, at the pace of the days worked so far.
     static func periodNet(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double, projected: Bool) -> NetPay {
         let summary = Calc.summary(shifts, s, range: range, asOf: now)
-        let gross = summary.totals.total
-        // a holiday's whole shift is in its base pay, at the holiday's multiplier
-        let pensionable = summary.breakdowns.values.reduce(0) { $0 + $1.basePay }
-        guard projected, gross > 0 else { return netPay(gross: gross, pensionable: pensionable, s) }
+        let totals = summary.totals
+        let gross = totals.total
+        // a holiday's whole shift is in its base pay, at the holiday's multiplier; a month's fixed pay is, but
+        // not its overtime or a bonus
+        let wages = summary.shifts.reduce(0) { sum, shift in
+            s.isMonthly(shift) ? sum : sum + (summary.breakdowns[shift.id]?.basePay ?? 0)
+        }
+        guard projected, gross > 0 else { return netPay(gross: gross, pensionable: wages + totals.salary, s) }
+        // the wages head on with the rest of the income that is not fixed
         let ahead = projectedIncome(shifts, s, range: range, asOf: now)
-        return netPay(gross: ahead, pensionable: pensionable * ahead / gross, s)
+        let fixed = totals.salary + totals.bonus
+        let pace = gross - fixed > 0 ? (ahead - fixed) / (gross - fixed) : 1
+        return netPay(gross: ahead, pensionable: wages * pace + totals.salary, s)
     }
 }

@@ -93,7 +93,7 @@ struct ShiftsView: View {
                     } label: {
                         ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency,
                                  short: summary.days[LocalTime.dayKey(shift.start)]?.short == true && shift.type == .work,
-                                 live: shown ? settings : nil)
+                                 live: shown ? settings : nil, byHours: settings.isMonthly(shift), place: settings.placeName(of: shift))
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {

@@ -211,7 +211,8 @@ struct SummaryCard: View {
 }
 
 /// A shift in a list (app.js shiftRow): its day, its hours or the kind of day off, its pay, and how its hours
-/// add up.
+/// add up. A shift paid by a month's fixed pay has its hours where its pay would be; with more than one workplace,
+/// its workplace leads the line under it.
 struct ShiftRow: View {
     let shift: Shift
     let breakdown: Breakdown
@@ -223,6 +224,10 @@ struct ShiftRow: View {
     /// The settings to count a running shift's pay by, each second, while its list is on screen; nil shows it
     /// as of the list's minute.
     var live: Settings? = nil
+    /// Paid by a month's fixed pay (Settings.isMonthly): its hours instead of a pay.
+    var byHours = false
+    /// Its workplace's name, with more than one (Settings.placeName).
+    var place: String? = nil
 
     var body: some View {
         let _ = Perf.drew("שורה")
@@ -263,7 +268,9 @@ struct ShiftRow: View {
     /// whose seconds stay the same as the list is drawn (NowView.anchor): the row and the list are not.
     @ViewBuilder
     private var pay: some View {
-        if let live, shift.type == .work, shift.end == nil {
+        if byHours {
+            Text(Format.hoursToHM(breakdown.netHours))
+        } else if let live, shift.type == .work, shift.end == nil {
             TimelineView(.periodic(from: NowView.anchor, by: 1)) { context in
                 Text(Format.money(Calc.breakdown(shift, live, asOf: context.date.ms).pay, currency))
             }
@@ -288,24 +295,26 @@ struct ShiftRow: View {
         }
     }
 
-    /// "8:41 שע׳ · הפסקה 30׳ · נ.ש 0:35 · שבת/חג" (app.js shiftMetaHtml), or what a day off pays.
+    /// "8:41 שע׳ · הפסקה 30׳ · נ.ש 0:35 · שבת/חג" (app.js shiftMetaHtml), or what a day off pays; after the workplace,
+    /// with more than one.
     private var meta: String {
         let b = breakdown
+        var parts = place.map { [$0] } ?? []
         switch shift.type {
         case .vacation:
-            return Format.hoursToHM(b.netHours) + " שע׳ בתשלום"
+            parts.append(Format.hoursToHM(b.netHours) + " שע׳ בתשלום")
         case .sick:
             let tier = b.sickTier ?? 1
             let plus = tier >= 4 ? "+" : ""
             let pct = Int(jsRound(b.sickPct ?? 0))
-            return "יום \(tier)\(plus) · \(pct)% מהתקן"
+            parts.append("יום \(tier)\(plus) · \(pct)% מהתקן")
         case .work:
-            var parts = [Format.hoursToHM(b.netHours) + " שע׳"]
+            if !byHours { parts.append(Format.hoursToHM(b.netHours) + " שע׳") }
             if b.breakMs > 0 { parts.append("הפסקה \(Int(jsRound(b.breakMs / 60000)))׳") }
             if b.overtimeHours > 0.01 { parts.append("נ.ש " + Format.hoursToHM(b.overtimeHours)) }
             if b.isHoliday { parts.append("שבת/חג") }
-            return parts.joined(separator: " · ")
         }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -633,7 +642,8 @@ extension Shift {
             if let span { parts.append(span) }
             parts.append(Format.hoursShort(breakdown.netHours))
         }
-        parts.append(Format.money(breakdown.pay, settings.currency))
+        // a month's fixed pay's shift has no pay of its own
+        if !settings.isMonthly(self) { parts.append(Format.money(breakdown.pay, settings.currency)) }
         let line = parts.joined(separator: " · ")
         return note.isEmpty ? line : line + "\n" + note
     }
@@ -781,7 +791,8 @@ struct ShiftPreview: View {
                 Text(b.ongoing ? "עד עכשיו" : "סה״כ")
                     .font(.headline)
                 Spacer()
-                Text(Format.money(b.pay, settings.currency))
+                // a month's fixed pay's shift: its hours
+                Text(settings.isMonthly(shift) ? Format.hoursShort(b.netHours) : Format.money(b.pay, settings.currency))
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(Color.accentColor)
@@ -790,31 +801,34 @@ struct ShiftPreview: View {
         .liftedCard()
     }
 
-    /// The hours by rate and what each pays (Calc.breakdown), then the break.
+    /// The hours by rate and what each pays (Calc.breakdown), then the break; a month's fixed pay's shift, its
+    /// hours alone.
     private func lines(_ b: Breakdown) -> [(title: String, hours: String, pay: Double?)] {
-        let s = settings
+        let s = settings.effective(for: shift)
+        let paid = !settings.isMonthly(shift)
+        func pay(_ value: Double) -> Double? { paid ? value : nil }
         switch shift.type {
         case .vacation:
-            return [("חופשה בתשלום", Format.hoursToHM(b.netHours), b.pay)]
+            return [("חופשה בתשלום", Format.hoursToHM(b.netHours), pay(b.pay))]
         case .sick:
             let tier = b.sickTier ?? 1
-            return [("יום מחלה \(tier)" + (tier >= 4 ? "+" : ""), "\(Int(jsRound(b.sickPct ?? 0)))%", b.pay)]
+            return [("יום מחלה \(tier)" + (tier >= 4 ? "+" : ""), "\(Int(jsRound(b.sickPct ?? 0)))%", pay(b.pay))]
         case .work:
             var list: [(title: String, hours: String, pay: Double?)] = []
             if b.isHoliday {
-                list.append(("שבת / חג · " + Self.percent(s.holidayMult), Format.hoursToHM(b.netHours), b.basePay))
+                list.append(("שבת / חג · " + Self.percent(s.holidayMult), Format.hoursToHM(b.netHours), pay(b.basePay)))
             } else {
-                list.append(("שעות רגילות", Format.hoursToHM(b.regularHours), b.basePay))
+                list.append(("שעות רגילות", Format.hoursToHM(b.regularHours), pay(b.basePay)))
                 if b.ot1Hours > 0.001 {
                     list.append(("נוספות " + Self.percent(s.overtime1Mult), Format.hoursToHM(b.ot1Hours),
-                                 b.ot1Hours * s.overtime1Mult * s.hourlyWage))
+                                 pay(b.ot1Hours * s.overtime1Mult * s.hourlyWage)))
                 }
                 if b.ot2Hours > 0.001 {
                     list.append(("נוספות " + Self.percent(s.overtime2Mult), Format.hoursToHM(b.ot2Hours),
-                                 b.ot2Hours * s.overtime2Mult * s.hourlyWage))
+                                 pay(b.ot2Hours * s.overtime2Mult * s.hourlyWage)))
                 }
                 if b.nightPremium > 0.005 {
-                    list.append(("תוספת לילה", Format.hoursToHM(b.nightHours), b.nightPremium))
+                    list.append(("תוספת לילה", Format.hoursToHM(b.nightHours), pay(b.nightPremium)))
                 }
             }
             if b.breakMs > 0 {
@@ -870,7 +884,7 @@ struct DayPreview: View {
                     ForEach(Array(zip(shifts, breakdowns).enumerated()), id: \.offset) { _, pair in
                         PayLine(title: pair.0.span ?? (pair.0.type == .sick ? "יום מחלה" : "חופשה בתשלום"),
                                 hours: pair.0.type == .work ? Format.hoursToHM(pair.1.netHours) : "",
-                                pay: pair.1.pay, currency: settings.currency)
+                                pay: settings.isMonthly(pair.0) ? nil : pair.1.pay, currency: settings.currency)
                     }
                 }
                 Divider()
@@ -878,7 +892,9 @@ struct DayPreview: View {
                     Text("סה״כ")
                         .font(.headline)
                     Spacer()
-                    Text(Format.money(breakdowns.reduce(0) { $0 + $1.pay }, settings.currency))
+                    // a day of a month's fixed pay alone: its hours
+                    Text(shifts.allSatisfy { settings.isMonthly($0) } ? Format.hoursShort(worked)
+                         : Format.money(zip(shifts, breakdowns).reduce(0) { settings.isMonthly($1.0) ? $0 : $0 + $1.1.pay }, settings.currency))
                         .font(.system(.title2, design: .rounded).weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(Color.accentColor)

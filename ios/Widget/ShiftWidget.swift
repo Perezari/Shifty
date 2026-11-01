@@ -331,9 +331,11 @@ struct ShiftWidgetView: View {
         return entry.onBreak ? .orange : WidgetStyle.accent
     }
 
-    /// Under the bar's right end: the start, or today's pay.
+    /// Under the bar's right end: the start, or today's pay; a month's fixed pay's, today's hours.
     private var wayStart: String {
-        guard let start = entry.start else { return Format.money(entry.pay, entry.currency) }
+        guard let start = entry.start else {
+            return entry.pay > 0 || entry.worked == 0 ? Format.money(entry.pay, entry.currency) : Format.hoursShort(entry.worked / 3600)
+        }
         return "התחלה " + Format.clock(start)
     }
 

@@ -94,11 +94,14 @@ struct NowView: View {
         let status = Calc.nowStatus(shifts, settings, active: store.active, at: date.ms)
         let reached = status.active != nil && status.remaining <= 0.001
         let period = Calc.period(around: date, monthStartDay: settings.monthStartDay)
-        let periodTotals = Calc.aggregate(shifts, settings, range: period, asOf: date.ms)
+        let periodTotals = Calc.periodTotals(shifts, settings, range: period, asOf: date.ms)
+        // a global pay: the period's overtime under the time, instead of the wage
+        let overtime: Double? = terms(settings, at: date).kind == .monthly
+            ? (Calc.monthlyOvertime(shifts, settings, range: period, asOf: date.ms)?.hours ?? 0) : nil
         return VStack(spacing: 14) {
-            NowCapsule(status: status, settings: settings, now: date)
-            dial(status, settings, shifts, at: date, reached: reached)
-            NowFacts(cells: facts(status, settings, totals: periodTotals, at: date))
+            NowCapsule(status: status, place: placeName(settings), choices: placeChoices(settings), now: date)
+            dial(status, settings, shifts, at: date, reached: reached, overtime: overtime)
+            NowFacts(cells: facts(status, settings, totals: periodTotals, global: overtime != nil, at: date))
         }
         .onChange(of: reached) { was, now in
             if now && !was { celebrate() }
@@ -115,12 +118,15 @@ struct NowView: View {
         let today = LocalTime.startOfDay(date)
         let weekStart = days.first?.date ?? today
         let weekMissing = Calc.shortfall(shifts, settings, range: TimeRange(start: weekStart, end: today), asOf: date.ms).total
+        let current = terms(settings, at: date)
         return VStack(spacing: 14) {
             WeekCard(days: days, missing: weekMissing, today: date)
-            PeriodCard(range: period, totals: Calc.aggregate(shifts, settings, range: period, asOf: date.ms),
+            PeriodCard(range: period, totals: Calc.periodTotals(shifts, settings, range: period, asOf: date.ms),
                        projected: Calc.projectedIncome(shifts, settings, range: period, asOf: date.ms),
                        missing: Calc.shortfall(shifts, settings, range: period, asOf: date.ms).total,
                        net: Calc.periodNet(shifts, settings, range: period, asOf: date.ms, projected: true),
+                       overtime: Calc.monthlyOvertime(shifts, settings, range: period, asOf: date.ms),
+                       hourValue: current.kind == .monthly ? current.hourValue : nil,
                        settings: settings, now: date)
             if settings.holidaysEnabled, let coming = Calc.nextHoliday(after: date, within: 14) {
                 HolidayBanner(date: coming.date, info: coming.info, settings: settings, today: date)
@@ -131,10 +137,36 @@ struct NowView: View {
         }
     }
 
+    // MARK: The workplace
+
+    /// The pay the screen is about: the running shift's, or that of the workplace the next one starts at.
+    private func terms(_ settings: Settings, at date: Date) -> PayTerms {
+        if let active = store.active { return settings.terms(of: active) }
+        var next = Shift(id: "", start: date)
+        next.workplaceId = store.nextWorkplace
+        return settings.terms(of: next)
+    }
+
+    /// The workplace on the capsule: the running shift's, or the next one's. The own one's default name is left out
+    /// while it is the only one.
+    private func placeName(_ settings: Settings) -> String? {
+        let name = (store.active.map { settings.effective(for: $0).workplaceName } ?? settings.place(store.nextWorkplace).name)
+            .trimmingCharacters(in: .whitespaces)
+        if settings.workplaces.isEmpty && (name.isEmpty || name == Settings().workplaceName) { return nil }
+        return name
+    }
+
+    /// The workplaces to choose the next shift's from, with more than one and none running.
+    private func placeChoices(_ settings: Settings) -> [PlaceChoice] {
+        guard !settings.workplaces.isEmpty, store.active == nil else { return [] }
+        return [PlaceChoice(id: nil, name: settings.workplaceName)] + settings.workplaces.map { PlaceChoice(id: $0.id, name: $0.name) }
+    }
+
     // MARK: The dial
 
     @ViewBuilder
-    private func dial(_ status: NowStatus, _ settings: Settings, _ shifts: [Shift], at date: Date, reached: Bool) -> some View {
+    private func dial(_ status: NowStatus, _ settings: Settings, _ shifts: [Shift], at date: Date, reached: Bool,
+                      overtime: Double?) -> some View {
         if let active = status.active {
             let layout = Calc.dial(active, settings, at: date, leave: plan)
             ShiftDial(layout: layout, reached: reached && plan == nil, planned: plan != nil, glow: glow,
@@ -143,15 +175,16 @@ struct NowView: View {
                           plan = Calc.dialTime(degrees, start: active.start, now: Date())
                       }) {
                 if let leave = plan {
-                    planCenter(active, leave: leave, settings, at: date)
+                    planCenter(active, leave: leave, settings, at: date, global: overtime != nil)
                 } else {
-                    shiftCenter(hoursText: Format.timer(status.netMs), pay: status.pay, faint: false, settings, at: date)
+                    shiftCenter(hoursText: Format.timer(status.netMs), pay: status.pay, overtime: overtime, faint: false, settings, at: date)
                 }
             }
         } else {
             ShiftDial(layout: Calc.dial(today: shifts, at: date), reached: false, planned: false, glow: false,
                       knob: Color.secondary, drag: nil) {
-                shiftCenter(hoursText: Format.hoursToHM(status.netHours), pay: status.pay, faint: status.netHours == 0, settings, at: date)
+                shiftCenter(hoursText: Format.hoursToHM(status.netHours), pay: status.pay, overtime: overtime,
+                            faint: status.netHours == 0, settings, at: date)
             }
         }
     }
@@ -161,8 +194,10 @@ struct NowView: View {
         return reached ? Color("Holiday") : .accentColor
     }
 
-    /// The day, the time worked and the wage: the running shift's, or today's.
-    private func shiftCenter(hoursText: String, pay: Double, faint: Bool, _ settings: Settings, at date: Date) -> some View {
+    /// The day, the time worked and the wage: the running shift's, or today's. A global pay's has the period's
+    /// overtime instead of the wage.
+    private func shiftCenter(hoursText: String, pay: Double, overtime: Double?, faint: Bool, _ settings: Settings,
+                             at date: Date) -> some View {
         VStack(spacing: 8) {
             Text(dayLine(date, settings))
                 .font(.subheadline.weight(.medium))
@@ -174,30 +209,40 @@ struct NowView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .foregroundStyle(faint ? Color.secondary : Color.primary)
-            Text(Format.money(pay, settings.currency))
-                .font(.system(size: 23, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(Color.accentColor)
+            if let overtime {
+                Text(Format.hoursToHM(overtime) + " נוספות החודש")
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .foregroundStyle(Color("Holiday"))
+            } else {
+                Text(Format.money(pay, settings.currency))
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.accentColor)
+            }
         }
         .frame(maxWidth: 230)
     }
 
-    /// Leaving at the time chosen: the wage then, and the overtime it adds or the hours it leaves short.
-    private func planCenter(_ active: Shift, leave: Date, _ settings: Settings, at date: Date) -> some View {
+    /// Leaving at the time chosen: the wage then (a global pay's, the hours), and the overtime it adds or the hours
+    /// it leaves short.
+    private func planCenter(_ active: Shift, leave: Date, _ settings: Settings, at date: Date, global: Bool) -> some View {
         let leaving = Calc.leaving(active, at: leave, settings, now: date)
         let atGoal = Calc.leaving(active, at: Calc.goalTime(active, settings, asOf: date.ms), settings, now: date)
-        let extra = leaving.netHours - Calc.standardHours(date, settings)
+        let extra = leaving.netHours - Calc.standardHours(date, settings.effective(for: active))
         return VStack(spacing: 8) {
             Text("אם תצא ב־" + Format.clock(leave))
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
-            Text(Format.money(leaving.pay, settings.currency))
+            Text(global ? Format.hoursToHM(leaving.netHours) : Format.money(leaving.pay, settings.currency))
                 .font(.system(size: 44, weight: .semibold, design: .rounded))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
                 .foregroundStyle(Color.accentColor)
-            Text(planDelta(extra, extraPay: leaving.pay - atGoal.pay, settings))
+            Text(planDelta(extra, extraPay: global ? nil : leaving.pay - atGoal.pay, settings))
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(extra >= -0.001 ? Color("Holiday") : Color.red)
@@ -210,8 +255,9 @@ struct NowView: View {
         .frame(maxWidth: 230)
     }
 
-    private func planDelta(_ extra: Double, extraPay: Double, _ settings: Settings) -> String {
+    private func planDelta(_ extra: Double, extraPay: Double?, _ settings: Settings) -> String {
         if extra > 0.001 {
+            guard let extraPay else { return "+" + Format.hoursToHM(extra) + " נוספות" }
             return "+" + Format.hoursToHM(extra) + " נוספות · +" + Format.money(extraPay, settings.currency)
         }
         if extra < -0.001 {
@@ -239,12 +285,14 @@ struct NowView: View {
 
     // MARK: The numbers and the buttons
 
-    private func facts(_ status: NowStatus, _ settings: Settings, totals: Totals, at date: Date) -> [FactCell] {
+    /// A global pay's has the period's hours where the income is heading.
+    private func facts(_ status: NowStatus, _ settings: Settings, totals: Totals, global: Bool, at date: Date) -> [FactCell] {
         let currency = settings.currency
+        let hours = FactCell(title: "שעות בתקופה", value: Format.hoursToHM(totals.netHours))
         guard let active = status.active else {
             return [
                 FactCell(title: "משמרות בתקופה", value: String(totals.count)),
-                FactCell(title: "הכנסה בתקופה", value: Format.moneyShort(totals.total, currency)),
+                global ? hours : FactCell(title: "הכנסה בתקופה", value: Format.moneyShort(totals.total, currency)),
                 FactCell(title: "יעד יומי", value: Format.hoursToHM(status.goal)),
             ]
         }
@@ -261,6 +309,8 @@ struct NowView: View {
         if settings.monthlyIncomeGoal > 0 {
             cells.append(FactCell(title: "מתוך " + Format.moneyShort(settings.monthlyIncomeGoal, currency),
                                   value: Format.moneyShort(status.periodTotal ?? 0, currency)))
+        } else if global {
+            cells.append(hours)
         } else if let projected = status.projected {
             cells.append(FactCell(title: "צפי ביעד", value: Format.moneyShort(projected, currency)))
         }
@@ -454,13 +504,44 @@ private struct ShiftButton: View {
     }
 }
 
-/// The state on a capsule: "במשמרת · סטודיו גל", a break's time, or none running.
+/// A workplace to choose the next shift's from (NowCapsule).
+private struct PlaceChoice: Identifiable, Hashable {
+    /// nil for the settings' own workplace.
+    let id: String?
+    let name: String
+}
+
+/// The state on a capsule: "במשמרת · סטודיו גל", a break's time, or none running. With more than one workplace and
+/// none running, a tap on it chooses the next shift's (designed in ios/preview).
 private struct NowCapsule: View {
     let status: NowStatus
-    let settings: Settings
+    /// The workplace's name, when it is shown.
+    let place: String?
+    let choices: [PlaceChoice]
     let now: Date
+    @Environment(ShiftStore.self) private var store
 
     var body: some View {
+        if choices.isEmpty {
+            capsule
+        } else {
+            Menu {
+                Section("המשמרת הבאה") {
+                    Picker("המשמרת הבאה", selection: next) {
+                        ForEach(choices) { choice in
+                            Text(choice.name).tag(choice.id)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
+            } label: {
+                capsule
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var capsule: some View {
         HStack(spacing: 7) {
             Image(systemName: "circle.fill")
                 .font(.system(size: 8))
@@ -476,10 +557,19 @@ private struct NowCapsule: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+            if !choices.isEmpty {
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 9)
         .surface(in: Capsule())
+    }
+
+    private var next: Binding<String?> {
+        Binding(get: { store.nextWorkplace }, set: { store.chooseNextWorkplace($0) })
     }
 
     private var title: String {
@@ -491,12 +581,6 @@ private struct NowCapsule: View {
     private var dot: Color {
         guard status.active != nil else { return .secondary }
         return status.activeBreak == nil ? .green : .orange
-    }
-
-    /// The workplace, unless it is the default.
-    private var place: String? {
-        let name = settings.workplaceName.trimmingCharacters(in: .whitespaces)
-        return name.isEmpty || name == Settings().workplaceName ? nil : name
     }
 }
 
@@ -796,6 +880,10 @@ private struct PeriodCard: View {
     let projected: Double
     let missing: Double
     let net: NetPay
+    /// The overtime of the shifts paid by a month's fixed pay, and the hours it covers (Calc.monthlyOvertime).
+    let overtime: (hours: Double, covered: Double?)?
+    /// A global pay's hour, when the pay now is one.
+    let hourValue: Double?
     let settings: Settings
     let now: Date
     @Environment(Pro.self) private var pro
@@ -817,10 +905,10 @@ private struct PeriodCard: View {
                     .monospacedDigit()
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text("צפי לסוף התקופה")
+                    Text(aside.title)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(Format.moneyShort(projected, settings.currency))
+                    Text(aside.value)
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                 }
@@ -828,7 +916,13 @@ private struct PeriodCard: View {
             HStack(spacing: 0) {
                 mini(String(totals.count), "משמרות", .primary)
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 30)
-                mini(Format.hoursToHM(totals.overtimeHours), "נוספות", Color("Holiday"))
+                if let overtime, let covered = overtime.covered {
+                    // a global pay's overtime against the hours it covers
+                    mini(Format.hoursToHM(overtime.hours), "נוספות", Color("Holiday"),
+                         of: "מתוך " + (covered == covered.rounded() ? String(Int(covered)) : Format.hoursToHM(covered)))
+                } else {
+                    mini(Format.hoursToHM(totals.overtimeHours), "נוספות", Color("Holiday"))
+                }
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 30)
                 mini(Format.hoursToHM(missing), "חוסר", missing > 0.01 ? .red : .primary)
             }
@@ -865,17 +959,38 @@ private struct PeriodCard: View {
         }
     }
 
-    private func mini(_ value: String, _ title: String, _ color: Color) -> some View {
+    private func mini(_ value: String, _ title: String, _ color: Color, of: String? = nil) -> some View {
         VStack(spacing: 2) {
-            Text(value)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(color)
+            HStack(alignment: .firstTextBaseline, spacing: 3) {
+                Text(value)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(color)
+                if let of {
+                    Text(of)
+                        .font(.caption2.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// Beside the income: a bonus in the period; a global pay's hour; or where the income is heading.
+    private var aside: (title: String, value: String) {
+        if totals.bonus > 0 {
+            return ("כולל בונוס שנתי", Format.moneyShort(totals.bonus, settings.currency))
+        }
+        if let hourValue, totals.salary > 0 {
+            return ("שכר גלובלי · ערך שעה", Format.money(hourValue, settings.currency))
+        }
+        return ("צפי לסוף התקופה", Format.moneyShort(projected, settings.currency))
     }
 
     /// "נסגרת בעוד 3 ימים", or tomorrow, or today.

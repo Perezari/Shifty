@@ -50,6 +50,8 @@ extension Calc {
     /// When the running shift reaches the day's goal: its start, the goal's hours, and the breaks that apply
     /// (as NowStatus's finish, which is nil once it is reached).
     static func goalTime(_ shift: Shift, _ s: Settings, asOf now: Double) -> Date {
+        // the shift's workplace's standard hours
+        let s = s.effective(for: shift)
         let goal = standardHours(Date(ms: now), s)
         return Date(ms: shift.start.ms + goal * hour + max(breaksMs(shift, asOf: now), s.autoBreakMinutes * 60000))
     }

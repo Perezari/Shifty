@@ -17,9 +17,11 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   goal's flag dragged to see the wage of leaving later; then the week, the pay period and a holiday coming), `ShiftsView`
   (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
   of the work, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (every setting
-  of the web app, the look, the lock, and the backup to a file and back) and `ShiftEditor` (a shift by
-  hand). `Components` holds what they share: the period's bar and picker, the summary card, a shift's
-  row, the settings' cards and the wheel of hours and minutes.
+  of the web app, the look, the lock, and the backup to a file and back), `WorkplaceViews` (the
+  workplaces in the settings, each on its page with its pay from each date, standard hours and travel, and
+  the sheet of a pay: by the hour or global, the overtime a global pay covers, an annual bonus) and
+  `ShiftEditor` (a shift by hand). `Components` holds what they share: the period's bar and picker, the
+  summary card, a shift's row, the settings' cards and the wheel of hours and minutes.
 - `Shifty/Live/`: the shift outside the app. `ShiftIntents` holds what its buttons do (start, end, a
   break, as App Intents that the system performs in the app, woken in the background if need be),
   `Shortcuts` the sentences Siri knows ("התחל משמרת בShifty"), `ShiftActivity` the Live Activity's data,
@@ -48,7 +50,12 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   `Format` (format.js), `Models` (a shift and the settings, in the web app's JSON), `Period` (a pay
   period as the Shifts and Calendar screens add it up) and `ShiftStore` (store.js: two JSON files in the
   App Group's container; restoring a backup replaces the shifts in iCloud too). `LocalTime` makes dates
-  the way JavaScript's `Date` does, so the engine gives the web app's results to the last bit.
+  the way JavaScript's `Date` does, so the engine gives the web app's results to the last bit. `Pay` is the
+  app's own: the workplaces besides the settings' (Shifty Pro), each workplace's pay from each date, by
+  the hour or a month's fixed pay (global: its hour is the month over 182) with an annual bonus; each shift
+  is counted by its workplace's standard hours and the wage of its day's pay (`Settings.effective`), and a
+  period's income adds the months' pay, the overtime they do not cover and a bonus due in it. With one
+  workplace and one pay, the settings are as the web app's and the engine gives its results.
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
   `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay
   period (`PeriodCheck`).

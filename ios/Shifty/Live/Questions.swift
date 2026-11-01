@@ -47,7 +47,9 @@ enum Answers {
         let day = LocalTime.startOfDay(now)
         let totals = Calc.aggregate(store.shifts, s, range: TimeRange(start: day, end: LocalTime.addingDays(1, to: day)), asOf: now.ms)
         guard totals.total > 0 || totals.netHours > 0 else { return "היום עוד לא עבדת." }
-        let text = "היום עבדת \(spoken(totals.netHours)) והרווחת \(Format.moneyShort(totals.total, s.currency))."
+        // a month's fixed pay earns nothing a day
+        let earned = totals.total > 0 ? " והרווחת \(Format.moneyShort(totals.total, s.currency))" : ""
+        let text = "היום עבדת \(spoken(totals.netHours))\(earned)."
         return store.active == nil ? text : text + " המשמרת עדיין פתוחה."
     }
 
@@ -65,7 +67,7 @@ enum Answers {
     static func period(_ store: ShiftStore, at now: Date = Date()) -> String {
         let s = store.settings
         let range = Calc.period(around: now, monthStartDay: s.monthStartDay)
-        let totals = Calc.aggregate(store.shifts, s, range: range, asOf: now.ms)
+        let totals = Calc.periodTotals(store.shifts, s, range: range, asOf: now.ms)
         guard totals.total > 0 || totals.netHours > 0 else { return "בתקופה הזו עוד לא עבדת." }
         let ahead = Calc.periodNet(store.shifts, s, range: range, asOf: now.ms, projected: true)
         let earned = Format.moneyShort(totals.total, s.currency)

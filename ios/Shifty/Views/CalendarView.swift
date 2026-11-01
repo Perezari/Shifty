@@ -278,7 +278,8 @@ struct DayDetail: View {
                         // not the finger lifted after a long press
                         if lifter?.isShowing != true { editing = shift }
                     } label: {
-                        ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency, showsDate: false)
+                        ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency, showsDate: false,
+                                 byHours: settings.isMonthly(shift), place: settings.placeName(of: shift))
                     }
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
