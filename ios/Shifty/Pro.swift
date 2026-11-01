@@ -1,5 +1,7 @@
 import Observation
 import StoreKit
+// with StoreKit, SwiftUI brings the App Store's purchase sheet (PurchaseAction)
+import SwiftUI
 import WidgetKit
 
 /// Shifty Pro, bought once (ios/store/listing.md): a non-consumable in-app purchase. StoreKit keeps the
