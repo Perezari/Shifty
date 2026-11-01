@@ -95,9 +95,12 @@ struct NowView: View {
         let reached = status.active != nil && status.remaining <= 0.001
         let period = Calc.period(around: date, monthStartDay: settings.monthStartDay)
         let periodTotals = Calc.periodTotals(shifts, settings, range: period, asOf: date.ms)
-        // a global pay: the period's overtime under the time, instead of the wage
-        let overtime: Double? = terms(settings, at: date).kind == .monthly
-            ? (Calc.monthlyOvertime(shifts, settings, range: period, asOf: date.ms)?.hours ?? 0) : nil
+        // a global pay: the period's overtime under the time, instead of the wage; with a bonus at targets, the hours
+        // left to the next
+        let current = terms(settings, at: date)
+        let overtime: MonthOvertime? = current.kind == .monthly
+            ? MonthOvertime(hours: Calc.monthlyOvertime(shifts, settings, range: period, asOf: date.ms)?.hours ?? 0, terms: current)
+            : nil
         return VStack(spacing: 14) {
             NowCapsule(status: status, place: placeName(settings), choices: placeChoices(settings), now: date)
             dial(status, settings, shifts, at: date, reached: reached, overtime: overtime)
@@ -108,7 +111,8 @@ struct NowView: View {
         }
     }
 
-    /// The week, the pay period, a holiday coming and, with Shifty Pro, the days off left.
+    /// The week, the pay period, a holiday coming and, with Shifty Pro, the days off left at each workplace keeping
+    /// them.
     private func cards(at date: Date) -> some View {
         Perf.drew("כרטיסים")
         let settings = store.settings
@@ -125,15 +129,28 @@ struct NowView: View {
                        projected: Calc.projectedIncome(shifts, settings, range: period, asOf: date.ms),
                        missing: Calc.shortfall(shifts, settings, range: period, asOf: date.ms).total,
                        net: Calc.periodNet(shifts, settings, range: period, asOf: date.ms, projected: true),
-                       overtime: Calc.monthlyOvertime(shifts, settings, range: period, asOf: date.ms),
+                       overtime: Calc.monthlyOvertime(shifts, settings, range: period, asOf: date.ms)
+                           .map { (hours: $0.hours, target: $0.terms.target(after: $0.hours)) },
                        hourValue: current.kind == .monthly ? current.hourValue : nil,
                        settings: settings, now: date)
             if settings.holidaysEnabled, let coming = Calc.nextHoliday(after: date, within: 14) {
                 HolidayBanner(date: coming.date, info: coming.info, settings: settings, today: date)
             }
-            if pro.unlocked, let since = settings.balanceDate, let leave = Calc.leave(shifts, settings, asOf: date) {
-                LeaveCard(balance: leave, since: since)
+            if pro.unlocked {
+                ForEach(leaves(shifts, settings, at: date)) { leave in
+                    LeaveCard(balance: leave.balance, since: leave.since, place: leave.place)
+                }
             }
+        }
+    }
+
+    /// The days off left at each workplace whose payslip's are kept; named with more than one workplace.
+    private func leaves(_ shifts: [Shift], _ settings: Settings, at date: Date) -> [PlaceLeave] {
+        let places: [String?] = [nil] + settings.workplaces.map { Optional($0.id) }
+        return places.compactMap { id -> PlaceLeave? in
+            let place = settings.place(id)
+            guard let since = place.rules.balanceDate, let balance = Calc.leave(shifts, settings, asOf: date, at: id) else { return nil }
+            return PlaceLeave(id: id ?? "", balance: balance, since: since, place: settings.workplaces.isEmpty ? nil : place.name)
         }
     }
 
@@ -166,7 +183,7 @@ struct NowView: View {
 
     @ViewBuilder
     private func dial(_ status: NowStatus, _ settings: Settings, _ shifts: [Shift], at date: Date, reached: Bool,
-                      overtime: Double?) -> some View {
+                      overtime: MonthOvertime?) -> some View {
         if let active = status.active {
             let layout = Calc.dial(active, settings, at: date, leave: plan)
             ShiftDial(layout: layout, reached: reached && plan == nil, planned: plan != nil, glow: glow,
@@ -195,8 +212,8 @@ struct NowView: View {
     }
 
     /// The day, the time worked and the wage: the running shift's, or today's. A global pay's has the period's
-    /// overtime instead of the wage.
-    private func shiftCenter(hoursText: String, pay: Double, overtime: Double?, faint: Bool, _ settings: Settings,
+    /// overtime instead of the wage, and with a bonus at targets, the hours left to the next.
+    private func shiftCenter(hoursText: String, pay: Double, overtime: MonthOvertime?, faint: Bool, _ settings: Settings,
                              at date: Date) -> some View {
         VStack(spacing: 8) {
             Text(dayLine(date, settings))
@@ -210,12 +227,20 @@ struct NowView: View {
                 .minimumScaleFactor(0.6)
                 .foregroundStyle(faint ? Color.secondary : Color.primary)
             if let overtime {
-                Text(Format.hoursToHM(overtime) + " נוספות החודש")
+                Text(Format.hoursToHM(overtime.hours) + " נוספות החודש")
                     .font(.system(size: 23, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .foregroundStyle(Color("Holiday"))
+                if let bonus = overtime.bonusLine {
+                    Text(bonus)
+                        .font(.system(size: 14, weight: .medium))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, -4)
+                }
             } else {
                 Text(Format.money(pay, settings.currency))
                     .font(.system(size: 23, weight: .semibold, design: .rounded))
@@ -872,6 +897,28 @@ private struct WeekColumn: View {
     }
 }
 
+/// A global pay's overtime this period, under the dial's time.
+private struct MonthOvertime {
+    let hours: Double
+    /// The pay now.
+    let terms: PayTerms
+
+    /// With a bonus at targets: "עוד 13:30 לבונוס", or "הגעת לכל היעדים".
+    var bonusLine: String? {
+        guard terms.overtimeCover == .tiers, !terms.overtimeTiers.isEmpty else { return nil }
+        guard let target = terms.target(after: hours) else { return "הגעת לכל היעדים" }
+        return "עוד " + Format.hoursToHM(target - hours) + " לבונוס"
+    }
+}
+
+/// A workplace's days off left, on its card.
+private struct PlaceLeave: Identifiable {
+    let id: String
+    let balance: LeaveBalance
+    let since: Date
+    let place: String?
+}
+
 /// The pay period: its income so far, where it is heading, its shifts, overtime and hours missing, and the
 /// net pay it is heading to, which opens line by line; without Shifty Pro, the net's line marked Pro opens Pro.
 private struct PeriodCard: View {
@@ -880,8 +927,9 @@ private struct PeriodCard: View {
     let projected: Double
     let missing: Double
     let net: NetPay
-    /// The overtime of the shifts paid by a month's fixed pay, and the hours it covers (Calc.monthlyOvertime).
-    let overtime: (hours: Double, covered: Double?)?
+    /// The overtime of the shifts paid by a month's fixed pay, and what it is held against: the hours the pay
+    /// covers, or the next bonus's target (Calc.monthlyOvertime, PayTerms.target).
+    let overtime: (hours: Double, target: Double?)?
     /// A global pay's hour, when the pay now is one.
     let hourValue: Double?
     let settings: Settings
@@ -916,10 +964,10 @@ private struct PeriodCard: View {
             HStack(spacing: 0) {
                 mini(String(totals.count), "משמרות", .primary)
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 30)
-                if let overtime, let covered = overtime.covered {
-                    // a global pay's overtime against the hours it covers
+                if let overtime, let target = overtime.target {
+                    // a global pay's overtime against the hours it covers, or the next bonus's target
                     mini(Format.hoursToHM(overtime.hours), "נוספות", Color("Holiday"),
-                         of: "מתוך " + (covered == covered.rounded() ? String(Int(covered)) : Format.hoursToHM(covered)))
+                         of: "מתוך " + (target == target.rounded() ? String(Int(target)) : Format.hoursToHM(target)))
                 } else {
                     mini(Format.hoursToHM(totals.overtimeHours), "נוספות", Color("Holiday"))
                 }
@@ -1070,16 +1118,20 @@ private struct NetSheet: View {
     }
 }
 
-/// The vacation and sick days left (Leave.swift): the last payslip's, and the months and days off since.
+/// The vacation and sick days left at a workplace (Leave.swift): the last payslip's, and the months and days off
+/// since.
 private struct LeaveCard: View {
     let balance: LeaveBalance
     let since: Date
+    /// The workplace's name, with more than one.
+    let place: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text("חופשה ומחלה")
+                Text(place.map { "חופשה ומחלה · " + $0 } ?? "חופשה ומחלה")
                     .font(.headline)
+                    .lineLimit(1)
                 Spacer()
                 Text("מהתלוש של " + Format.dayMonth(since))
                     .font(.footnote)

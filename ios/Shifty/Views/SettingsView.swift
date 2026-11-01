@@ -2,11 +2,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
-/// The settings (app.js renderSettings): the workplaces, each with its pay from each date, standard hours and
-/// travel on its page (WorkplaceViews.swift), the holidays, vacation and sick days and the days left of them,
-/// overtime, breaks, Shabbat and night, the pay period, the net pay's estimate, the look, the notifications, the
-/// lock, iCloud and the backup; Shifty Pro on top, and its sections marked without it. Each change is saved as
-/// it is made, and goes to iCloud.
+/// The settings (app.js renderSettings): the workplaces, each on its page with what its employer sets
+/// (WorkplaceViews.swift); then the user's own: the holidays, the pay period, the net pay's credit points, the look,
+/// the notifications, the lock, iCloud and the backup; Shifty Pro on top, and its sections marked without it. Each
+/// change is saved as it is made, and goes to iCloud.
 struct SettingsView: View {
     @Environment(ShiftStore.self) private var store
     @Environment(Pro.self) private var pro
@@ -14,13 +13,8 @@ struct SettingsView: View {
     @AppStorage(Alerts.key) private var alerts = true
     @AppStorage(Alerts.breakKey) private var breakReminder = true
     @AppStorage(Alerts.summaryKey) private var periodSummary = true
-    @AppStorage(Place.enabledKey) private var placeOn = false
-    @AppStorage(Place.radiusKey) private var placeRadius = 150.0
     @AppStorage(CardLook.key) private var glassCards = false
     @AppStorage(Perf.key) private var measuring = false
-    @State private var placeSet = Place.coordinate != nil
-    @State private var placeBusy = false
-    @State private var hoursEdit: HoursEdit?
     @State private var exporting = false
     @State private var backup = BackupFile(data: Data())
     @State private var importing = false
@@ -30,9 +24,6 @@ struct SettingsView: View {
     @State private var lockSwitch = false
     @State private var lockProblem = false
 
-    /// How far around the workplace counts as there, in meters.
-    private static let radii: [Double] = [100, 150, 250, 400]
-
     var body: some View {
         let s = store.settings
         let _ = Perf.drew("הגדרות")
@@ -40,72 +31,13 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 26) {
                 ProCard()
 
-                // each workplace's name, pay from each date, standard hours and travel, on its page
+                // each workplace on its page: its pay from each date, standard hours, travel and employer's rules
                 WorkplacesSection()
 
                 SettingsSection(title: "חגי ישראל",
-                                note: "חגים, ערבי חג ויום הזיכרון מזוהים לבד, בכל שנה. בערב חג וביום מקוצר התקן הוא השעות שכאן.") {
+                                note: "חגים, ערבי חג ויום הזיכרון מזוהים לבד, בכל שנה. השעות של ערב חג נקבעות בדף של כל מקום עבודה.") {
                     Toggle("זיהוי חגים אוטומטי", isOn: setting(\.holidaysEnabled))
                         .settingsRow()
-                    Divider()
-                    hoursRow("שעות עבודה בערב חג", \.holidayEveHours, s)
-                }
-
-                SettingsSection(title: "חופשה ומחלה",
-                                note: "יום חופש משלם את השעות שכאן. יום מחלה משלם חלק מהתקן של היום, לפי מספר ימי המחלה ברצף.") {
-                    hoursRow("שעות ליום חופש", \.vacationHours, s)
-                    Divider()
-                    PercentRow(title: "מחלה, יום 1", value: setting(\.sickDay1Pct), range: 0...100)
-                    Divider()
-                    PercentRow(title: "מחלה, יום 2", value: setting(\.sickDay2Pct), range: 0...100)
-                    Divider()
-                    PercentRow(title: "מחלה, יום 3", value: setting(\.sickDay3Pct), range: 0...100)
-                    Divider()
-                    PercentRow(title: "מחלה, יום 4 והלאה", value: setting(\.sickDay4Pct), range: 0...100)
-                }
-
-                SettingsSection(title: "יתרת חופשה ומחלה",
-                                note: "היתרות והתאריך מהתלוש האחרון. מאז, בכל חודש נוסף חלק מימי החופשה של השנה ו-1.5 ימי מחלה (עד 90), ויורדים ימי החופשה והמחלה שרשמת. לפי החוק, בשבוע עבודה של 5 ימים יש 12 ימי חופשה בשנה בחמש השנים הראשונות.",
-                                pro: true) {
-                    Toggle("מעקב יתרות", isOn: keepsBalance)
-                        .settingsRow()
-                    if s.balanceDate != nil {
-                        Divider()
-                        DatePicker("נכון לתאריך", selection: balanceDate, displayedComponents: .date)
-                            .settingsRow()
-                        Divider()
-                        NumberRow(title: "יתרת חופשה", value: setting(\.vacationBalance), unit: "ימים")
-                        Divider()
-                        NumberRow(title: "יתרת מחלה", value: setting(\.sickBalance), unit: "ימים")
-                        Divider()
-                        NumberRow(title: "ימי חופשה בשנה", value: setting(\.vacationDaysPerYear), unit: "ימים")
-                    }
-                }
-
-                SettingsSection(title: "שעות נוספות") {
-                    PercentRow(title: "שעתיים ראשונות", value: multiplier(\.overtime1Mult), range: 100...300)
-                    Divider()
-                    PercentRow(title: "מעבר לכך", value: multiplier(\.overtime2Mult), range: 100...300)
-                }
-
-                SettingsSection(title: "הפסקות, שבת ולילה",
-                                note: "ההפסקה האוטומטית יורדת מכל משמרת ארוכה, אם לא נרשמה הפסקה ארוכה ממנה.") {
-                    MinutesRow(title: "הפסקה אוטומטית", value: setting(\.autoBreakMinutes))
-                    Divider()
-                    hoursRow("מעל כמה שעות", \.autoBreakAfterHours, s)
-                    Divider()
-                    PercentRow(title: "תוספת שבת וחג", value: multiplier(\.holidayMult), range: 100...300)
-                    Divider()
-                    Toggle("חישוב שעות לילה", isOn: setting(\.nightEnabled))
-                        .settingsRow()
-                    if s.nightEnabled {
-                        Divider()
-                        hoursRow("תחילת הלילה", \.nightStart, s)
-                        Divider()
-                        hoursRow("סוף הלילה", \.nightEnd, s)
-                        Divider()
-                        PercentRow(title: "תוספת לילה", value: multiplier(\.nightMult), range: 100...300)
-                    }
                 }
 
                 SettingsSection(title: "תקופת השכר",
@@ -126,11 +58,9 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(title: "נטו משוער",
-                                note: "לכל תושב 2.25 נקודות זיכוי, ולאישה 2.75. העובד מפריש לפנסיה בדרך כלל 6%. החישוב לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, ולכן התלוש יכול להיות שונה מעט.",
+                                note: "לכל תושב 2.25 נקודות זיכוי, ולאישה 2.75. ההפרשה לפנסיה נקבעת בדף של כל מקום עבודה. החישוב לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, ולכן התלוש יכול להיות שונה מעט.",
                                 pro: true) {
                     NumberRow(title: "נקודות זיכוי", value: setting(\.creditPoints), unit: "נק׳")
-                    Divider()
-                    NumberRow(title: "הפרשה לפנסיה", value: setting(\.pensionPercent), unit: "%")
                 }
 
                 SettingsSection(title: "תצוגה",
@@ -160,43 +90,6 @@ struct SettingsView: View {
                     Divider()
                     Toggle("סיכום בסוף כל תקופה", isOn: $periodSummary)
                         .settingsRow()
-                }
-
-                SettingsSection(title: "תזכורת לפי מיקום", note: placeNote, pro: true) {
-                    Toggle("כשמגיעים לעבודה ויוצאים ממנה", isOn: $placeOn)
-                        .settingsRow()
-                    if placeOn {
-                        Divider()
-                        Button(action: setPlaceHere) {
-                            HStack {
-                                Text(placeButton)
-                                    .foregroundStyle(.tint)
-                                Spacer()
-                                if placeBusy {
-                                    ProgressView()
-                                } else if placeSet {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                }
-                            }
-                            .settingsRow()
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(placeBusy)
-                        Divider()
-                        HStack {
-                            Text("טווח")
-                            Spacer()
-                            Picker("טווח", selection: $placeRadius) {
-                                ForEach(Self.radii, id: \.self) { meters in
-                                    Text(verbatim: "\(Int(meters)) מ׳").tag(meters)
-                                }
-                            }
-                            .labelsHidden()
-                        }
-                        .settingsRow()
-                    }
                 }
 
                 SettingsSection(title: "נעילה",
@@ -261,11 +154,6 @@ struct SettingsView: View {
                 Button("סיום", action: hideKeyboard)
             }
         }
-        .sheet(item: $hoursEdit) { edit in
-            HoursSheet(title: edit.title, hours: edit.hours) { value in
-                store.updateSettings { edit.apply(&$0, value) }
-            }
-        }
         .alert("לשחזר מהגיבוי?", isPresented: restoringShown) {
             Button("שחזור", role: .destructive, action: restore)
             Button("ביטול", role: .cancel) { restoring = nil }
@@ -289,13 +177,6 @@ struct SettingsView: View {
         .onChange(of: periodSummary) { _, _ in
             LiveShift.refresh(store)
         }
-        .onChange(of: placeOn) { _, on in
-            if on { Place.shared.askAlways() }
-            Place.shared.start()
-        }
-        .onChange(of: placeRadius) { _, _ in
-            Place.shared.start()
-        }
         .onAppear { lockSwitch = lockOn }
         .onChange(of: lockSwitch) { _, on in
             guard on != lockOn else { return }
@@ -304,24 +185,6 @@ struct SettingsView: View {
     }
 
     // MARK: Rows
-
-    /// Hours and minutes of a setting, on the wheel.
-    private func hoursRow(_ title: String, _ key: WritableKeyPath<Settings, Double>, _ s: Settings) -> some View {
-        let value = s[keyPath: key]
-        return HStack {
-            Text(title)
-            Spacer()
-            Button {
-                hoursEdit = HoursEdit(title: title, hours: value) { settings, hours in
-                    settings[keyPath: key] = hours
-                }
-            } label: {
-                ValueChip(text: Format.hoursToHM(value))
-            }
-            .buttonStyle(.plain)
-        }
-        .settingsRow()
-    }
 
     /// A row that does something, in the tint.
     private func actionRow(_ title: String) -> some View {
@@ -333,46 +196,11 @@ struct SettingsView: View {
 
     // MARK: Bindings
 
-    /// Whether the days off left are kept: from today's payslip, until its own date is picked.
-    private var keepsBalance: Binding<Bool> {
-        Binding(
-            get: { store.settings.balanceDate != nil },
-            set: { on in
-                guard on != (store.settings.balanceDate != nil) else { return }
-                store.updateSettings { $0.balanceDate = on ? LocalTime.startOfDay(Date()) : nil }
-            }
-        )
-    }
-
-    /// The payslip's date, a day.
-    private var balanceDate: Binding<Date> {
-        Binding(
-            get: { store.settings.balanceDate ?? LocalTime.startOfDay(Date()) },
-            set: { date in
-                let day = LocalTime.startOfDay(date)
-                guard store.settings.balanceDate != day else { return }
-                store.updateSettings { $0.balanceDate = day }
-            }
-        )
-    }
-
     /// A setting, saved (and sent to iCloud) as it changes.
     private func setting<Value: Equatable>(_ key: WritableKeyPath<Settings, Value>) -> Binding<Value> {
         Binding(
             get: { store.settings[keyPath: key] },
             set: { value in
-                guard store.settings[keyPath: key] != value else { return }
-                store.updateSettings { $0[keyPath: key] = value }
-            }
-        )
-    }
-
-    /// A multiplier as a percentage: 1.25 is 125.
-    private func multiplier(_ key: WritableKeyPath<Settings, Double>) -> Binding<Double> {
-        Binding(
-            get: { jsRound(store.settings[keyPath: key] * 100) },
-            set: { percent in
-                let value = percent / 100
                 guard store.settings[keyPath: key] != value else { return }
                 store.updateSettings { $0[keyPath: key] = value }
             }
@@ -413,35 +241,6 @@ struct SettingsView: View {
         let alerts = "ההתראות: כשמגיעים ליעד היומי, כשמתחילות השעות הנוספות של 150%, אחרי 6 שעות ברצף בלי הפסקה, ואחרי 12 שעות של משמרת פתוחה. הסיכום מגיע בבוקר שאחרי סוף התקופה."
         guard pro.unlocked else { return alerts + " המשמרת במסך הנעילה וב-Dynamic Island: ב-Shifty Pro." }
         return "המשמרת שרצה מופיעה במסך הנעילה וב-Dynamic Island, עם כפתורים להפסקה ולסיום. " + alerts
-    }
-
-    // MARK: The place
-
-    private var placeButton: String {
-        placeSet ? "קבע מחדש את מקום העבודה כאן" : "קבע את מקום העבודה כאן"
-    }
-
-    /// What the place's reminder does, and what it still needs.
-    private var placeNote: String {
-        guard placeOn && pro.unlocked else {
-            return "האייפון ישאל אם להתחיל משמרת כשמגיעים לעבודה, ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה. מקום העבודה נשמר רק באייפון הזה."
-        }
-        if !placeSet { return "עמוד במקום העבודה ולחץ על הכפתור." }
-        if !Place.shared.always {
-            return "כדי שזה יעבוד גם כשהאפליקציה סגורה, צריך לאפשר מיקום תמיד: בהגדרות האייפון, Shifty, מיקום."
-        }
-        return "מקום העבודה נקבע. ההתראות יגיעו גם כשהאפליקציה סגורה."
-    }
-
-    private func setPlaceHere() {
-        placeBusy = true
-        Place.shared.setHere { found in
-            Task { @MainActor in
-                placeBusy = false
-                placeSet = Place.coordinate != nil
-                if !found { message = "לא הצלחתי למצוא את המיקום. בדוק שהמיקום מאופשר ל-Shifty." }
-            }
-        }
     }
 
     // MARK: iCloud
@@ -592,39 +391,49 @@ struct NumberRow: View {
     let title: String
     @Binding var value: Double
     let unit: String
-    @State private var draft = ""
-    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 8) {
             Text(title)
             Spacer()
-            TextField("0", text: $draft)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.center)
-                .monospacedDigit()
-                .focused($focused)
-                .frame(width: 84)
-                .padding(.vertical, 6)
-                .background {
-                    Capsule().fill(Color.primary.opacity(0.07))
-                }
-                .onChange(of: draft) { _, typed in
-                    if let number = Double(typed.replacingOccurrences(of: ",", with: ".")), number >= 0 {
-                        value = number
-                    }
-                }
+            NumberField(value: $value)
             Text(unit)
                 .foregroundStyle(.secondary)
         }
         .settingsRow()
-        .onAppear { draft = Self.text(value) }
-        .onChange(of: focused) { _, now in
-            if !now { draft = Self.text(value) }
-        }
-        .onChange(of: value) { _, now in
-            if !focused { draft = Self.text(now) }
-        }
+    }
+}
+
+/// NumberRow's field, a number in a capsule: also two in one row, as a bonus's target and its amount.
+struct NumberField: View {
+    @Binding var value: Double
+    var width: CGFloat = 84
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField("0", text: $draft)
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.center)
+            .monospacedDigit()
+            .focused($focused)
+            .frame(width: width)
+            .padding(.vertical, 6)
+            .background {
+                Capsule().fill(Color.primary.opacity(0.07))
+            }
+            .onChange(of: draft) { _, typed in
+                if let number = Double(typed.replacingOccurrences(of: ",", with: ".")), number >= 0 {
+                    value = number
+                }
+            }
+            .onAppear { draft = Self.text(value) }
+            .onChange(of: focused) { _, now in
+                if !now { draft = Self.text(value) }
+            }
+            .onChange(of: value) { _, now in
+                if !focused { draft = Self.text(now) }
+            }
     }
 
     /// 50 as "50", 22.6 as "22.6".
@@ -634,7 +443,7 @@ struct NumberRow: View {
 }
 
 /// A percentage, by fives (app.js numRow's percentages).
-private struct PercentRow: View {
+struct PercentRow: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>
@@ -654,7 +463,7 @@ private struct PercentRow: View {
 }
 
 /// Minutes, by fives.
-private struct MinutesRow: View {
+struct MinutesRow: View {
     let title: String
     @Binding var value: Double
 

@@ -59,15 +59,25 @@ extension Calc {
         let totals = summary.totals
         let gross = totals.total
         // a holiday's whole shift is in its base pay, at the holiday's multiplier; a month's fixed pay is, but
-        // not its overtime or a bonus
-        let wages = summary.shifts.reduce(0) { sum, shift in
-            s.isMonthly(shift) ? sum : sum + (summary.breakdowns[shift.id]?.basePay ?? 0)
+        // not its overtime or a bonus. Each employer saves its own share for the pension: the settings' share is
+        // theirs, weighed by what each pays.
+        var wages = 0.0
+        var pension = 0.0
+        for shift in summary.shifts where !s.isMonthly(shift) {
+            let base = summary.breakdowns[shift.id]?.basePay ?? 0
+            wages += base
+            pension += base * s.effective(for: shift).pensionPercent
         }
-        guard projected, gross > 0 else { return netPay(gross: gross, pensionable: wages + totals.salary, s) }
+        for place in s.payPlaces {
+            pension += Calc.salary(place.pay, range: range) * s.place(place.id).rules.pensionPercent
+        }
+        var weighed = s
+        if !s.workplaces.isEmpty && wages + totals.salary > 0 { weighed.pensionPercent = pension / (wages + totals.salary) }
+        guard projected, gross > 0 else { return netPay(gross: gross, pensionable: wages + totals.salary, weighed) }
         // the wages head on with the rest of the income that is not fixed
         let ahead = projectedIncome(shifts, s, range: range, asOf: now)
         let fixed = totals.salary + totals.bonus
         let pace = gross - fixed > 0 ? (ahead - fixed) / (gross - fixed) : 1
-        return netPay(gross: ahead, pensionable: wages * pace + totals.salary, s)
+        return netPay(gross: ahead, pensionable: wages * pace + totals.salary, weighed)
     }
 }

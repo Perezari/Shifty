@@ -179,7 +179,7 @@ expect(near(mixedTotals.salary, 12_000.0 * 15 / 30), "the month's pay from the 1
 let hourWorth = 12_000.0 / 182
 expect(near(mixedTotals.extraOvertime, (2 * 1.25 + 0.4 * 1.5) * hourWorth * 1.4 / 2.4), "the overtime past the hour covered")
 expect(near(mixedTotals.total, mixedTotals.pay + mixedTotals.salary + mixedTotals.extraOvertime), "the period's income")
-expect(Calc.monthlyOvertime(mixed, global, range: november, asOf: now.ms).map { near($0.hours, 2.4) && $0.covered == 1 } == true,
+expect(Calc.monthlyOvertime(mixed, global, range: november, asOf: now.ms).map { near($0.hours, 2.4) && $0.terms.target(after: $0.hours) == 1 } == true,
        "2:24 of overtime, of an hour covered")
 expect(near(Calc.periodNet(mixed, global, range: november, asOf: now.ms, projected: false).pension, (8 * 50 + 6_000) * 0.06),
        "the pension from the wages and the month's pay, not from its overtime")
@@ -188,6 +188,13 @@ expect(Calc.periodTotals(mixed, global, range: november, asOf: now.ms).extraOver
 global.payTerms[1].overtimeCover = .none
 expect(near(Calc.periodTotals(mixed, global, range: november, asOf: now.ms).extraOvertime, (2 * 1.25 + 0.4 * 1.5) * hourWorth),
        "none of it covered")
+
+// a bonus at targets of overtime: 300 at 2 hours, 500 more at 4; 2:24 reaches the first alone
+global.payTerms[1].overtimeCover = .tiers
+global.payTerms[1].overtimeTiers = [OvertimeTier(hours: 2, amount: 300), OvertimeTier(hours: 4, amount: 500)]
+expect(near(Calc.periodTotals(mixed, global, range: november, asOf: now.ms).extraOvertime, 300), "the first target's bonus")
+expect(global.payTerms[1].target(after: 2.4) == 4 && global.payTerms[1].target(after: 4) == nil && global.payTerms[1].target(after: 1) == 2,
+       "the next target, none past the last")
 
 // an annual bonus of 5,000 with December's pay, while the global pay holds on 1 December
 global.payTerms[1].bonus = 5_000
@@ -216,6 +223,26 @@ expect(near(twoTotals.travel, 20 + 10) && near(twoTotals.pay, 8 * 50 + fridayPay
 var gone = friday
 gone.workplaceId = "deleted"
 expect(near(Calc.breakdown(gone, two).pay, 6 * 50), "a shift of a workplace that is gone counts as the own one's")
+
+// its employer's rules: overtime at 150% from the first hour, and 10% to the pension
+two.workplaces[0].rules.overtime1Mult = 1.5
+two.workplaces[0].rules.pensionPercent = 10
+expect(near(Calc.breakdown(friday, two).pay, 5 * 40 + 40 * 1.5), "its own overtime's rate")
+expect(near(Calc.breakdown(beforeRaise, two).pay, 8 * 50) && two.overtime1Mult == 1.25, "the own one's rules unchanged")
+let twoNet = Calc.periodNet([friday, beforeRaise], two, range: november, asOf: now.ms, projected: false)
+expect(near(twoNet.pension, 8 * 50 * 0.06 + 5 * 40 * 0.10), "each employer's share of the pension")
+
+// the days off left of each workplace: its own payslip, its own days off
+two.workplaces[0].rules.balanceDate = LocalTime.date(2026, 9, 30)
+two.workplaces[0].rules.vacationBalance = 4
+var cafeVacation = Shift(id: "cv", start: LocalTime.date(2026, 10, 13, 12), end: LocalTime.date(2026, 10, 13, 12), type: .vacation)
+cafeVacation.workplaceId = "cafe"
+let ownVacation = Shift(id: "ov", start: LocalTime.date(2026, 10, 12, 12), end: LocalTime.date(2026, 10, 12, 12), type: .vacation)
+let cafeLeave = Calc.leave([cafeVacation, ownVacation], two, asOf: LocalTime.date(2026, 10, 20), at: "cafe")
+expect(cafeLeave.map { $0.vacationTaken == 1 && $0.months == 0 && near($0.vacation, 4 - 1) } == true,
+       "the café's balance: no month yet, its day off alone")
+expect(Calc.leave([cafeVacation, ownVacation], two, asOf: LocalTime.date(2026, 10, 20)) == nil, "the own one's not kept")
+expect(two.place("cafe").rules.pensionPercent == 10 && two.place(nil).rules == s.rules, "each workplace's rules read alike")
 
 // in JSON and back
 let twoBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(two))

@@ -2,39 +2,56 @@ import CoreLocation
 import Foundation
 import UserNotifications
 
-/// The workplace as a place on the map: on arriving there the iPhone asks whether to start a shift, and on
-/// leaving it whether to end the one running, in notifications whose buttons do it without opening the app.
-/// iOS watches the place and wakes the app when it is crossed, also when the app is closed, once the location
-/// is allowed "always". The place is this iPhone's (UserDefaults), as the lock is. With Shifty Pro alone.
+/// Each workplace as a place on the map: on arriving there the iPhone asks whether to start a shift (there), and on
+/// leaving it whether to end the one running there, in notifications whose buttons do it without opening the app.
+/// iOS watches the places and wakes the app when one is crossed, also when the app is closed, once the location is
+/// allowed "always". The places are this iPhone's (UserDefaults), as the lock is: the own workplace's under the
+/// keys below, another's under them and its id. With Shifty Pro alone.
 final class Place: NSObject, CLLocationManagerDelegate {
     static let shared = Place()
     static let enabledKey = "placeEnabled"
     static let latitudeKey = "placeLatitude"
     static let longitudeKey = "placeLongitude"
     static let radiusKey = "placeRadius"
+    /// The own workplace's region; another's is this and its id.
     private static let region = "shifty.work"
 
     private let manager = CLLocationManager()
-    /// Waiting for the location now, to set the place there.
-    private var settingHere: ((Bool) -> Void)?
+    /// Waiting for the location now, to set a workplace's place there.
+    private var settingHere: (place: String?, done: (Bool) -> Void)?
 
     override init() {
         super.init()
         manager.delegate = self
     }
 
-    static var enabled: Bool { UserDefaults.standard.bool(forKey: enabledKey) }
-
-    /// The place set, if any.
-    static var coordinate: CLLocationCoordinate2D? {
-        let defaults = UserDefaults.standard
-        guard defaults.object(forKey: latitudeKey) != nil else { return nil }
-        return CLLocationCoordinate2D(latitude: defaults.double(forKey: latitudeKey), longitude: defaults.double(forKey: longitudeKey))
+    /// A key of a workplace's place: the own one's (nil) as it was, another's with its id.
+    static func key(_ base: String, _ place: String?) -> String {
+        place.map { base + "." + $0 } ?? base
     }
 
-    static var radius: Double {
-        let value = UserDefaults.standard.double(forKey: radiusKey)
+    static func enabled(_ place: String?) -> Bool {
+        UserDefaults.standard.bool(forKey: key(enabledKey, place))
+    }
+
+    /// The place set, if any.
+    static func coordinate(_ place: String?) -> CLLocationCoordinate2D? {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: key(latitudeKey, place)) != nil else { return nil }
+        return CLLocationCoordinate2D(latitude: defaults.double(forKey: key(latitudeKey, place)),
+                                      longitude: defaults.double(forKey: key(longitudeKey, place)))
+    }
+
+    static func radius(_ place: String?) -> Double {
+        let value = UserDefaults.standard.double(forKey: key(radiusKey, place))
         return value > 0 ? value : 150
+    }
+
+    /// The workplace a region is watched for: nil for the own one; not one of these, none.
+    private static func place(of region: CLRegion) -> String?? {
+        if region.identifier == Self.region { return .some(nil) }
+        guard region.identifier.hasPrefix(Self.region + ".") else { return nil }
+        return .some(String(region.identifier.dropFirst(Self.region.count + 1)))
     }
 
     /// Whether iOS lets the place be watched with the app closed.
@@ -42,17 +59,22 @@ final class Place: NSObject, CLLocationManagerDelegate {
         manager.authorizationStatus == .authorizedAlways
     }
 
-    /// On launch, also in the background for a crossing: the place watched as the settings say, or not at all.
+    /// On launch, also in the background for a crossing: each workplace's place watched as the settings say, or none.
     func start() {
-        for region in manager.monitoredRegions where region.identifier == Self.region {
+        for region in manager.monitoredRegions where Self.place(of: region) != nil {
             manager.stopMonitoring(for: region)
         }
-        guard ProFlag.on, Self.enabled, let center = Self.coordinate,
-              CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
-        let region = CLCircularRegion(center: center, radius: Self.radius, identifier: Self.region)
-        region.notifyOnEntry = true
-        region.notifyOnExit = true
-        manager.startMonitoring(for: region)
+        guard ProFlag.on, CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
+        // the workplaces from the files, as the app may be woken in the background for this
+        let places: [String?] = [nil] + ShiftStore.snapshot().settings.workplaces.map { Optional($0.id) }
+        for place in places where Self.enabled(place) {
+            guard let center = Self.coordinate(place) else { continue }
+            let region = CLCircularRegion(center: center, radius: Self.radius(place),
+                                          identifier: place.map { Self.region + "." + $0 } ?? Self.region)
+            region.notifyOnEntry = true
+            region.notifyOnExit = true
+            manager.startMonitoring(for: region)
+        }
     }
 
     /// Asks for the location "always": first while using the app, then, iOS asking again, always.
@@ -63,9 +85,9 @@ final class Place: NSObject, CLLocationManagerDelegate {
         manager.requestAlwaysAuthorization()
     }
 
-    /// The place set where the iPhone is now; false when the location is not allowed or not found.
-    func setHere(_ done: @escaping (Bool) -> Void) {
-        settingHere = done
+    /// A workplace's place set where the iPhone is now; false when the location is not allowed or not found.
+    func setHere(_ place: String?, _ done: @escaping (Bool) -> Void) {
+        settingHere = (place, done)
         askAlways()
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         manager.requestLocation()
@@ -74,18 +96,18 @@ final class Place: NSObject, CLLocationManagerDelegate {
     // MARK: CLLocationManagerDelegate
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let done = settingHere, let location = locations.last else { return }
+        guard let setting = settingHere, let location = locations.last else { return }
         settingHere = nil
-        UserDefaults.standard.set(location.coordinate.latitude, forKey: Self.latitudeKey)
-        UserDefaults.standard.set(location.coordinate.longitude, forKey: Self.longitudeKey)
+        UserDefaults.standard.set(location.coordinate.latitude, forKey: Self.key(Self.latitudeKey, setting.place))
+        UserDefaults.standard.set(location.coordinate.longitude, forKey: Self.key(Self.longitudeKey, setting.place))
         start()
-        done(true)
+        setting.done(true)
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard let done = settingHere else { return }
+        guard let setting = settingHere else { return }
         settingHere = nil
-        done(false)
+        setting.done(false)
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -93,13 +115,13 @@ final class Place: NSObject, CLLocationManagerDelegate {
     }
 
     func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        guard region.identifier == Self.region else { return }
-        Task { @MainActor in await Self.arrived() }
+        guard let place = Self.place(of: region) else { return }
+        Task { @MainActor in await Self.arrived(at: place) }
     }
 
     func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        guard region.identifier == Self.region else { return }
-        Task { @MainActor in await Self.left() }
+        guard let place = Self.place(of: region) else { return }
+        Task { @MainActor in await Self.left(place) }
     }
 
     // MARK: The questions
@@ -124,24 +146,27 @@ final class Place: NSObject, CLLocationManagerDelegate {
         ])
     }
 
-    /// Arrived at work: whether to start, unless a shift runs.
+    /// Arrived at a workplace: whether to start, unless a shift runs; the shift to start is there.
     @MainActor
-    static func arrived() async {
-        guard ProFlag.on, ShiftStore.shared.active == nil else { return }
-        await ask(arriveCategory, title: "הגעת ל" + placeName, body: "להתחיל משמרת עכשיו?")
+    static func arrived(at place: String?) async {
+        let store = ShiftStore.shared
+        guard ProFlag.on, store.active == nil else { return }
+        store.chooseNextWorkplace(place)
+        await ask(arriveCategory, title: "הגעת ל" + name(place), body: "להתחיל משמרת עכשיו?")
     }
 
-    /// Left work: whether to end the shift running, if one runs.
+    /// Left a workplace: whether to end the shift running there, if one runs.
     @MainActor
-    static func left() async {
-        guard ProFlag.on, let active = ShiftStore.shared.active else { return }
-        await ask(leaveCategory, title: "יצאת מ" + placeName, body: "המשמרת פתוחה מ־" + Format.clock(active.start) + ". לסיים אותה?")
+    static func left(_ place: String?) async {
+        let store = ShiftStore.shared
+        guard ProFlag.on, let active = store.active, store.settings.workplace(of: active)?.id == place else { return }
+        await ask(leaveCategory, title: "יצאת מ" + name(place), body: "המשמרת פתוחה מ־" + Format.clock(active.start) + ". לסיים אותה?")
     }
 
-    /// The workplace's name, or "העבודה" while it has the default.
+    /// A workplace's name, or "העבודה" while the own one has the default.
     @MainActor
-    private static var placeName: String {
-        let name = ShiftStore.shared.settings.workplaceName.trimmingCharacters(in: .whitespaces)
+    private static func name(_ place: String?) -> String {
+        let name = ShiftStore.shared.settings.place(place).name.trimmingCharacters(in: .whitespaces)
         return name.isEmpty || name == Settings().workplaceName ? "העבודה" : name
     }
 

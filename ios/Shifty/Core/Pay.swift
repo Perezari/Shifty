@@ -5,10 +5,17 @@ enum PayKind: String {
     case hourly, monthly
 }
 
-/// What a month's fixed pay covers of the overtime: all of it, up to some hours a month, or none of it, each
-/// hour of which is then paid on top of it.
+/// What a month's fixed pay does with the overtime: covers all of it, up to some hours a month, or none of it (each
+/// hour then paid on top at its worth); or pays a bonus at each target of hours a month, the hours short of the first
+/// not paid.
 enum OvertimeCover: String {
-    case all, upTo, none
+    case all, upTo, none, tiers
+}
+
+/// A bonus at a target of overtime hours a month (OvertimeCover.tiers): each one reached adds its amount.
+struct OvertimeTier: Hashable {
+    var hours: Double
+    var amount: Double
 }
 
 /// A workplace's pay from a date on: by the hour, or a month's (global), with an annual bonus. Shifts before
@@ -23,6 +30,8 @@ struct PayTerms: Hashable, Identifiable {
     var overtimeCover: OvertimeCover = .upTo
     /// The overtime hours a month that the month's pay covers (overtimeCover upTo).
     var overtimeHours = 0.0
+    /// The bonuses at targets of overtime hours (overtimeCover tiers), the lowest first.
+    var overtimeTiers: [OvertimeTier] = []
     /// A fixed bonus paid once a year, with the pay of `bonusMonth` (0 January); 0: none.
     var bonus = 0.0
     var bonusMonth = 0
@@ -32,12 +41,50 @@ struct PayTerms: Hashable, Identifiable {
         kind == .monthly ? monthlySalary / 182 : hourlyWage
     }
 
+    /// What a month's overtime is held against: the hours the pay covers, or the next bonus's target not reached at
+    /// `hours`; nil without one, or once every target is reached.
+    func target(after hours: Double) -> Double? {
+        switch overtimeCover {
+        case .upTo: overtimeHours
+        case .tiers: overtimeTiers.first { hours < $0.hours - 1e-9 }?.hours
+        case .all, .none: nil
+        }
+    }
+
     /// The date the first terms of a workplace are given: the start of the shifts' time.
     static let start = Date(ms: 0)
 }
 
+/// What an employer sets, besides the pay and the standard hours: overtime, breaks, Shabbat and night, a holiday's eve,
+/// vacation and sick days and the days left of them, and the pension. The settings' own workplace keeps them in the
+/// settings themselves, as the web app does (Settings.rules); another workplace, its own.
+struct EmployerRules: Hashable {
+    var overtime1Hours = 2.0
+    var overtime1Mult = 1.25
+    var overtime2Mult = 1.5
+    var autoBreakMinutes = 0.0
+    var autoBreakAfterHours = 6.0
+    var holidayMult = 1.5
+    var nightEnabled = false
+    var nightStart = 22.0
+    var nightEnd = 6.0
+    var nightMult = 1.0
+    var holidayEveHours = 4.1
+    var vacationHours = 8.6
+    var sickDay1Pct = 0.0
+    var sickDay2Pct = 50.0
+    var sickDay3Pct = 50.0
+    var sickDay4Pct = 100.0
+    var pensionPercent = 6.0
+    var vacationBalance = 0.0
+    var sickBalance = 0.0
+    var balanceDate: Date?
+    var vacationDaysPerYear = 12.0
+}
+
 /// A workplace besides the settings' own (Shifty Pro): its name, its pay from each date, the standard hours of
-/// each weekday and its travel. The settings' own workplace keeps them in the settings, as the web app does.
+/// each weekday, its travel and its employer's rules. The settings' own workplace keeps them in the settings, as
+/// the web app does.
 struct Workplace: Hashable, Identifiable {
     var id: String
     var name: String
@@ -46,9 +93,46 @@ struct Workplace: Hashable, Identifiable {
     var standardByDay: [Double?] = [8.6, 8.6, 8.6, 8.6, 8.6, nil, nil]
     var travelPerDay = 0.0
     var travelMonthlyCap = 0.0
+    var rules = EmployerRules()
 }
 
 extension Settings {
+    /// The own workplace's employer's rules, the settings' own fields.
+    var rules: EmployerRules {
+        get {
+            EmployerRules(overtime1Hours: overtime1Hours, overtime1Mult: overtime1Mult, overtime2Mult: overtime2Mult,
+                          autoBreakMinutes: autoBreakMinutes, autoBreakAfterHours: autoBreakAfterHours, holidayMult: holidayMult,
+                          nightEnabled: nightEnabled, nightStart: nightStart, nightEnd: nightEnd, nightMult: nightMult,
+                          holidayEveHours: holidayEveHours, vacationHours: vacationHours, sickDay1Pct: sickDay1Pct,
+                          sickDay2Pct: sickDay2Pct, sickDay3Pct: sickDay3Pct, sickDay4Pct: sickDay4Pct,
+                          pensionPercent: pensionPercent, vacationBalance: vacationBalance, sickBalance: sickBalance,
+                          balanceDate: balanceDate, vacationDaysPerYear: vacationDaysPerYear)
+        }
+        set {
+            overtime1Hours = newValue.overtime1Hours
+            overtime1Mult = newValue.overtime1Mult
+            overtime2Mult = newValue.overtime2Mult
+            autoBreakMinutes = newValue.autoBreakMinutes
+            autoBreakAfterHours = newValue.autoBreakAfterHours
+            holidayMult = newValue.holidayMult
+            nightEnabled = newValue.nightEnabled
+            nightStart = newValue.nightStart
+            nightEnd = newValue.nightEnd
+            nightMult = newValue.nightMult
+            holidayEveHours = newValue.holidayEveHours
+            vacationHours = newValue.vacationHours
+            sickDay1Pct = newValue.sickDay1Pct
+            sickDay2Pct = newValue.sickDay2Pct
+            sickDay3Pct = newValue.sickDay3Pct
+            sickDay4Pct = newValue.sickDay4Pct
+            pensionPercent = newValue.pensionPercent
+            vacationBalance = newValue.vacationBalance
+            sickBalance = newValue.sickBalance
+            balanceDate = newValue.balanceDate
+            vacationDaysPerYear = newValue.vacationDaysPerYear
+        }
+    }
+
     /// The settings' own workplace's pay: its terms from each date, or by the hour at `hourlyWage` from the
     /// start.
     var ownPay: [PayTerms] {
@@ -72,8 +156,9 @@ extension Settings {
         (!payTerms.isEmpty || !workplaces.isEmpty) && terms(of: shift).kind == .monthly
     }
 
-    /// The settings a shift is counted by: its workplace's name, standard hours and travel, and the wage of the
-    /// pay in effect on its day (a month's pay's hour). The settings themselves with one workplace and one pay.
+    /// The settings a shift is counted by: its workplace's name, standard hours, travel and employer's rules, and the
+    /// wage of the pay in effect on its day (a month's pay's hour). The settings themselves with one workplace and one
+    /// pay.
     func effective(for shift: Shift) -> Settings {
         guard !payTerms.isEmpty || !workplaces.isEmpty else { return self }
         var s = self
@@ -82,6 +167,7 @@ extension Settings {
             s.standardByDay = place.standardByDay
             s.travelPerDay = place.travelPerDay
             s.travelMonthlyCap = place.travelMonthlyCap
+            s.rules = place.rules
         }
         s.hourlyWage = terms(of: shift).hourValue
         return s
@@ -97,7 +183,7 @@ extension Settings {
     func place(_ id: String?) -> Workplace {
         if let id, let place = workplaces.first(where: { $0.id == id }) { return place }
         return Workplace(id: "", name: workplaceName, pay: ownPay, standardByDay: standardByDay,
-                         travelPerDay: travelPerDay, travelMonthlyCap: travelMonthlyCap)
+                         travelPerDay: travelPerDay, travelMonthlyCap: travelMonthlyCap, rules: rules)
     }
 
     /// A workplace changed on its page. The own one's pay is kept as `hourlyWage` alone while it is one wage from
@@ -115,6 +201,7 @@ extension Settings {
         standardByDay = place.standardByDay
         travelPerDay = place.travelPerDay
         travelMonthlyCap = place.travelMonthlyCap
+        rules = place.rules
         if pay.count == 1 && pay[0].kind == .hourly && pay[0].bonus == 0 {
             payTerms = []
             hourlyWage = pay[0].hourlyWage
@@ -141,29 +228,21 @@ extension Settings {
 extension Calc {
     /// A pay period's income (the Now, Shifts and Calendar screens', the net's and the summaries'): its shifts'
     /// wages and travel (aggregate), and for each workplace paid by the month, its month's pay for the part of
-    /// the period its terms cover, the overtime beyond what it covers at its hour's worth, and an annual bonus
-    /// due in the period, on its month's first day.
+    /// the period its terms cover, the overtime it does not cover (at its hour's worth, or as the bonuses of the
+    /// targets reached), and an annual bonus due in the period, on its month's first day.
     static func periodTotals(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double? = nil) -> Totals {
         var totals = aggregate(shifts, s, range: range, asOf: asOf)
         let places = s.payPlaces
         guard places.contains(where: { place in place.pay.contains { $0.kind == .monthly || $0.bonus > 0 } }) else { return totals }
-        let days = max(1, daysBetween(range.start, range.end))
         let years = LocalTime.parts(range.start).year...LocalTime.parts(range.end).year
         for place in places {
             let pay = place.pay
-            for (i, t) in pay.enumerated() {
-                // the part of the period these terms hold, from their date to the next terms'
-                if t.kind == .monthly {
-                    let from = max(t.from, range.start)
-                    let to = min(i + 1 < pay.count ? pay[i + 1].from : range.end, range.end)
-                    if to > from { totals.salary += t.monthlySalary * Double(daysBetween(from, to)) / Double(days) }
-                }
-                // the bonus, with the pay of its month, as long as these terms hold on its first day
-                if t.bonus > 0 {
-                    for year in years {
-                        let due = LocalTime.date(year, t.bonusMonth, 1)
-                        if due >= range.start && due < range.end && Settings.terms(pay, at: due)?.id == t.id { totals.bonus += t.bonus }
-                    }
+            totals.salary += salary(pay, range: range)
+            // the bonus, with the pay of its month, as long as its terms hold on its first day
+            for t in pay where t.bonus > 0 {
+                for year in years {
+                    let due = LocalTime.date(year, t.bonusMonth, 1)
+                    if due >= range.start && due < range.end && Settings.terms(pay, at: due)?.id == t.id { totals.bonus += t.bonus }
                 }
             }
         }
@@ -172,8 +251,22 @@ extension Calc {
         return totals
     }
 
-    /// The overtime of the shifts paid by a month's fixed pay that the pay does not cover, worth its tiers at
-    /// the pay's hour. With a cover of some hours, its share of the period's overtime past them.
+    /// A workplace's month's fixed pay in a period: each month's pay for the part of the period its terms hold, from
+    /// their date to the next terms'.
+    static func salary(_ pay: [PayTerms], range: TimeRange) -> Double {
+        let days = max(1, daysBetween(range.start, range.end))
+        var salary = 0.0
+        for (i, t) in pay.enumerated() where t.kind == .monthly {
+            let from = max(t.from, range.start)
+            let to = min(i + 1 < pay.count ? pay[i + 1].from : range.end, range.end)
+            if to > from { salary += t.monthlySalary * Double(daysBetween(from, to)) / Double(days) }
+        }
+        return salary
+    }
+
+    /// The overtime of the shifts paid by a month's fixed pay that the pay does not cover: worth its tiers at the
+    /// pay's hour, all of it or past the hours covered (its share of the period's overtime past them); or the bonuses
+    /// of the targets reached.
     static func extraOvertime(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double? = nil) -> Double {
         struct Overtime {
             var terms: PayTerms
@@ -183,38 +276,35 @@ extension Calc {
         var byTerms: [String: Overtime] = [:]
         for shift in shifts where shift.type == .work && !shift.deleted && inRange(shift, range) && s.isMonthly(shift) {
             let t = s.terms(of: shift)
+            let rules = s.effective(for: shift)
             let b = breakdown(shift, s, asOf: asOf)
             guard b.overtimeHours > 0 else { continue }
             let key = (s.workplace(of: shift)?.id ?? "") + "/" + t.id
             var o = byTerms[key] ?? Overtime(terms: t)
             o.hours += b.overtimeHours
-            o.worth += (b.ot1Hours * s.overtime1Mult + b.ot2Hours * s.overtime2Mult) * t.hourValue
+            o.worth += (b.ot1Hours * rules.overtime1Mult + b.ot2Hours * rules.overtime2Mult) * t.hourValue
             byTerms[key] = o
         }
         return byTerms.values.reduce(0) { sum, o in
-            let extra: Double
             switch o.terms.overtimeCover {
-            case .all: extra = 0
-            case .none: extra = o.hours
-            case .upTo: extra = max(0, o.hours - o.terms.overtimeHours)
+            case .all: sum
+            case .none: sum + o.worth
+            case .upTo: sum + o.worth * max(0, o.hours - o.terms.overtimeHours) / o.hours
+            case .tiers: sum + o.terms.overtimeTiers.filter { o.hours >= $0.hours - 1e-9 }.reduce(0) { $0 + $1.amount }
             }
-            return sum + o.worth * extra / o.hours
         }
     }
 
-    /// The period's overtime against what a month's pay covers of it: the hours, and the cover's hours when
-    /// the pay covers some (the Now screen's "6:30 מתוך 30"). Nil without shifts paid by the month.
-    static func monthlyOvertime(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double? = nil) -> (hours: Double, covered: Double?)? {
+    /// The period's overtime of the shifts paid by a month's fixed pay, and that pay's terms (the newest shift's), for
+    /// the Now screen's "6:30 מתוך 20". Nil without such shifts.
+    static func monthlyOvertime(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double? = nil) -> (hours: Double, terms: PayTerms)? {
         var hours = 0.0
-        var covered: Double? = nil
-        var any = false
+        var terms: PayTerms?
         for shift in shifts where shift.type == .work && !shift.deleted && inRange(shift, range) && s.isMonthly(shift) {
-            any = true
             hours += breakdown(shift, s, asOf: asOf).overtimeHours
-            let t = s.terms(of: shift)
-            if t.overtimeCover == .upTo { covered = t.overtimeHours }
+            if terms == nil { terms = s.terms(of: shift) }
         }
-        return any ? (hours, covered) : nil
+        return terms.map { (hours, $0) }
     }
 
     /// The local days from one midnight to another, across a change of the clocks.
@@ -225,9 +315,11 @@ extension Calc {
 
 // MARK: JSON
 
+extension OvertimeTier: Codable {}
+
 extension PayTerms: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, from, kind, hourlyWage, monthlySalary, overtimeCover, overtimeHours, bonus, bonusMonth
+        case id, from, kind, hourlyWage, monthlySalary, overtimeCover, overtimeHours, overtimeTiers, bonus, bonusMonth
     }
 
     init(from decoder: Decoder) throws {
@@ -240,6 +332,7 @@ extension PayTerms: Codable {
         monthlySalary = (try? c.decodeIfPresent(Double.self, forKey: .monthlySalary)) ?? d.monthlySalary
         overtimeCover = ((try? c.decodeIfPresent(String.self, forKey: .overtimeCover)) ?? nil).flatMap(OvertimeCover.init(rawValue:)) ?? d.overtimeCover
         overtimeHours = (try? c.decodeIfPresent(Double.self, forKey: .overtimeHours)) ?? d.overtimeHours
+        overtimeTiers = (try? c.decodeIfPresent([OvertimeTier].self, forKey: .overtimeTiers)) ?? d.overtimeTiers
         bonus = (try? c.decodeIfPresent(Double.self, forKey: .bonus)) ?? d.bonus
         bonusMonth = (try? c.decodeIfPresent(Int.self, forKey: .bonusMonth)) ?? d.bonusMonth
     }
@@ -253,14 +346,79 @@ extension PayTerms: Codable {
         try c.encode(monthlySalary, forKey: .monthlySalary)
         try c.encode(overtimeCover.rawValue, forKey: .overtimeCover)
         try c.encode(overtimeHours, forKey: .overtimeHours)
+        if !overtimeTiers.isEmpty { try c.encode(overtimeTiers, forKey: .overtimeTiers) }
         try c.encode(bonus, forKey: .bonus)
         try c.encode(bonusMonth, forKey: .bonusMonth)
     }
 }
 
+extension EmployerRules: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case overtime1Hours, overtime1Mult, overtime2Mult, autoBreakMinutes, autoBreakAfterHours, holidayMult,
+             nightEnabled, nightStart, nightEnd, nightMult, holidayEveHours, vacationHours,
+             sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, pensionPercent,
+             vacationBalance, sickBalance, balanceDate, vacationDaysPerYear
+    }
+
+    /// A missing key takes the default, as the settings' do.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = EmployerRules()
+        func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+            (try? c.decodeIfPresent(T.self, forKey: key)) ?? fallback
+        }
+        overtime1Hours = value(.overtime1Hours, d.overtime1Hours)
+        overtime1Mult = value(.overtime1Mult, d.overtime1Mult)
+        overtime2Mult = value(.overtime2Mult, d.overtime2Mult)
+        autoBreakMinutes = value(.autoBreakMinutes, d.autoBreakMinutes)
+        autoBreakAfterHours = value(.autoBreakAfterHours, d.autoBreakAfterHours)
+        holidayMult = value(.holidayMult, d.holidayMult)
+        nightEnabled = value(.nightEnabled, d.nightEnabled)
+        nightStart = value(.nightStart, d.nightStart)
+        nightEnd = value(.nightEnd, d.nightEnd)
+        nightMult = value(.nightMult, d.nightMult)
+        holidayEveHours = value(.holidayEveHours, d.holidayEveHours)
+        vacationHours = value(.vacationHours, d.vacationHours)
+        sickDay1Pct = value(.sickDay1Pct, d.sickDay1Pct)
+        sickDay2Pct = value(.sickDay2Pct, d.sickDay2Pct)
+        sickDay3Pct = value(.sickDay3Pct, d.sickDay3Pct)
+        sickDay4Pct = value(.sickDay4Pct, d.sickDay4Pct)
+        pensionPercent = value(.pensionPercent, d.pensionPercent)
+        vacationBalance = value(.vacationBalance, d.vacationBalance)
+        sickBalance = value(.sickBalance, d.sickBalance)
+        balanceDate = ISODate.decodeIfPresent(c, .balanceDate)
+        vacationDaysPerYear = value(.vacationDaysPerYear, d.vacationDaysPerYear)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(overtime1Hours, forKey: .overtime1Hours)
+        try c.encode(overtime1Mult, forKey: .overtime1Mult)
+        try c.encode(overtime2Mult, forKey: .overtime2Mult)
+        try c.encode(autoBreakMinutes, forKey: .autoBreakMinutes)
+        try c.encode(autoBreakAfterHours, forKey: .autoBreakAfterHours)
+        try c.encode(holidayMult, forKey: .holidayMult)
+        try c.encode(nightEnabled, forKey: .nightEnabled)
+        try c.encode(nightStart, forKey: .nightStart)
+        try c.encode(nightEnd, forKey: .nightEnd)
+        try c.encode(nightMult, forKey: .nightMult)
+        try c.encode(holidayEveHours, forKey: .holidayEveHours)
+        try c.encode(vacationHours, forKey: .vacationHours)
+        try c.encode(sickDay1Pct, forKey: .sickDay1Pct)
+        try c.encode(sickDay2Pct, forKey: .sickDay2Pct)
+        try c.encode(sickDay3Pct, forKey: .sickDay3Pct)
+        try c.encode(sickDay4Pct, forKey: .sickDay4Pct)
+        try c.encode(pensionPercent, forKey: .pensionPercent)
+        try c.encode(vacationBalance, forKey: .vacationBalance)
+        try c.encode(sickBalance, forKey: .sickBalance)
+        try c.encodeIfPresent(balanceDate.map(ISODate.string), forKey: .balanceDate)
+        try c.encode(vacationDaysPerYear, forKey: .vacationDaysPerYear)
+    }
+}
+
 extension Workplace: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap
+        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules
     }
 
     init(from decoder: Decoder) throws {
@@ -273,6 +431,7 @@ extension Workplace: Codable {
         standardByDay = (try? c.decodeIfPresent([Double?].self, forKey: .standardByDay)) ?? d.standardByDay
         travelPerDay = (try? c.decodeIfPresent(Double.self, forKey: .travelPerDay)) ?? d.travelPerDay
         travelMonthlyCap = (try? c.decodeIfPresent(Double.self, forKey: .travelMonthlyCap)) ?? d.travelMonthlyCap
+        rules = (try? c.decodeIfPresent(EmployerRules.self, forKey: .rules)) ?? d.rules
     }
 
     func encode(to encoder: Encoder) throws {
@@ -283,5 +442,6 @@ extension Workplace: Codable {
         try c.encode(standardByDay, forKey: .standardByDay)
         try c.encode(travelPerDay, forKey: .travelPerDay)
         try c.encode(travelMonthlyCap, forKey: .travelMonthlyCap)
+        try c.encode(rules, forKey: .rules)
     }
 }
