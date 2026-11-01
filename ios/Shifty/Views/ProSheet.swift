@@ -7,6 +7,7 @@ struct ProSheet: View {
     @Environment(Pro.self) private var pro
     @Environment(\.purchase) private var purchase
     @Environment(\.dismiss) private var dismiss
+    @State private var buying = false
 
     private struct Feature {
         let symbol: String
@@ -37,7 +38,7 @@ struct ProSheet: View {
                             }
                         }
                         Spacer(minLength: 6)
-                        buying
+                        buyBar
                     }
                     .padding(.horizontal, 22)
                     .padding(.bottom, 12)
@@ -97,13 +98,13 @@ struct ProSheet: View {
     }
 
     /// The price and the purchase; under them, that it is once, and restoring an earlier one.
-    private var buying: some View {
+    private var buyBar: some View {
         VStack(spacing: 12) {
             Button {
-                Task { await pro.buy(with: purchase) }
+                Task { await buy() }
             } label: {
                 Group {
-                    if pro.busy || (pro.loading && pro.price == nil) {
+                    if buying || pro.busy || (pro.loading && pro.price == nil) {
                         ProgressView()
                             .tint(.white)
                     } else if let price = pro.price {
@@ -117,7 +118,7 @@ struct ProSheet: View {
             }
             .buttonStyle(.glassProminent)
             .controlSize(.large)
-            .disabled(pro.price == nil || pro.busy)
+            .disabled(pro.price == nil || buying || pro.busy)
             Text("בלי מנוי ובלי חיובים נוספים.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -125,13 +126,27 @@ struct ProSheet: View {
                 Task { await pro.restore() }
             }
             .font(.subheadline.weight(.medium))
-            .disabled(pro.busy)
+            .disabled(buying || pro.busy)
             if let message = pro.message {
                 Text(message)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
+        }
+    }
+
+    /// The App Store's purchase sheet, its end told to Pro.
+    private func buy() async {
+        guard let product = pro.product else { return }
+        buying = true
+        defer { buying = false }
+        pro.message = nil
+        do {
+            let result = try await purchase(product)
+            await pro.finish(result)
+        } catch {
+            pro.message = "הרכישה לא הושלמה: \(error.localizedDescription)"
         }
     }
 }

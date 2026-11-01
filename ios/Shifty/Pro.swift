@@ -1,7 +1,5 @@
 import Observation
 import StoreKit
-// with StoreKit, SwiftUI brings the App Store's purchase sheet (PurchaseAction)
-import SwiftUI
 import WidgetKit
 
 /// Shifty Pro, bought once (ios/store/listing.md): a non-consumable in-app purchase. StoreKit keeps the
@@ -86,25 +84,18 @@ final class Pro {
         }
     }
 
-    /// The purchase, on the App Store's sheet: bought, or waiting for a parent's approval (Ask to Buy).
-    func buy(with purchase: PurchaseAction) async {
-        guard let product else { return }
-        busy = true
-        defer { busy = false }
-        message = nil
-        do {
-            switch try await purchase(product) {
-            case .success(let verification):
-                await apply(verification)
-            case .pending:
-                message = "הרכישה ממתינה לאישור. Shifty Pro ייפתח כשהיא תאושר."
-            case .userCancelled:
-                break
-            @unknown default:
-                break
-            }
-        } catch {
-            message = "הרכישה לא הושלמה: \(error.localizedDescription)"
+    /// How the App Store's purchase sheet ended (ProSheet): bought, or waiting for a parent's approval (Ask to
+    /// Buy).
+    func finish(_ result: Product.PurchaseResult) async {
+        switch result {
+        case .success(let verification):
+            await apply(verification)
+        case .pending:
+            message = "הרכישה ממתינה לאישור. Shifty Pro ייפתח כשהיא תאושר."
+        case .userCancelled:
+            break
+        @unknown default:
+            break
         }
     }
 
