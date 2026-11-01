@@ -42,7 +42,7 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   the shifts from the App Group: the shift's widget for the home screen and the lock screen, the Live
   Activity on the Lock Screen and in the Dynamic Island, and the shift's switch for the Control Center
   and the Action button.
-- `Shifty/Pro.swift`: Shifty Pro, the one in-app purchase (`com.perezari.shifty.pro`, a non-consumable
+- `Shifty/Pro.swift`: Shifty Pro, the one in-app purchase (`com.perezari.shifty.pro.lifetime`, a non-consumable
   paid once): StoreKit 2's transactions followed from launch, the purchase, and restoring it. It opens the
   net pay estimate, the vacation and sick days left, the Live Activity and the widgets, Siri and the
   Control Center, iCloud and the place's reminder; everything else is free. What it finds is kept in

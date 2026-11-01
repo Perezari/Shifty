@@ -28,7 +28,9 @@ Shifty - משמרות ושכר
 ## Pricing and availability
 
 Free, in Israel only: its holidays, overtime rules and tax estimate are Israel's. Shifty Pro is the
-in-app purchase `com.perezari.shifty.pro`, a non-consumable at ₪24.90.
+in-app purchase `com.perezari.shifty.pro.lifetime`, a non-consumable at ₪24.90. (The first,
+`com.perezari.shifty.pro`, was created as a consumable by mistake, and so was never kept as owned; App Store
+Connect can't change a product's type, nor give its ID again.)
 
 ## App privacy
 
@@ -114,5 +116,5 @@ purchase's review screenshot (the purchase's page, Review Information).
 
 6. Third-party material: none. This is not a regulated industry; the net pay is shown as an estimate.
 
-7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro), paid once. It opens the net pay estimate, the vacation and sick-day balances, the Live Activity and widgets, Siri and the Control Center, iCloud sync and the location reminder; everything else is free. To reach it: the Shifty Pro card at the top of Settings (הגדרות), any section there marked Pro, or the net pay line marked Pro on the Now tab. Its sheet shows what it opens, the price, the buy button and "שחזור רכישה" (Restore Purchase), which is also on the Settings card. Without it, the widgets show a lock and Siri answers that the action is in Shifty Pro.
+7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro.lifetime), paid once. It opens the net pay estimate, the vacation and sick-day balances, the Live Activity and widgets, Siri and the Control Center, iCloud sync and the location reminder; everything else is free. To reach it: the Shifty Pro card at the top of Settings (הגדרות), any section there marked Pro, or the net pay line marked Pro on the Now tab. Its sheet shows what it opens, the price, the buy button and "שחזור רכישה" (Restore Purchase), which is also on the Settings card. Without it, the widgets show a lock and Siri answers that the action is in Shifty Pro.
 ```

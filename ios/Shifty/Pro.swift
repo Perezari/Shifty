@@ -8,7 +8,9 @@ import WidgetKit
 @MainActor
 @Observable
 final class Pro {
-    static let productID = "com.perezari.shifty.pro"
+    /// A non-consumable. (The first, com.perezari.shifty.pro, was made a consumable in App Store Connect by mistake,
+    /// and so was never kept as owned; a product's type can't be changed there, nor its ID given again.)
+    static let productID = "com.perezari.shifty.pro.lifetime"
     static let shared = Pro()
 
     private(set) var unlocked: Bool
