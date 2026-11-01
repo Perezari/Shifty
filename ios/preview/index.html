@@ -295,6 +295,14 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .net-total span { font-size: 17px; font-weight: 600; }
 .net-total b { font: 700 30px/1 var(--font-round); color: var(--accent); }
 .sheet p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+/* (proposed) what the employer saves for the worker, under the net */
+.employer { display: flex; flex-direction: column; padding: 10px 14px; border-radius: 16px; background: var(--track); }
+.employer > div { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; color: var(--ink-2); }
+.employer > div:first-child { font-weight: 600; color: var(--ink); padding-bottom: 5px; }
+.employer > div > span:last-child { font-family: var(--font-round); font-variant-numeric: tabular-nums; }
+/* (proposed) the bonus accrued toward its payment */
+.accrued { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.accrued i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
 /* the vacation and sick days left */
 .leave { display: grid; grid-template-columns: 1fr 1fr; }
 .leave > div { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
@@ -588,14 +596,19 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- the net pay, as Net.swift gives it at 2026's rates: the period heading to ₪ 8,640, ₪ 8,200 of it pensionable ----
   const BRACKETS = [[7010, .10], [10060, .14], [19000, .20], [25100, .31], [46690, .35], [60130, .47], [Infinity, .50]];
-  function netPay(gross, pensionable, points = 2.25, pensionPct = 6) {
-    const pension = pensionable * pensionPct / 100;
+  /** (proposed) The study fund is saved from a wage up to ₪ 15,712 a month (2026's ceiling, free of tax). */
+  const STUDY_CEILING = 15712;
+  function netPay(gross, pensionable, points = 2.25, pensionPct = 6, studyPct = 2.5) {
+    const pension = pensionable * pensionPct / 100, studyFund = Math.min(pensionable, STUDY_CEILING) * studyPct / 100;
     let tax = 0, floor = 0;
     for (const [top, rate] of BRACKETS) { if (gross > floor) tax += (Math.min(gross, top) - floor) * rate; floor = top; }
     const credit = points * 242 + 0.35 * Math.min(pension, 0.07 * Math.min(pensionable, 9700));
     const insured = Math.min(gross, 51910), reduced = Math.min(insured, 7703), full = insured - reduced;
-    const p = { gross, incomeTax: Math.max(0, tax - credit), insurance: reduced * .0104 + full * .07, health: reduced * .0323 + full * .0517, pension };
-    p.net = gross - p.incomeTax - p.insurance - p.health - p.pension;
+    const p = { gross, incomeTax: Math.max(0, tax - credit), insurance: reduced * .0104 + full * .07, health: reduced * .0323 + full * .0517, pension,
+      studyFund };
+    p.net = gross - p.incomeTax - p.insurance - p.health - p.pension - p.studyFund;
+    // (proposed) what the employer saves besides: 6.5% for the pension, 8.33% for severance, 7.5% for the study fund
+    p.employer = { pension: pensionable * .065, severance: pensionable * .0833, studyFund: Math.min(pensionable, STUDY_CEILING) * .075 };
     return p;
   }
   const NET = netPay(8640, 8200);
@@ -830,7 +843,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     }
     return `<div class="now">${statusBar(s.now)}
       <div class="now-scroll scroll" data-scroll="now"><div class="stack">${top}${dial(s, center, plan)}<div class="facts glass">${facts}</div>
-        <div class="actions">${actions}</div>${weekCard(s)}${monthCard()}${holidayBanner()}${state.pro ? leaveCard() : ""}</div></div>
+        <div class="actions">${actions}</div>${weekCard(s)}${monthCard()}${holidayBanner()}${state.pro ? leaveCard() + (isGlobal() ? bonusCard() : "") : ""}</div></div>
       <div class="home-ind"></div>${state.sheet === "net" ? netSheet() : ""}</div>`;
   }
   const fact = (value, label, color) => `<div><b style="${color ? "color:" + color : ""}"><span class="ltr">${value}</span></b><span>${label}</span></div>`;
@@ -896,13 +909,15 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   /** The period's net pay line by line, on a sheet (NowView's NetSheet). */
   function netSheet() {
-    const row = (title, value) => `<div><span>${title}</span><span class="ltr">${moneyShort(value)}</span></div>`, n = netNow();
+    const row = (title, value) => `<div><span>${title}</span><span class="ltr">${moneyShort(value)}</span></div>`, n = netNow(), e = n.employer;
     return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
       <div class="sheet"><span class="grab"></span>
         <div class="sheet-head"><b>נטו משוער</b><span>אוקטובר 2026</span></div>
-        <div class="lines">${row("ברוטו צפוי", n.gross)}${row("מס הכנסה", n.incomeTax)}${row("ביטוח לאומי", n.insurance)}${row("מס בריאות", n.health)}${row("פנסיה", n.pension)}</div>
+        <div class="lines">${row("ברוטו צפוי", n.gross)}${row("מס הכנסה", n.incomeTax)}${row("ביטוח לאומי", n.insurance)}${row("מס בריאות", n.health)}${row("פנסיה", n.pension)}${row("קרן השתלמות", n.studyFund)}</div>
         <div class="net-total"><span>נטו</span><b class="ltr">${moneyShort(n.net)}</b></div>
-        <p>לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, 2.25 נקודות זיכוי ו־6% לפנסיה מהשכר בלי שעות נוספות ונסיעות. אפשר לשנות בהגדרות.</p>
+        <div class="employer"><div><span>המעביד מפריש בשבילך</span><span class="ltr">${moneyShort(e.pension + e.severance + e.studyFund)}</span></div>
+          ${row("פנסיה", e.pension)}${row("פיצויים", e.severance)}${row("קרן השתלמות", e.studyFund)}</div>
+        <p>לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026 ו־2.25 נקודות זיכוי. הפנסיה וקרן ההשתלמות מהשכר בלי שעות נוספות ונסיעות, כמו שנקבע בדף של כל מקום עבודה.</p>
       </div>`;
   }
 
@@ -912,6 +927,17 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div><b>${value}</b><span>${title}</span></div></div>`;
     return `<section class="card glass"><div class="card-head"><span class="title">חופשה ומחלה</span><span class="meta">מהתלוש של <span class="num">30/9</span></span></div>
       <div class="leave">${tile(icon.sun, "var(--amber)", "7.5", "ימי חופשה")}${tile(icon.cross, "#FF2D55", "18", "ימי מחלה")}</div></section>`;
+  }
+
+  /** (proposed) The yearly bonus accrued since it was last paid, toward its next payment with March's pay: a year's share of it. */
+  function bonusCard() {
+    const now = new Date();
+    let last = new Date(now.getFullYear(), 2, 1);
+    if (last > now) last = new Date(now.getFullYear() - 1, 2, 1);
+    const next = new Date(last.getFullYear() + 1, 2, 1), share = (now - last) / (next - last);
+    return `<section class="card glass"><div class="card-head"><span class="title">בונוס צבור</span><span class="meta">ישולם במרץ <span class="num">${next.getFullYear()}</span></span></div>
+      <div class="money-line"><b class="num"><span class="ltr">${moneyShort(BONUS * share)}</span></b><span>מתוך <b class="ltr num">${moneyShort(BONUS)}</b></span></div>
+      <div class="accrued"><i style="width:${(share * 100).toFixed(1)}%"></i></div></section>`;
   }
 
   /** A shortened day or a holiday coming, from the Hebrew calendar (Holidays.swift): its standard. */
@@ -1125,8 +1151,14 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         ${sec("חופשה ומחלה", row("שעות ליום חופש", `<span class="num">${second ? "5:30" : "8:36"}</span>`) + row("מחלה, יום 1", pct(0))
           + row("מחלה, יום 2 ו־3", pct(50)) + row("מחלה, מיום 4", pct(100)))}
         ${proSec("יתרת חופשה ומחלה", row("מעקב יתרות", "כבוי"))}
-        ${sec("פנסיה", row("הפרשה לפנסיה", pct(6)))}
-        ${sec("נסיעות", row("החזר נסיעות ליום", second ? "אין" : `<span class="ltr num">${CUR} 22.60</span>`))}
+        ${sec("פנסיה", row("הפרשת עובד", pct(6)) + row("הפרשת מעביד", pct(6.5)) + row("פיצויים", pct(second ? 6 : 8.33)),
+          "החלק שלך יורד מהנטו המשוער. החלק של המעביד מופיע בדף הנטו.")}
+        ${sec("קרן השתלמות", row("הפרשת עובד", pct(second ? 0 : 2.5)) + row("הפרשת מעביד", pct(second ? 0 : 7.5)),
+          "משכר של עד ₪15,712 בחודש, התקרה הפטורה ממס ב־2026. החלק שלך יורד מהנטו המשוער.")}
+        ${sec("נסיעות", `<div class="setrow"><div class="seg-in"><button type="button" class="${second ? "on" : ""}">לפי יום</button>
+          <button type="button" class="${second ? "" : "on"}">לחודש</button></div></div>`
+          + (second ? row("החזר נסיעות ליום", "אין") : row("סכום לחודש מלא", `<span class="ltr num">${CUR} 600</span>`)),
+          second ? "תקרה של 0 היא בלי תקרה." : "סכום קבוע בכל חודש. נכנס למס, לא לפנסיה.")}
         ${proSec("תזכורת לפי מיקום", row(`כשמגיעים ל${name} ויוצאים`, "כבוי"))}
         ${second ? sec("", `<button class="setrow red" type="button" data-del="1">מחיקת מקום העבודה</button>`) : ""}
       </div></div><div class="home-ind"></div></div>`;
@@ -1399,10 +1431,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
+    now: '<span class="tag">הצעה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
     shifts: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
     calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
-    settings: '<span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
+    settings: '<span class="tag">הצעה</span>בדף של מקום העבודה: הפרשות המעביד לפנסיה ולפיצויים, קרן השתלמות עד התקרה, ונסיעות כסכום לחודש מלא. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
