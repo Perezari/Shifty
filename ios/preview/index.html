@@ -468,6 +468,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .topline.pick { border: 0; color: inherit; font-family: inherit; cursor: pointer; }
 .topline.pick > svg { width: 12px; height: 12px; color: var(--ink-2); }
 .mini b small { font: 600 12px/1 var(--font-round); color: var(--ink-2); }
+.dial .to-bonus { font-size: 13.5px; font-weight: 500; color: var(--ink-2); margin-top: -4px; }
+.setrow.pick { width: 100%; border: 0; background: none; padding: 0; font: inherit; color: inherit; text-align: start; cursor: pointer; }
+.setrow + .setrow.pick { border-top: .5px solid var(--sep); }
+.setrow .tick { margin-inline-start: auto; display: flex; color: var(--accent); }
+.pay-sheet { top: 58px; overflow-y: auto; scrollbar-width: none; }
+.pay-sheet::-webkit-scrollbar { display: none; }
+.sheet .sec-title { padding: 0 16px; margin-bottom: -6px; }
 .smeta .wp-name { font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
@@ -537,7 +544,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   const TABS = ["now", "shifts", "calendar", "settings"];
   // pay: the main workplace's pay now, "hourly" or "global"; places: one workplace or two; next: where the next shift is;
   // page: a workplace's page open in Settings
-  const state = { screen: "now", state: "work", theme: null, tab: "now", pro: false, pay: "hourly", places: 1, next: 0, plan: null, sheet: null, page: null };
+  // cover: what a global pay does with overtime ("all", "upTo", "none", or "tiers": a bonus at each target)
+  const state = { screen: "now", state: "work", theme: null, tab: "now", pro: false, pay: "hourly", places: 1, next: 0, cover: "tiers",
+    plan: null, sheet: null, page: null };
   try { Object.assign(state, JSON.parse(localStorage.getItem("shifty-preview") || "{}")); } catch (e) {}
   state.plan = null;
   state.sheet = null;
@@ -582,6 +591,21 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   // ---- (proposed) workplaces, each with its pay from a date: the main one by the hour since January or, from the first of
   //      this month, global; a second one by the hour, on Fridays. Made up, as the rest ----
   const SALARY = 12000, OT_IN = 30, HOUR_VALUE = SALARY / 182, MONTH_OT = 6.5, MONTH_HOURS = 118.5, BONUS = 5000;
+  /** (proposed) A global pay's bonus at each target of overtime hours a month: each reached adds its amount, and hours short of
+   *  the first are not paid. */
+  const TIERS = [[20, 1500], [40, 1500]];
+  /** What a global pay does with overtime: the choices of its sheet, each with its line. */
+  const COVERS = [
+    ["all", "כלולות בשכר", "השכר מכסה את כל השעות הנוספות."],
+    ["upTo", "כלולות עד מספר שעות", "שעות מעבר לכך משולמות לפי ערך שעה."],
+    ["none", "משולמות כולן", "כל שעה נוספת משולמת לפי ערך שעה."],
+    ["tiers", "בונוס ביעד", "סכום קבוע כשמגיעים למספר שעות בחודש. שעות שלא הגיעו ליעד לא משולמות."],
+  ];
+  /** The next target not reached at `hours`, as [hours, amount]; null past the last. */
+  const nextTier = (hours) => TIERS.find(([h]) => hours < h) || null;
+  /** "בונוס ב־20 וב־40 שעות", "עד 30 שעות בחודש": what the pay does with overtime, in a row. */
+  const coverText = () => ({ all: "כלולות בשכר", upTo: `עד ${OT_IN} שעות בחודש`, none: "משולמות כולן",
+    tiers: `בונוס ב־${TIERS.map(([h]) => h).join(" וב־")} שעות` })[state.cover];
   const SECOND = { name: "קפה אגם", wage: 42 };
   const isGlobal = () => state.pay === "global";
   const NET_GLOBAL = netPay(SALARY, SALARY);
@@ -797,7 +821,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   }
   const fact = (value, label, color) => `<div><b style="${color ? "color:" + color : ""}"><span class="ltr">${value}</span></b><span>${label}</span></div>`;
   /** A global pay's line under the time, instead of the wage: the month's overtime, today's `more` with it. */
-  const monthOvertime = (more) => `<span class="earned num" style="color:var(--amber)"><span class="ltr">${hm(MONTH_OT + more)}</span> נוספות החודש</span>`;
+  const monthOvertime = (more) => {
+    const hours = MONTH_OT + more, next = state.cover === "tiers" ? nextTier(hours) : null;
+    // with a bonus at targets, the hours left to the next one
+    const to = state.cover !== "tiers" ? "" : next ? `<span class="to-bonus num">עוד <span class="ltr">${hm(next[0] - hours)}</span> לבונוס</span>`
+      : `<span class="to-bonus">הגעת לכל היעדים</span>`;
+    return `<span class="earned num" style="color:var(--amber)"><span class="ltr">${hm(hours)}</span> נוספות החודש</span>${to}`;
+  };
 
   // ---- ideas under the buttons, for the user to choose from ----
   /** The week, Sunday on the right: each day's hours against its standard, today's as it grows. */
@@ -825,7 +855,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const head = isGlobal()
       ? `<b class="num"><span class="ltr">${moneyShort(SALARY)}</span></b><span>שכר גלובלי · ערך שעה <b class="ltr num">${money(HOUR_VALUE)}</b></span>`
       : `<b class="num"><span class="ltr">${moneyShort(6075.4)}</span></b><span>צפי לסוף החודש <b class="ltr num">${moneyShort(8640)}</b></span>`;
-    const overtime = isGlobal() ? `${hm(MONTH_OT)}<small> מתוך ${OT_IN}</small>` : hm(MONTH_OT);
+    // a global pay's overtime against the hours it covers, or against the next bonus's target
+    const target = !isGlobal() ? null : state.cover === "upTo" ? OT_IN : state.cover === "tiers" ? (nextTier(MONTH_OT) || [null])[0] : null;
+    const overtime = target ? `${hm(MONTH_OT)}<small> מתוך ${target}</small>` : hm(MONTH_OT);
     return `<section class="card glass"><div class="card-head"><span class="title">אוקטובר</span><span class="meta">נסגר בעוד 2 ימים</span></div>
       <div class="money-line">${head}</div>
       <div class="mini"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num" style="color:var(--amber)">${overtime}</b><span>נוספות</span></div><div><b class="num" style="color:var(--red)">2:10</b><span>חוסר</span></div></div>
@@ -1026,25 +1058,33 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const places = place(0, PLACE, isGlobal() ? `${moneyShort(SALARY)} לחודש · גלובלי` : `${CUR} ${WAGE} לשעה`)
       + (state.places === 2 ? place(1, SECOND.name, `${CUR} ${SECOND.wage} לשעה`) : "")
       + `<button class="setrow add" type="button" ${state.pro ? 'data-places="2"' : 'data-sheet="pro"'}>${icon.plus}הוספת מקום עבודה${state.pro ? "" : '<span class="pro-badge">Pro</span>'}</button>`;
+    // (proposed) what each employer sets is on its workplace's page; here, what is the user's own
     return `<div class="app">${statusBar(s.now)}<div class="edge"></div>
       <div class="scroll" data-scroll="settings"><div class="scr"><h1 class="large">הגדרות</h1>
         ${pro}
         ${sec("מקומות עבודה", places)}
-        ${proSec("יתרת חופשה ומחלה", row("מעקב יתרות", "כבוי"))}
-        ${proSec("נטו משוער", row("נקודות זיכוי", `<span class="num">2.25</span>`) + row("הפרשה לפנסיה", `<span class="num">6%</span>`))}
+        <p class="sec-note" style="margin-top:-2px">השכר, השעות, השעות הנוספות, החופשה, הפנסיה והתזכורת של כל מעסיק נמצאים בדף שלו.</p>
+        ${sec("חגי ישראל", row("זיהוי חגים אוטומטי", "פועל"))}
+        ${sec("תקופת השכר", row("יום תחילת החודש", `<span class="num">1</span>`) + row("יעד הכנסה חודשי", "אין"))}
+        ${proSec("נטו משוער", row("נקודות זיכוי", `<span class="num">2.25</span>`))}
         ${sec("תצוגה", row("מראה", "כמו האייפון"))}
-        ${proSec("תזכורת לפי מיקום", row("כשמגיעים לעבודה ויוצאים ממנה", "כבוי"))}
+        ${sec("התראות", row("התראות על המשמרת", "פועל"))}
         ${proSec("iCloud", row("גיבוי ב-iCloud", "כבוי"))}
       </div></div><div class="home-ind"></div></div>`;
   }
 
-  /** (proposed) A workplace's page, pushed from Settings: its name, its pay from each date, newest first, a global pay's terms,
-   *  its standard hours and its travel; another workplace can be deleted. */
+  /** A workplace's page, pushed from Settings: its name, its pay from each date, newest first, a global pay's terms, its standard
+   *  hours, and (proposed) the rest of what its employer sets: overtime, breaks, Shabbat and night, a holiday's eve, vacation and
+   *  sick days and their balances, the pension, travel and its place's reminder; another workplace can be deleted. */
   function placePage(i) {
     const s = shift(), second = i === 1, global = isGlobal() && !second, name = second ? SECOND.name : PLACE;
     const row = (title, value) => `<div class="setrow"><span>${title}</span><span class="val">${value}</span></div>`;
     const sec = (title, rows, note) => `<section class="sec">${title ? `<div class="sec-title">${title}</div>` : ""}<div class="sec-card glass">${rows}</div>
       ${note ? `<p class="sec-note">${note}</p>` : ""}</section>`;
+    // Pro's: marked without it, a tap opening Shifty Pro
+    const proSec = (title, rows) => state.pro ? sec(title, rows)
+      : `<button class="locked" type="button" data-sheet="pro"><section class="sec"><div class="sec-title">${title}<span class="pro-badge">Pro</span></div><div class="sec-card glass">${rows}</div></section></button>`;
+    const pct = (v) => `<span class="num">${v}%</span>`;
     const term = (from, pay, now) => `<button class="setrow link" type="button" data-sheet="pay"><span class="when"><span>${pay}</span><small>מ־${from}</small></span>
       ${now ? '<span class="now-tag">עכשיו</span>' : ""}<span class="chev">${sized(icon.chevron, 14)}</span></button>`;
     const terms = second ? term("1 בספטמבר 2026", `${CUR} ${SECOND.wage} לשעה`, true)
@@ -1055,38 +1095,56 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div class="scroll" data-scroll="place${i}"><div class="scr"><h1 class="large">${name}</h1>
         ${sec("", row("שם", name))}
         ${sec("שכר", terms + add, "משמרות שלפני כל תאריך נשארות בשכר שהיה אז.")}
-        ${global ? sec("השכר עכשיו", row("שעות נוספות כלולות", `עד <span class="num">${OT_IN}</span> שעות בחודש`)
-          + row("ערך שעה", `<span class="ltr num">${money(HOUR_VALUE)}</span>`) + row("בונוס שנתי", `<span class="ltr num">${moneyShort(BONUS)}</span> במרץ`),
-          "ערך שעה הוא השכר החודשי חלקי 182. לפיו מחושבות שעות נוספות שמעבר לכלולות, ב־125% וב־150%.") : ""}
+        ${global ? sec("השכר עכשיו", row("שעות נוספות", coverText())
+          + (state.cover === "upTo" || state.cover === "none" ? row("ערך שעה", `<span class="ltr num">${money(HOUR_VALUE)}</span>`) : "")
+          + row("בונוס שנתי", `<span class="ltr num">${moneyShort(BONUS)}</span> במרץ`),
+          state.cover === "tiers" ? "כל יעד שמגיעים אליו בחודש מוסיף את הבונוס שלו." : "ערך שעה הוא השכר החודשי חלקי 182.") : ""}
         ${sec("שעות תקן ליום", second ? row("ו׳", `<span class="num">5:30</span>`) : row("א׳–ד׳", `<span class="num">9:06</span>`) + row("ה׳", `<span class="num">8:06</span>`))}
+        ${sec("שעות נוספות", row("שעתיים ראשונות", pct(125)) + row("מעבר לכך", pct(150)))}
+        ${sec("הפסקות, שבת ולילה", row("הפסקה אוטומטית", second ? "אין" : `<span class="num">30</span> דק׳`) + row("תוספת שבת וחג", pct(150))
+          + row("חישוב שעות לילה", "כבוי"))}
+        ${sec("ערב חג", row("שעות עבודה בערב חג", `<span class="num">4:06</span>`))}
+        ${sec("חופשה ומחלה", row("שעות ליום חופש", `<span class="num">${second ? "5:30" : "8:36"}</span>`) + row("מחלה, יום 1", pct(0))
+          + row("מחלה, יום 2 ו־3", pct(50)) + row("מחלה, מיום 4", pct(100)))}
+        ${proSec("יתרת חופשה ומחלה", row("מעקב יתרות", "כבוי"))}
+        ${sec("פנסיה", row("הפרשה לפנסיה", pct(6)))}
         ${sec("נסיעות", row("החזר נסיעות ליום", second ? "אין" : `<span class="ltr num">${CUR} 22.60</span>`))}
+        ${proSec("תזכורת לפי מיקום", row(`כשמגיעים ל${name} ויוצאים`, "כבוי"))}
         ${second ? sec("", `<button class="setrow red" type="button" data-del="1">מחיקת מקום העבודה</button>`) : ""}
       </div></div><div class="home-ind"></div></div>`;
   }
 
-  /** (proposed) A change of the pay from a date, on a sheet: by the hour or global; for a global pay, the month's and the
-   *  overtime it covers, all of it, some hours or none. */
+  /** (proposed) A change of the pay from a date, on a sheet: by the hour or global; for a global pay, the month's and what it
+   *  does with overtime: covers all of it, some hours, none, or (proposed) pays a bonus at each target of hours; and an
+   *  annual bonus. */
   function paySheet() {
     const global = isGlobal();
     const row = (title, value) => `<div class="setrow"><span>${title}</span>${value}</div>`;
     const chip = (value) => `<span class="vchip">${value}</span>`;
     const kind = `<div class="setrow"><div class="seg-in"><button type="button" class="${global ? "" : "on"}" data-pay="hourly">לפי שעה</button>
       <button type="button" class="${global ? "on" : ""}" data-pay="global">גלובלי</button></div></div>`;
-    const covered = `<div class="setrow col"><span>שעות נוספות כלולות בשכר</span><div class="seg-in"><button type="button">כולן</button>
-      <button type="button" class="on">עד מספר שעות</button><button type="button">אף אחת</button></div></div>`;
     const rows = row("מתאריך", chip(global ? firstOfMonth() : "1 בינואר 2026")) + kind
-      + (global ? row("שכר חודשי", chip(`<span class="ltr">${moneyShort(SALARY)}</span>`)) + covered + row("עד", chip(`${OT_IN} שעות בחודש`))
-        : row("שכר לשעה", chip(`<span class="ltr">${CUR} ${WAGE}</span>`)));
-    const note = global
-      ? "ההחתמה נשארת כמו שהיא: השעות, היעד והנוספות נספרים. השכר של התקופה הוא השכר החודשי, ונוספות שמעבר לכלולות מתווספות לפי ערך שעה, השכר חלקי 182."
+      + (global ? row("שכר חודשי", chip(`<span class="ltr">${moneyShort(SALARY)}</span>`)) : row("שכר לשעה", chip(`<span class="ltr">${CUR} ${WAGE}</span>`)));
+    // the overtime: one of four, each with its line; then its hours covered, or its targets
+    const covers = COVERS.map(([key, title, line]) => `<button class="setrow pick" type="button" data-cover="${key}">
+      <span class="when"><span>${title}</span><small>${line}</small></span>${state.cover === key ? `<span class="tick">${sized(icon.check, 18)}</span>` : ""}</button>`).join("");
+    const detail = state.cover === "upTo" ? row("עד", chip(`${OT_IN} שעות בחודש`))
+      : state.cover === "tiers" ? TIERS.map(([h, amount]) => row(`ביעד של <span class="num">${h}</span> שעות`, chip(`<span class="ltr">${moneyShort(amount)}</span>`))).join("")
+        + `<button class="setrow add" type="button">${icon.plus}הוספת יעד</button>` : "";
+    const detailNote = state.cover === "tiers" ? "כל יעד שמגיעים אליו בחודש מוסיף את הבונוס שלו להכנסה ולנטו. השעון מראה כמה נשאר ליעד הבא."
+      : state.cover === "all" ? "השעון ימשיך לספור את השעות הנוספות." : "ערך שעה הוא השכר החודשי חלקי 182, ב־125% וב־150%.";
+    const overtime = global ? `<div class="sec-title">שעות נוספות</div><div class="sec-card glass">${covers}</div>
+      ${detail ? `<div class="sec-card glass">${detail}</div>` : ""}<p>${detailNote}</p>` : "";
+    const note = global ? "ההחתמה נשארת כמו שהיא: השעות, היעד והנוספות נספרים, והשכר של התקופה הוא השכר החודשי."
       : "משמרות שלפני התאריך נשארות בשכר הקודם. השכר החדש חל מהיום הזה והלאה.";
     // an annual bonus, with the pay of its month: in that month's income and net
-    const bonus = row("בונוס שנתי", chip(`<span class="ltr">${moneyShort(global ? BONUS : 0)}</span>`)) + (global ? row("בחודש", chip("מרץ")) : "");
+    const bonus = row("סכום", chip(`<span class="ltr">${moneyShort(global ? BONUS : 0)}</span>`)) + (global ? row("בחודש", chip("מרץ")) : "");
     return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
-      <div class="sheet"><span class="grab"></span>
+      <div class="sheet pay-sheet"><span class="grab"></span>
         <div class="sheet-bar"><button class="circle glass" type="button" data-sheet="" aria-label="ביטול">${icon.close}</button><b>שינוי בשכר</b>
           <button class="circle prominent" type="button" data-sheet="" aria-label="שמירה">${icon.check}</button></div>
-        <div class="sec-card glass">${rows}</div><p>${note}</p><div class="sec-card glass">${bonus}</div>
+        <div class="sec-card glass">${rows}</div><p>${note}</p>${overtime}
+        <div class="sec-title">בונוס שנתי</div><div class="sec-card glass">${bonus}</div>
         <p>סכום קבוע שמגיע פעם בשנה, עם השכר של החודש שבחרת. הוא נכנס להכנסה ולנטו המשוער של אותו חודש.</p></div>`;
   }
 
@@ -1323,10 +1381,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה, ובכרטיס התקופה השכר החודשי, ערך השעה והנוספות מתוך הכלולות (בחודש של הבונוס: הבונוס). עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה.',
+    now: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. <span class="tag">הצעה</span>עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
     shifts: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
     calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
-    settings: '<span class="tag built">כמו שבבנייה</span>מקומות עבודה, כמה שרוצים, כל אחד בדף משלו: השכר מכל תאריך, לפי שעה או גלובלי, עם בונוס שנתי, שעות התקן והנסיעות. "שינוי בשכר מתאריך" שומר את המשמרות הישנות בשכר שהיה. מקום עבודה נוסף ב-Pro.',
+    settings: '<span class="tag">הצעה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, תקופת השכר, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
@@ -1504,7 +1562,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   function save() {
     try {
       localStorage.setItem("shifty-preview", JSON.stringify({ screen: state.screen, state: state.state, theme: state.theme, tab: state.tab, pro: state.pro,
-        pay: state.pay, places: state.places, next: state.next }));
+        pay: state.pay, places: state.places, next: state.next, cover: state.cover }));
     } catch (e) {}
   }
 
@@ -1524,6 +1582,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     if (b.dataset.reset) state.plan = null;
     // (proposed) the pay and the workplaces: the page's switches, a workplace's page, and deleting one
     else if (b.dataset.pay) state.pay = b.dataset.pay;
+    else if (b.dataset.cover) state.cover = b.dataset.cover;
     else if (b.dataset.places) { state.places = +b.dataset.places; if (state.places === 1) { state.next = 0; if (state.page === "1") state.page = null; } }
     else if (b.dataset.del) { state.places = 1; state.next = 0; state.page = null; }
     else if (b.dataset.page != null) { state.page = b.dataset.page || null; state.sheet = null; }
