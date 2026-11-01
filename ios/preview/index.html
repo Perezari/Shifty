@@ -35,6 +35,7 @@
   --menu: rgba(250, 250, 252, .82);
   --sep: rgba(60, 60, 67, .16);
   --cm-dim: rgba(0, 0, 0, .06);
+  --seg-on: #FFFFFF;
   --font-text: -apple-system, "SF Pro Text", system-ui, "Rubik", "Segoe UI", sans-serif;
   --font-round: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, "Rubik", sans-serif;
 }
@@ -47,7 +48,7 @@
     --orange: #FF9F0A; --red: #FF453A; --green: #30D158; --amber: #D8A64E;
     --track: rgba(255, 255, 255, .07); --knob: #F5F7F8; --glass: rgba(44, 48, 54, .55); --glass-edge: rgba(255, 255, 255, .14);
     --glass-shade: rgba(0, 0, 0, .35); --activity: rgba(28, 28, 30, .88); --notif: rgba(36, 36, 40, .78);
-    --menu: rgba(48, 48, 52, .8); --sep: rgba(235, 235, 245, .14); --cm-dim: rgba(0, 0, 0, .35);
+    --menu: rgba(48, 48, 52, .8); --sep: rgba(235, 235, 245, .14); --cm-dim: rgba(0, 0, 0, .35); --seg-on: #636366;
     color-scheme: dark;
   }
 }
@@ -59,7 +60,7 @@
   --orange: #FF9F0A; --red: #FF453A; --green: #30D158; --amber: #D8A64E;
   --track: rgba(255, 255, 255, .07); --knob: #F5F7F8; --glass: rgba(44, 48, 54, .55); --glass-edge: rgba(255, 255, 255, .14);
   --glass-shade: rgba(0, 0, 0, .35); --activity: rgba(28, 28, 30, .88); --notif: rgba(36, 36, 40, .78);
-  --menu: rgba(48, 48, 52, .8); --sep: rgba(235, 235, 245, .14); --cm-dim: rgba(0, 0, 0, .35);
+  --menu: rgba(48, 48, 52, .8); --sep: rgba(235, 235, 245, .14); --cm-dim: rgba(0, 0, 0, .35); --seg-on: #636366;
   color-scheme: dark;
 }
 
@@ -440,6 +441,35 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   font-size: 13px; font-weight: 600; }
 .w-lock svg { width: 26px; height: 26px; color: var(--accent); }
 
+/* ---- (proposed) workplaces, as many as wanted, each with its pay from a date: by the hour, or global ---- */
+.setrow.link, .setrow.add, .setrow.red { width: 100%; border: 0; background: none; padding: 0; font: inherit; color: inherit;
+  text-align: start; cursor: pointer; }
+.setrow + .setrow.link, .setrow + .setrow.add, .setrow + .setrow.red { border-top: .5px solid var(--sep); }
+.setrow .wp, .setrow .when { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; }
+.setrow .wp small, .setrow .when small { font-size: 13px; color: var(--ink-2); }
+.setrow .chev { display: flex; color: var(--ink-3); margin-inline-start: auto; }
+.setrow .now-tag { margin-inline-start: auto; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft);
+  padding: 2px 7px; border-radius: 999px; }
+.setrow .now-tag + .chev { margin-inline-start: 8px; }
+.setrow.add { justify-content: flex-start; gap: 8px; color: var(--accent); }
+.setrow.add svg { width: 18px; height: 18px; }
+.setrow.add .pro-badge { margin-inline-start: auto; }
+.setrow.red { justify-content: center; color: var(--red); }
+.setrow.col { flex-direction: column; align-items: stretch; justify-content: center; gap: 8px; padding: 10px 0; }
+.sec-note { margin: 0; padding: 0 16px; font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+.vchip { font: 500 16px/1 var(--font-text); font-variant-numeric: tabular-nums; padding: 7px 12px; border-radius: 999px; background: var(--track); }
+.seg-in { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border-radius: 10px; background: var(--track); }
+.setrow > .seg-in { flex: 1; }
+.seg-in button { border: 0; background: none; border-radius: 8px; padding: 8px 0; font: 500 14px/1 var(--font-text); color: var(--ink); cursor: pointer; }
+.seg-in button.on { background: var(--seg-on); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); font-weight: 600; }
+.sheet-bar { display: flex; align-items: center; justify-content: space-between; }
+.sheet-bar b { font-size: 17px; }
+.circle.prominent { background: var(--accent); color: #fff; }
+.topline.pick { border: 0; color: inherit; font-family: inherit; cursor: pointer; }
+.topline.pick > svg { width: 12px; height: 12px; color: var(--ink-2); }
+.mini b small { font: 600 12px/1 var(--font-round); color: var(--ink-2); }
+.smeta .wp-name { font-weight: 600; }
+
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 </style>
 
@@ -473,6 +503,16 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         <button type="button" id="pro-on" data-pro="1">Pro</button>
       </div>
     </div>
+    <div class="row">
+      <div class="seg" role="group" aria-label="שכר">
+        <button type="button" id="pay-hourly" data-pay="hourly">שכר לפי שעה</button>
+        <button type="button" id="pay-global" data-pay="global">שכר גלובלי</button>
+      </div>
+      <div class="seg" role="group" aria-label="מקומות עבודה">
+        <button type="button" id="places-1" data-places="1">מקום עבודה אחד</button>
+        <button type="button" id="places-2" data-places="2">שניים</button>
+      </div>
+    </div>
     <p class="note" id="note"></p>
   </div>
   <div class="stage" id="stage"><div class="device" id="device"><div id="view"></div><div class="chrome" id="chrome" hidden></div><div id="layer"></div></div></div>
@@ -495,10 +535,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     idle: { now: at(17, 5), today: [[at(7, 15), at(11, 0)], [at(11, 30), at(15, 15)]] },               // after a shift of 7:30
   };
   const TABS = ["now", "shifts", "calendar", "settings"];
-  const state = { screen: "now", state: "work", theme: null, tab: "now", pro: false, plan: null, sheet: null };
+  // pay: the main workplace's pay now, "hourly" or "global"; places: one workplace or two; next: where the next shift is;
+  // page: a workplace's page open in Settings
+  const state = { screen: "now", state: "work", theme: null, tab: "now", pro: false, pay: "hourly", places: 1, next: 0, plan: null, sheet: null, page: null };
   try { Object.assign(state, JSON.parse(localStorage.getItem("shifty-preview") || "{}")); } catch (e) {}
   state.plan = null;
   state.sheet = null;
+  state.page = null;
   if (!scenes[state.state]) state.state = "work";
   if (!TABS.includes(state.tab)) state.tab = "now";
 
@@ -535,6 +578,18 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     return p;
   }
   const NET = netPay(8640, 8200);
+
+  // ---- (proposed) workplaces, each with its pay from a date: the main one by the hour since January or, from the first of
+  //      this month, global; a second one by the hour, on Fridays. Made up, as the rest ----
+  const SALARY = 12000, OT_IN = 30, HOUR_VALUE = SALARY / 182, MONTH_OT = 6.5, MONTH_HOURS = 118.5;
+  const SECOND = { name: "קפה אגם", wage: 42 };
+  const isGlobal = () => state.pay === "global";
+  const NET_GLOBAL = netPay(SALARY, SALARY);
+  const netNow = () => isGlobal() ? NET_GLOBAL : NET;
+  /** "1 בנובמבר 2026": the first of this month, when the global pay begins. */
+  const firstOfMonth = () => { const d = new Date(); return "1 ב" + months[d.getMonth()] + " " + d.getFullYear(); };
+  /** The period's income: its shifts', and a global pay's month. */
+  const income = (t) => t.total + (isGlobal() ? SALARY : 0);
   /** "6 שעות ו־42 דקות", as Siri says it (Questions.swift). */
   const spoken = (hours) => {
     const t = Math.max(0, Math.round(hours * 60)), h = Math.floor(t / 60), m = t % 60;
@@ -604,7 +659,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   const PRO = [
     ["money", "נטו משוער", "כמה ייכנס לחשבון בסוף התקופה, אחרי מס, ביטוח לאומי ופנסיה."],
     ["sun", "יתרות חופשה ומחלה", "לפי התלוש האחרון, ומתעדכנות כל חודש."],
-    ["phone", "מסך הנעילה וווידג'טים", "המשמרת שרצה ב-Live Activity, ב-Dynamic Island ובמסך הבית."],
+    ["phone", "מסך הנעילה והווידג׳טים", "המשמרת שרצה ב-Live Activity, ב-Dynamic Island ובמסך הבית."],
     ["mic", "Siri ומרכז הבקרה", "להתחיל ולסיים משמרת, ולשאול כמה הרווחת, בלי לפתוח את Shifty."],
     ["cloud", "סנכרון ב-iCloud", "אותן משמרות והגדרות בכל מכשיר עם אותו Apple ID."],
     ["pin", "תזכורת לפי מיקום", "שאלה כשמגיעים לעבודה וכשיוצאים ממנה."],
@@ -694,33 +749,40 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const status = !s.running ? `<span class="dot" style="background:var(--ink-3)"></span>לא במשמרת`
       : onBreak ? `<span class="dot pulse" style="background:var(--orange)"></span><span style="color:var(--orange)">בהפסקה <span class="num ltr">${timer(s.now - s.open)}</span></span>`
       : `<span class="dot pulse" style="background:var(--green)"></span>במשמרת`;
-    const top = `<div class="topline glass">${status}<span class="place">· ${PLACE}</span></div>`;
+    // with two workplaces, the next shift's is chosen from the line on top, before it starts
+    const place = !s.running && state.places === 2 && state.next === 1 ? SECOND.name : PLACE;
+    const top = !s.running && state.places === 2
+      ? `<button class="topline glass pick" type="button" data-menu="place" data-tap-menu>${status}<span class="place">· ${place}</span>${icon.down}</button>`
+      : `<div class="topline glass">${status}<span class="place">· ${place}</span></div>`;
     const date = `<span class="date-in">${dayLine(new Date(s.now))}</span>`;
     let center, facts, actions;
     if (!s.running) {
       const today = 7.5;
-      center = `${date}<span class="time num"><span class="ltr">${hm(today)}</span></span>
-        <span class="earned num"><span class="ltr">${money(today * WAGE)}</span></span>`;
-      facts = fact("14", "משמרות החודש") + fact(moneyShort(6075.4), "הכנסה החודש") + fact(hm(GOAL_H), "יעד יומי");
+      center = `${date}<span class="time num"><span class="ltr">${hm(today)}</span></span>${isGlobal() ? monthOvertime(0)
+        : `<span class="earned num"><span class="ltr">${money(today * WAGE)}</span></span>`}`;
+      facts = fact("14", "משמרות החודש") + (isGlobal() ? fact(hm(MONTH_HOURS), "שעות החודש") : fact(moneyShort(6075.4), "הכנסה החודש"))
+        + fact(hm(GOAL_H), "יעד יומי");
       actions = `<button class="capsule prominent" type="button" data-menu="act:start">${icon.play}התחל משמרת</button>
         <button class="capsule glass square" type="button" data-menu="plus" aria-label="הוספה ידנית">${icon.plus}</button>`;
     } else {
       if (plan) {
         const delta = plan.extra >= 0.0001
-          ? `<span class="delta num" style="color:var(--amber)"><span class="ltr">+${hm(plan.extra)}</span> נוספות · <span class="ltr">+${money(plan.extraPay)}</span></span>`
+          ? `<span class="delta num" style="color:var(--amber)"><span class="ltr">+${hm(plan.extra)}</span> נוספות${isGlobal() ? ""
+            : ` · <span class="ltr">+${money(plan.extraPay)}</span>`}</span>`
           : plan.extra <= -0.0001 ? `<span class="delta num" style="color:var(--red)">חסרות <span class="ltr">${hm(-plan.extra)}</span> ליעד</span>`
           : `<span class="delta" style="color:var(--accent)">בדיוק ביעד</span>`;
         center = `<span class="date-in">אם תצא ב־<span class="num ltr">${clock(new Date(plan.end))}</span></span>
-          <span class="plan-pay num"><span class="ltr">${money(plan.pay)}</span></span>${delta}
+          <span class="plan-pay num"><span class="ltr">${isGlobal() ? hm(plan.net) : money(plan.pay)}</span></span>${delta}
           <button class="reset" type="button" data-reset="1">חזרה</button>`;
       } else {
-        center = `${date}<span class="time num"><span class="ltr">${timer(s.netMs)}</span></span>
-          <span class="earned num"><span class="ltr">${money(s.pay)}</span></span>`;
+        center = `${date}<span class="time num"><span class="ltr">${timer(s.netMs)}</span></span>${isGlobal() ? monthOvertime(s.overtime)
+          : `<span class="earned num"><span class="ltr">${money(s.pay)}</span></span>`}`;
       }
       const middle = plan ? fact(clock(new Date(plan.end)), "יציאה מתוכננת", plan.extra >= 0 ? "var(--amber)" : "var(--red)")
         : past ? fact("+" + hm(s.overtime), "שעות נוספות", "var(--amber)")
         : fact(clock(new Date(s.finish)), "יעד · עוד " + hm(s.remaining));
-      facts = fact(clock(new Date(s.start)), "התחלה") + middle + fact(moneyShort(s.projected), "צפי ביעד");
+      facts = fact(clock(new Date(s.start)), "התחלה") + middle
+        + (isGlobal() ? fact(hm(MONTH_HOURS + s.net), "שעות החודש") : fact(moneyShort(s.projected), "צפי ביעד"));
       // as on the iPhone now (a39a6cd): the icon and the word in the button's color, on glass
       actions = onBreak
         ? `<button class="capsule prominent" type="button" data-menu="act:back">${icon.play}חזרה לעבודה</button>
@@ -734,6 +796,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div class="home-ind"></div>${state.sheet === "net" ? netSheet() : ""}</div>`;
   }
   const fact = (value, label, color) => `<div><b style="${color ? "color:" + color : ""}"><span class="ltr">${value}</span></b><span>${label}</span></div>`;
+  /** A global pay's line under the time, instead of the wage: the month's overtime, today's `more` with it. */
+  const monthOvertime = (more) => `<span class="earned num" style="color:var(--amber)"><span class="ltr">${hm(MONTH_OT + more)}</span> נוספות החודש</span>`;
 
   // ---- ideas under the buttons, for the user to choose from ----
   /** The week, Sunday on the right: each day's hours against its standard, today's as it grows. */
@@ -755,12 +819,17 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div class="week">${cols}</div></section>`;
   }
 
-  /** The pay period: the income so far, where it is heading, and its overtime and hours missing. */
+  /** The pay period: the income so far, where it is heading, and its overtime and hours missing. A global pay's: the month's
+   *  pay and its hour's value, and the overtime against the hours it covers. */
   function monthCard() {
+    const head = isGlobal()
+      ? `<b class="num"><span class="ltr">${moneyShort(SALARY)}</span></b><span>שכר גלובלי · ערך שעה <b class="ltr num">${money(HOUR_VALUE)}</b></span>`
+      : `<b class="num"><span class="ltr">${moneyShort(6075.4)}</span></b><span>צפי לסוף החודש <b class="ltr num">${moneyShort(8640)}</b></span>`;
+    const overtime = isGlobal() ? `${hm(MONTH_OT)}<small> מתוך ${OT_IN}</small>` : hm(MONTH_OT);
     return `<section class="card glass"><div class="card-head"><span class="title">אוקטובר</span><span class="meta">נסגר בעוד 2 ימים</span></div>
-      <div class="money-line"><b class="num"><span class="ltr">${moneyShort(6075.4)}</span></b><span>צפי לסוף החודש <b class="ltr num">${moneyShort(8640)}</b></span></div>
-      <div class="mini"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num" style="color:var(--amber)">6:30</b><span>נוספות</span></div><div><b class="num" style="color:var(--red)">2:10</b><span>חוסר</span></div></div>
-      ${state.pro ? `<button class="net-row" type="button" data-sheet="net">נטו משוער לסוף התקופה<b class="ltr">${moneyShort(NET.net)}</b><span class="chev">${sized(icon.chevron, 14)}</span></button>`
+      <div class="money-line">${head}</div>
+      <div class="mini"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num" style="color:var(--amber)">${overtime}</b><span>נוספות</span></div><div><b class="num" style="color:var(--red)">2:10</b><span>חוסר</span></div></div>
+      ${state.pro ? `<button class="net-row" type="button" data-sheet="net">נטו משוער לסוף התקופה<b class="ltr">${moneyShort(netNow().net)}</b><span class="chev">${sized(icon.chevron, 14)}</span></button>`
         : `<button class="net-row" type="button" data-sheet="pro">נטו משוער לסוף התקופה<span class="pro-badge">Pro</span><span class="chev">${sized(icon.chevron, 14)}</span></button>`}
       </section>`;
   }
@@ -781,12 +850,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   /** The period's net pay line by line, on a sheet (NowView's NetSheet). */
   function netSheet() {
-    const row = (title, value) => `<div><span>${title}</span><span class="ltr">${moneyShort(value)}</span></div>`;
+    const row = (title, value) => `<div><span>${title}</span><span class="ltr">${moneyShort(value)}</span></div>`, n = netNow();
     return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
       <div class="sheet"><span class="grab"></span>
         <div class="sheet-head"><b>נטו משוער</b><span>אוקטובר 2026</span></div>
-        <div class="lines">${row("ברוטו צפוי", NET.gross)}${row("מס הכנסה", NET.incomeTax)}${row("ביטוח לאומי", NET.insurance)}${row("מס בריאות", NET.health)}${row("פנסיה", NET.pension)}</div>
-        <div class="net-total"><span>נטו</span><b class="ltr">${moneyShort(NET.net)}</b></div>
+        <div class="lines">${row("ברוטו צפוי", n.gross)}${row("מס הכנסה", n.incomeTax)}${row("ביטוח לאומי", n.insurance)}${row("מס בריאות", n.health)}${row("פנסיה", n.pension)}</div>
+        <div class="net-total"><span>נטו</span><b class="ltr">${moneyShort(n.net)}</b></div>
         <p>לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, 2.25 נקודות זיכוי ו־6% לפנסיה מהשכר בלי שעות נוספות ונסיעות. אפשר לשנות בהגדרות.</p>
       </div>`;
   }
@@ -810,34 +879,47 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   /** The wage of `net` hours on a day of `std`: 125% for two hours past it, 150% after. */
   const dayPay = (net, std) => (Math.min(net, std) + Math.min(Math.max(0, net - std), 2) * 1.25 + Math.max(0, net - std - 2) * 1.5) * WAGE;
   const midnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+  /** The month the Shifts and Calendar tabs show: this one, or in its first week the one before, which has days to show. */
+  const periodStart = () => { const t = midnight(); return new Date(t.getFullYear(), t.getMonth() - (t.getDate() < 8 ? 1 : 0), 1); };
   /** The period's shifts and days off, the newest first: back from yesterday, thirteen shifts with a sick day and three days of
-   *  vacation among them (with today's, the Now screen's fourteen), and none on the days before. */
+   *  vacation among them (with today's, the Now screen's fourteen), and none on the days before. With two workplaces, the
+   *  second's Fridays too. A global pay's shifts earn nothing each (`hourly` false): the month's pay is the period's. */
   function periodShifts(s) {
-    const today = midnight(), first = new Date(today.getFullYear(), today.getMonth(), 1), list = [];
+    const today = midnight(), first = periodStart(), list = [];
+    const hourly = !isGlobal(), place = state.places === 2 ? PLACE : "";
     for (let d = new Date(today), n = 0, worked = 0; worked < 13;) {
       d.setDate(d.getDate() - 1);
       if (d < first) break;
+      if (d.getDay() === 5 && state.places === 2) {
+        const start = new Date(d);
+        start.setHours(8, 0, 0, 0);
+        list.push({ day: new Date(d), type: "work", start: +start, end: +start + 5.5 * 3600000, breakMin: 0, net: 5.5, pay: 5.5 * SECOND.wage,
+          std: 5.5, wage: SECOND.wage, overtime: 0, hourly: true, place: SECOND.name });
+        continue;
+      }
       if (d.getDay() > 4) continue;
       n++;
       const day = new Date(d), std = day.getDay() === 4 ? 8.1 : 9.1;
       const r = (k) => { const x = Math.sin(day.getDate() * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
-      if (n === 4) { list.push({ day, type: "sick", start: +day, net: std, pay: 0, std }); continue; }
-      if (n >= 9 && n <= 11) { list.push({ day, type: "vacation", start: +day, net: std, pay: std * WAGE, std }); continue; }
+      if (n === 4) { list.push({ day, type: "sick", start: +day, net: std, pay: 0, std, hourly, place }); continue; }
+      if (n >= 9 && n <= 11) { list.push({ day, type: "vacation", start: +day, net: std, pay: hourly ? std * WAGE : 0, std, hourly, place }); continue; }
       worked++;
       const start = new Date(day);
       start.setHours(7, Math.floor(r(1) * 9) * 5, 0, 0);
       const gross = Math.round((std + 0.5 + (r(2) - 0.2) * 1.4) * 12) / 12;
       const net = gross - 0.5;
-      list.push({ day, type: "work", start: +start, end: +start + gross * 3600000, breakMin: 30, net, pay: dayPay(net, std), std,
-        overtime: Math.max(0, net - std), short: net < std - 0.01, note: n === 6 ? "ישיבת צוות" : n === 14 ? "ספירת מלאי" : "" });
+      list.push({ day, type: "work", start: +start, end: +start + gross * 3600000, breakMin: 30, net, pay: hourly ? dayPay(net, std) : 0, std,
+        overtime: Math.max(0, net - std), short: net < std - 0.01, note: n === 6 ? "ישיבת צוות" : n === 14 ? "ספירת מלאי" : "", hourly, place });
     }
-    if (s.running) {
-      list.push({ day: today, type: "work", start: s.start, end: null, breakMin: Math.round(s.breakMs / 60000), net: s.net, pay: s.pay, std: GOAL_H,
-        overtime: s.overtime, running: true, onBreak: s.open != null });
+    if (first.getMonth() !== today.getMonth()) {
+      // the month before: today is not in it
+    } else if (s.running) {
+      list.push({ day: today, type: "work", start: s.start, end: null, breakMin: Math.round(s.breakMs / 60000), net: s.net, pay: hourly ? s.pay : 0,
+        std: GOAL_H, overtime: s.overtime, running: true, onBreak: s.open != null, hourly, place });
     } else {
       for (const [a, b] of s.today) {
         const net = (b - a) / 3600000;
-        list.push({ day: today, type: "work", start: a, end: b, breakMin: 0, net, pay: net * WAGE, std: GOAL_H, overtime: 0 });
+        list.push({ day: today, type: "work", start: a, end: b, breakMin: 0, net, pay: hourly ? net * WAGE : 0, std: GOAL_H, overtime: 0, hourly, place });
       }
     }
     return list.sort((a, b) => b.start - a.start);
@@ -870,21 +952,24 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   const summary = (cells) => `<div class="sum">${cells.map(([t, v]) => `<div><span>${t}</span><b><span class="ltr">${v}</span></b></div>`).join("")}</div>`;
   /** The period between the earlier one, on the right, and the later. */
-  const periodBar = () => { const d = new Date();
+  const periodBar = () => { const d = periodStart();
     return `<div class="pbar"><span class="pb">${icon.back}</span><span class="pt">${months[d.getMonth()]} ${d.getFullYear()}${icon.down}</span><span class="pb">${icon.chevron}</span></div>`; };
   const range = (e) => `${clock(new Date(e.start))} – ${clock(new Date(e.end))}`;
 
-  /** A shift's row (Components.swift ShiftRow): its day, its hours or the kind of day off, its pay, and how its hours add up. */
+  /** A shift's row (Components.swift ShiftRow): its day, its hours or the kind of day off, its pay, and how its hours add up. A
+   *  global pay's shift has its hours where the pay was; with two workplaces, each row names its own. */
   function shiftRow(e, i) {
-    const off = e.type !== "work";
+    const off = e.type !== "work", byHours = e.hourly === false;
     const time = e.type === "vacation" ? "חופשה בתשלום" : e.type === "sick" ? "יום מחלה"
       : e.end == null ? `התחלה <span class="num">${clock(new Date(e.start))}</span>` : `<span class="num">${range(e)}</span>`;
     const tag = e.running ? `<span class="rtag${e.onBreak ? " brk" : ""}">${e.onBreak ? "בהפסקה" : "פעילה"}</span>` : "";
-    const meta = e.type === "vacation" ? `${hm(e.net)} שע׳ בתשלום` : e.type === "sick" ? "יום 1 · 0% מהתקן"
-      : [hm(e.net) + " שע׳", e.breakMin ? `הפסקה ${e.breakMin}׳` : "", e.overtime > 0.01 ? "נ.ש " + hm(e.overtime) : ""].filter(Boolean).join(" · ");
+    const where = e.place ? `<span class="wp-name">${e.place}</span>` : "";
+    const meta = e.type === "vacation" ? [where, `${hm(e.net)} שע׳ בתשלום`].filter(Boolean).join(" · ") : e.type === "sick" ? "יום 1 · 0% מהתקן"
+      : [where, byHours ? "" : hm(e.net) + " שע׳", e.breakMin ? `הפסקה ${e.breakMin}׳` : "", e.overtime > 0.01 ? "נ.ש " + hm(e.overtime) : ""]
+        .filter(Boolean).join(" · ");
     return `<div class="srow glass" data-menu="shift:${i}">
       <span class="badge${e.short ? " short" : ""}${off ? " off" : ""}"><b>${e.day.getDate()}</b><small>${days[e.day.getDay()].replace("׳", "")}</small></span>
-      <div class="sbody"><div class="sline"><b>${time}</b>${tag}<span class="spay num"><span class="ltr">${money(e.pay)}</span></span></div>
+      <div class="sbody"><div class="sline"><b>${time}</b>${tag}<span class="spay num"><span class="ltr">${byHours ? hm(e.net) : money(e.pay)}</span></span></div>
         <div class="smeta num">${meta}</div>${e.note ? `<div class="snote">${e.note}</div>` : ""}</div></div>`;
   }
 
@@ -894,14 +979,14 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     return `<div class="app">${statusBar(s.now)}<div class="edge"></div>
       <div class="navbar"><button class="circle glass" type="button" data-menu="plus" aria-label="הוספת משמרת">${icon.plus}</button></div>
       <div class="scroll" data-scroll="shifts"><div class="scr"><h1 class="large">משמרות</h1>${periodBar()}
-        ${summary([["שעות", hm(t.hours)], ["שעות חוסר", hm(t.missing)], ["משמרות", String(t.count)], ["סה״כ", moneyShort(t.total)]])}
+        ${summary([["שעות", hm(t.hours)], ["שעות חוסר", hm(t.missing)], ["משמרות", String(t.count)], ["סה״כ", moneyShort(income(t))]])}
         ${list.map(shiftRow).join("")}</div></div><div class="home-ind"></div></div>`;
   }
 
   // ---- the Calendar tab (CalendarView.swift): each day worked filled by its hours against its standard, red when short ----
   function calendarScreen() {
     const s = shift(), list = periodShifts(s), sums = byDay(list), t = totals(list), today = midnight();
-    const first = new Date(today.getFullYear(), today.getMonth(), 1), last = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const first = periodStart(), last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
     let cells = days.map((d) => `<span class="wd">${d.replace("׳", "")}</span>`).join("");
     for (let d = new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay()); d <= last || d.getDay() !== 0; d.setDate(d.getDate() + 1)) {
       const inside = d >= first && d <= last, sum = inside ? sums.get(d.getDate()) : null, isToday = +d === +today;
@@ -917,7 +1002,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     }
     return `<div class="app">${statusBar(s.now)}<div class="edge"></div>
       <div class="scroll" data-scroll="calendar"><div class="scr"><h1 class="large">לוח</h1>${periodBar()}<div class="cal glass">${cells}</div>
-        ${summary([["ימי עבודה", String(t.days.size)], ["שעות", hm(t.hours)], ["שעות חוסר", hm(t.missing)], ["סה״כ", moneyShort(t.total)]])}
+        ${summary([["ימי עבודה", String(t.days.size)], ["שעות", hm(t.hours)], ["שעות חוסר", hm(t.missing)], ["סה״כ", moneyShort(income(t))]])}
       </div></div><div class="home-ind"></div></div>`;
   }
 
@@ -932,14 +1017,19 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const icon46 = appIcon[dark() ? "dark" : "light"];
     const pro = state.pro
       ? `<div class="pro-on glass"><span class="mini-icon">${icon46}</span><div><b>Shifty Pro</b><br><span>פעיל. תודה!</span></div><span class="ok">${sized(icon.check, 20)}</span></div>`
-      : `<div class="pro-card glass"><div class="top"><span class="mini-icon">${icon46}</span><div><b>Shifty Pro</b><span>נטו משוער, יתרות, מסך הנעילה וווידג'טים, Siri וסנכרון. בתשלום אחד.</span></div></div>
+      : `<div class="pro-card glass"><div class="top"><span class="mini-icon">${icon46}</span><div><b>Shifty Pro</b><span>נטו משוער, יתרות, מסך הנעילה והווידג׳טים, Siri וסנכרון. בתשלום אחד.</span></div></div>
           <button class="capsule prominent" type="button" data-sheet="pro"><span>שדרוג ב־<span class="ltr">${PRO_PRICE}</span></span></button>
           <button class="pro-link" type="button" data-buy="1">שחזור רכישה</button></div>`;
+    // (proposed) the workplaces, each opening its page; another one with Shifty Pro
+    const place = (i, name, pay) => `<button class="setrow link" type="button" data-page="${i}"><span class="wp"><span>${name}</span><small>${pay}</small></span>
+      <span class="chev">${sized(icon.chevron, 14)}</span></button>`;
+    const places = place(0, PLACE, isGlobal() ? `${moneyShort(SALARY)} לחודש · גלובלי` : `${CUR} ${WAGE} לשעה`)
+      + (state.places === 2 ? place(1, SECOND.name, `${CUR} ${SECOND.wage} לשעה`) : "")
+      + `<button class="setrow add" type="button" ${state.pro ? 'data-places="2"' : 'data-sheet="pro"'}>${icon.plus}הוספת מקום עבודה${state.pro ? "" : '<span class="pro-badge">Pro</span>'}</button>`;
     return `<div class="app">${statusBar(s.now)}<div class="edge"></div>
       <div class="scroll" data-scroll="settings"><div class="scr"><h1 class="large">הגדרות</h1>
         ${pro}
-        ${sec("שכר ומקום עבודה", row("מקום עבודה", PLACE) + row("שכר לשעה", `<span class="ltr num">${CUR} ${WAGE}</span>`))}
-        ${sec("שעות תקן ליום", row("א׳–ד׳", `<span class="num">9:06</span>`) + row("ה׳", `<span class="num">8:06</span>`))}
+        ${sec("מקומות עבודה", places)}
         ${proSec("יתרת חופשה ומחלה", row("מעקב יתרות", "כבוי"))}
         ${proSec("נטו משוער", row("נקודות זיכוי", `<span class="num">2.25</span>`) + row("הפרשה לפנסיה", `<span class="num">6%</span>`))}
         ${sec("תצוגה", row("מראה", "כמו האייפון"))}
@@ -948,30 +1038,81 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       </div></div><div class="home-ind"></div></div>`;
   }
 
+  /** (proposed) A workplace's page, pushed from Settings: its name, its pay from each date, newest first, a global pay's terms,
+   *  its standard hours and its travel; another workplace can be deleted. */
+  function placePage(i) {
+    const s = shift(), second = i === 1, global = isGlobal() && !second, name = second ? SECOND.name : PLACE;
+    const row = (title, value) => `<div class="setrow"><span>${title}</span><span class="val">${value}</span></div>`;
+    const sec = (title, rows, note) => `<section class="sec">${title ? `<div class="sec-title">${title}</div>` : ""}<div class="sec-card glass">${rows}</div>
+      ${note ? `<p class="sec-note">${note}</p>` : ""}</section>`;
+    const term = (from, pay, now) => `<button class="setrow link" type="button" data-sheet="pay"><span class="when"><span>${pay}</span><small>מ־${from}</small></span>
+      ${now ? '<span class="now-tag">עכשיו</span>' : ""}<span class="chev">${sized(icon.chevron, 14)}</span></button>`;
+    const terms = second ? term("1 בספטמבר 2026", `${CUR} ${SECOND.wage} לשעה`, true)
+      : (isGlobal() ? term(firstOfMonth(), `${moneyShort(SALARY)} לחודש · גלובלי`, true) : "") + term("1 בינואר 2026", `${CUR} ${WAGE} לשעה`, !isGlobal());
+    const add = `<button class="setrow add" type="button" data-sheet="pay">${icon.plus}שינוי בשכר מתאריך</button>`;
+    return `<div class="app">${statusBar(s.now)}<div class="edge"></div>
+      <div class="navbar" style="justify-content:flex-start"><button class="circle glass" type="button" data-page="" aria-label="הגדרות">${icon.back}</button></div>
+      <div class="scroll" data-scroll="place${i}"><div class="scr"><h1 class="large">${name}</h1>
+        ${sec("", row("שם", name))}
+        ${sec("שכר", terms + add, "משמרות שלפני כל תאריך נשארות בשכר שהיה אז.")}
+        ${global ? sec("שכר גלובלי", row("שעות נוספות כלולות", `עד <span class="num">${OT_IN}</span> בחודש`)
+          + row("ערך שעה", `<span class="ltr num">${money(HOUR_VALUE)}</span>`),
+          "ערך שעה הוא השכר החודשי חלקי 182. לפיו מחושבות שעות נוספות שמעבר לכלולות, ב־125% וב־150%.") : ""}
+        ${sec("שעות תקן ליום", second ? row("ו׳", `<span class="num">5:30</span>`) : row("א׳–ד׳", `<span class="num">9:06</span>`) + row("ה׳", `<span class="num">8:06</span>`))}
+        ${sec("נסיעות", row("החזר נסיעות ליום", second ? "אין" : `<span class="ltr num">${CUR} 22.60</span>`))}
+        ${second ? sec("", `<button class="setrow red" type="button" data-del="1">מחיקת מקום העבודה</button>`) : ""}
+      </div></div><div class="home-ind"></div></div>`;
+  }
+
+  /** (proposed) A change of the pay from a date, on a sheet: by the hour or global; for a global pay, the month's and the
+   *  overtime it covers, all of it, some hours or none. */
+  function paySheet() {
+    const global = isGlobal();
+    const row = (title, value) => `<div class="setrow"><span>${title}</span>${value}</div>`;
+    const chip = (value) => `<span class="vchip">${value}</span>`;
+    const kind = `<div class="setrow"><div class="seg-in"><button type="button" class="${global ? "" : "on"}" data-pay="hourly">לפי שעה</button>
+      <button type="button" class="${global ? "on" : ""}" data-pay="global">גלובלי</button></div></div>`;
+    const covered = `<div class="setrow col"><span>שעות נוספות כלולות בשכר</span><div class="seg-in"><button type="button">כולן</button>
+      <button type="button" class="on">עד מספר שעות</button><button type="button">אף אחת</button></div></div>`;
+    const rows = row("מתאריך", chip(global ? firstOfMonth() : "1 בינואר 2026")) + kind
+      + (global ? row("שכר חודשי", chip(`<span class="ltr">${moneyShort(SALARY)}</span>`)) + covered + row("עד", chip(`${OT_IN} שעות בחודש`))
+        : row("שכר לשעה", chip(`<span class="ltr">${CUR} ${WAGE}</span>`)));
+    const note = global
+      ? "ההחתמה נשארת כמו שהיא: השעות, היעד והנוספות נספרים. השכר של התקופה הוא השכר החודשי, ונוספות שמעבר לכלולות מתווספות לפי ערך שעה, השכר חלקי 182."
+      : "משמרות שלפני התאריך נשארות בשכר הקודם. השכר החדש חל מהיום הזה והלאה.";
+    return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
+      <div class="sheet"><span class="grab"></span>
+        <div class="sheet-bar"><button class="circle glass" type="button" data-sheet="" aria-label="ביטול">${icon.close}</button><b>שינוי בשכר</b>
+          <button class="circle prominent" type="button" data-sheet="" aria-label="שמירה">${icon.check}</button></div>
+        <div class="sec-card glass">${rows}</div><p>${note}</p></div>`;
+  }
+
   // ---- the menus of a long press: what was pressed lifted, with what can be done to it ----
   const line = (a, b, c) => `<div><span>${a}</span><span class="num">${b}</span><span class="num"><span class="ltr">${c}</span></span></div>`;
-  /** A shift lifted: its day and hours, its pay by rate, its break and its note. */
+  /** A shift lifted: its day and hours, its pay by rate, its break and its note; a global pay's, its hours alone. */
   function shiftPreview(e) {
     let lines;
+    const wage = e.wage || WAGE, byHours = e.hourly === false, pay = (v) => byHours ? "" : money(v);
     if (e.type === "work") {
       const regular = Math.min(e.net, e.std), extra = Math.max(0, e.net - e.std), a = Math.min(extra, 2), b = Math.max(0, extra - 2);
-      lines = line("שעות רגילות", hm(regular), money(regular * WAGE))
-        + (a > 0.01 ? line("נוספות 125%", hm(a), money(a * WAGE * 1.25)) : "") + (b > 0.01 ? line("נוספות 150%", hm(b), money(b * WAGE * 1.5)) : "")
+      lines = line("שעות רגילות", hm(regular), pay(regular * wage))
+        + (a > 0.01 ? line("נוספות 125%", hm(a), pay(a * wage * 1.25)) : "") + (b > 0.01 ? line("נוספות 150%", hm(b), pay(b * wage * 1.5)) : "")
         + (e.breakMin ? line("הפסקה", hm(e.breakMin / 60), "") : "");
     } else {
-      lines = e.type === "vacation" ? line("חופשה בתשלום", hm(e.net), money(e.pay)) : line("יום מחלה 1", "0%", money(0));
+      lines = e.type === "vacation" ? line("חופשה בתשלום", hm(e.net), pay(e.pay)) : line("יום מחלה 1", "0%", pay(0));
     }
     const when = e.type !== "work" ? "" : e.end == null ? `מ־${clock(new Date(e.start))}` : range(e);
     return `<div class="pv"><div class="pv-head"><b>${dayLine(e.day)}</b><span class="num">${when}</span></div><div class="pv-lines">${lines}</div>
-      ${e.note ? `<div class="pv-note">${e.note}</div>` : ""}<div class="pv-total"><span>${e.running ? "עד עכשיו" : "סה״כ"}</span><b class="num"><span class="ltr">${money(e.pay)}</span></b></div></div>`;
+      ${e.note ? `<div class="pv-note">${e.note}</div>` : ""}<div class="pv-total"><span>${e.running ? "עד עכשיו" : "סה״כ"}</span><b class="num"><span class="ltr">${byHours ? hm(e.net) : money(e.pay)}</span></b></div></div>`;
   }
   /** A day lifted: its shifts or its day off, or that it has none. */
   function dayPreview(date, entries) {
     const worked = entries.filter((e) => e.type === "work"), hours = worked.reduce((a, e) => a + e.net, 0);
-    const lines = entries.map((e) => e.type !== "work" ? line(e.type === "vacation" ? "חופשה בתשלום" : "יום מחלה", "", money(e.pay))
-      : line(e.end == null ? `מ־${clock(new Date(e.start))}` : `<span class="num">${range(e)}</span>`, hm(e.net), money(e.pay))).join("");
+    const pay = (e) => e.hourly === false ? "" : money(e.pay), byHours = entries.length > 0 && entries.every((e) => e.hourly === false);
+    const lines = entries.map((e) => e.type !== "work" ? line(e.type === "vacation" ? "חופשה בתשלום" : "יום מחלה", "", pay(e))
+      : line(e.end == null ? `מ־${clock(new Date(e.start))}` : `<span class="num">${range(e)}</span>`, hm(e.net), pay(e))).join("");
     return `<div class="pv"><div class="pv-head"><b>${dayLine(date)}</b><span class="num">${worked.length ? hm(hours) + " שע׳" : ""}</span></div>
-      ${entries.length ? `<div class="pv-lines">${lines}</div><div class="pv-total"><span>סה״כ</span><b class="num"><span class="ltr">${money(entries.reduce((a, e) => a + e.pay, 0))}</span></b></div>`
+      ${entries.length ? `<div class="pv-lines">${lines}</div><div class="pv-total"><span>סה״כ</span><b class="num"><span class="ltr">${byHours ? hm(hours) : money(entries.reduce((a, e) => a + e.pay, 0))}</span></b></div>`
         : `<div class="pv-empty">אין משמרת ביום זה</div>`}</div>`;
   }
   /** What a long press on `key` opens: a preview (or the thing itself, lifted) and the menu's sections. */
@@ -987,7 +1128,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       return { preview: shiftPreview(e), sections };
     }
     if (kind === "day") {
-      const today = midnight(), date = new Date(today.getFullYear(), today.getMonth(), +arg), sum = byDay(periodShifts(s)).get(+arg);
+      const today = midnight(), month = periodStart(), date = new Date(month.getFullYear(), month.getMonth(), +arg), sum = byDay(periodShifts(s)).get(+arg);
       const entries = sum ? sum.entries : [];
       const sections = !entries.length ? [{ items: [item("משמרת", icon.timer), item("יום חופש", icon.sun), item("יום מחלה", icon.sick)] }]
         : sum.off ? [{ items: [item("פתיחת היום", icon.calendar)] }, remove()]
@@ -1007,6 +1148,11 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       return sections ? { sections } : null;
     }
     if (kind === "plus") return { sections: [{ items: [item("משמרת", icon.timer), item("יום חופש", icon.sun), item("יום מחלה", icon.sick)] }] };
+    // (proposed) where the next shift is, with two workplaces: a tap on the line on top
+    if (kind === "place") {
+      const choice = (i, name) => item(name, state.next === i ? sized(icon.check, 19) : null, { data: `data-next="${i}"` });
+      return { sections: [{ head: "המשמרת הבאה", items: [choice(0, PLACE), choice(1, SECOND.name)] }] };
+    }
     return null;
   }
 
@@ -1165,19 +1311,19 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- the page ----
   const notes = {
-    lock: '<span class="tag built">כמו שבבנייה</span>מסך הנעילה, עם הרקע שמתחלף לכהה יחד עם האייפון. <span class="tag">הצעה</span>ב-Shifty Pro בלבד; בחינם אין Live Activity.',
-    island: '<span class="tag built">אחרי התיקון</span>השעון ב-Dynamic Island ברוחב שמספיק לשעות, דקות ושניות. <span class="tag">הצעה</span>ב-Shifty Pro בלבד.',
-    widgets: '<span class="tag built">כמו שבבנייה</span>הווידג\'טים למסך הבית. <span class="tag">הצעה</span>בחינם הם מציעים את Shifty Pro, ולחיצה פותחת את האפליקציה.',
+    lock: '<span class="tag built">כמו שבבנייה</span>מסך הנעילה, עם הרקע שמתחלף לכהה יחד עם האייפון. ב-Shifty Pro בלבד; בחינם אין Live Activity.',
+    island: '<span class="tag built">כמו שבבנייה</span>השעון ב-Dynamic Island ברוחב שמספיק לשעות, דקות ושניות. ב-Shifty Pro בלבד.',
+    widgets: '<span class="tag built">כמו שבבנייה</span>הווידג\'טים למסך הבית. בחינם הם מציעים את Shifty Pro, ולחיצה פותחת אותו באפליקציה.',
     place: '<span class="tag built">כמו שבבנייה</span>ההתראות מגיעות גם כשהאפליקציה סגורה. כשמגיעים לעבודה וכשיוצאים ממנה, לפי מקום העבודה שנקבע בהגדרות. כשמגיעים ליעד, לפי שעה שנקבעת מראש.',
     ask: '<span class="tag built">כמו שבבנייה</span>Siri עונה בלי לפתוח את Shifty. מתחת: הסיכום שמגיע בבוקר שאחרי סוף התקופה, והתזכורת אחרי 6 שעות בלי הפסקה, עם כפתור להפסקה. כל אחד מהם נכבה בהגדרות.',
     icon: '<span class="tag built">כמו שבבנייה</span>הסמל של Shifty במסך הבית: בהיר, כהה, וצבוע בגוון שבוחרים באייפון.',
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag">הצעה</span>בחינם, "נטו משוער" בכרטיס התקופה מסומן Pro, ולחיצה פותחת את Shifty Pro. כרטיס החופשה והמחלה מופיע רק ב-Pro.',
-    shifts: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על משמרת: הפירוט שלה ותפריט. לחיצה ארוכה על הפלוס: משמרת, יום חופש או יום מחלה.',
-    calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט.',
-    settings: '<span class="tag">הצעה</span>Shifty Pro בראש ההגדרות, עם שחזור רכישה. בחינם, הקטעים של Pro מעומעמים ומסומנים, ולחיצה עליהם פותחת את Shifty Pro.',
+    now: '<span class="tag">הצעה</span>בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה, ובכרטיס התקופה השכר החודשי, ערך השעה והנוספות מתוך הכלולות. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה.',
+    shifts: '<span class="tag">הצעה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
+    calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. <span class="tag">הצעה</span>בשכר גלובלי, הסה״כ הוא השכר החודשי.',
+    settings: '<span class="tag">הצעה</span>מקומות עבודה, כמה שרוצים, כל אחד בדף משלו: השכר מכל תאריך, לפי שעה או גלובלי, שעות התקן והנסיעות. "שינוי בשכר מתאריך" שומר את המשמרות הישנות בשכר שהיה. מקום עבודה נוסף ב-Pro.',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
@@ -1237,10 +1383,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   function render() {
     const old = view.querySelector(".scroll");
     if (old) scrolls[old.dataset.scroll] = old.scrollTop;
+    const settings = () => state.page != null ? placePage(+state.page) : settingsScreen();
     view.innerHTML = state.screen === "now"
-      ? { now: nowScreen, shifts: shiftsScreen, calendar: calendarScreen, settings: settingsScreen }[state.tab]()
+      ? { now: nowScreen, shifts: shiftsScreen, calendar: calendarScreen, settings }[state.tab]()
       : { lock: lockScreen, island: islandScreen, widgets: widgetsScreen, place: placeScreen, ask: askScreen, icon: iconScreen }[state.screen]();
     if (state.screen === "now" && state.sheet === "pro") view.insertAdjacentHTML("beforeend", proSheet());
+    if (state.screen === "now" && state.sheet === "pay") view.insertAdjacentHTML("beforeend", paySheet());
     const again = view.querySelector(".scroll");
     if (again) {
       again.scrollTop = scrolls[again.dataset.scroll] || 0;
@@ -1255,6 +1403,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     for (const b of document.querySelectorAll("[data-state]")) b.setAttribute("aria-pressed", String(b.dataset.state === state.state));
     for (const b of document.querySelectorAll("[data-theme-set]")) b.setAttribute("aria-pressed", String(b.dataset.themeSet === (dark() ? "dark" : "light")));
     for (const b of document.querySelectorAll("[data-pro]")) b.setAttribute("aria-pressed", String((b.dataset.pro === "1") === state.pro));
+    for (const b of document.querySelectorAll(".bar [data-pay]")) b.setAttribute("aria-pressed", String(b.dataset.pay === state.pay));
+    for (const b of document.querySelectorAll(".bar [data-places]")) b.setAttribute("aria-pressed", String(+b.dataset.places === state.places));
   }
 
   // dragging the flag along the dial: the time is the angle's on the twelve hours after the start, by five minutes
@@ -1314,7 +1464,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const d = device.getBoundingClientRect(), r = el.getBoundingClientRect();
     const box = { top: (r.top - d.top) / scale, left: (r.left - d.left) / scale, width: r.width / scale, height: r.height / scale };
     const sections = def.sections.map((sec) => `<div class="cm-sec">${sec.head ? `<div class="cm-head">${sec.head}</div>` : ""}${sec.items.map((it) =>
-      `<button class="cm-item${it.red ? " red" : ""}" type="button" data-cm-close><span>${it.title}${it.sub ? `<small class="num">${it.sub}</small>` : ""}</span>${it.svg || ""}</button>`).join("")}</div>`).join("");
+      `<button class="cm-item${it.red ? " red" : ""}" type="button" data-cm-close${it.data ? " " + it.data : ""}><span>${it.title}${it.sub ? `<small class="num">${it.sub}</small>` : ""}</span>${it.svg || ""}</button>`).join("")}</div>`).join("");
     const lifted = def.preview ? `<div class="cm-preview cm-card">${def.preview}</div>`
       : `<div class="cm-preview cm-src">${el.outerHTML.replace(/ data-menu="[^"]*"/, "").replace(" pressing", "")}</div>`;
     layer.innerHTML = `<div class="cm"><button class="cm-dim" type="button" data-cm-close aria-label="סגירה"></button>${lifted}<div class="cm-menu" role="menu">${sections}</div></div>`;
@@ -1349,7 +1499,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     device.style.setProperty("--s", String(scale));
   }
   function save() {
-    try { localStorage.setItem("shifty-preview", JSON.stringify({ screen: state.screen, state: state.state, theme: state.theme, tab: state.tab, pro: state.pro })); } catch (e) {}
+    try {
+      localStorage.setItem("shifty-preview", JSON.stringify({ screen: state.screen, state: state.state, theme: state.theme, tab: state.tab, pro: state.pro,
+        pay: state.pay, places: state.places, next: state.next }));
+    } catch (e) {}
   }
 
   document.addEventListener("click", (e) => {
@@ -1358,8 +1511,19 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     if (!b) return;
     if (b.dataset.tab) return switchTab(b.dataset.tab);
     if ("expand" in b.dataset) return setMini(false);
-    if ("cmClose" in b.dataset) return closeMenu();
+    if ("cmClose" in b.dataset) {
+      // a menu's choice of the next shift's workplace
+      if (b.dataset.next != null) { state.next = +b.dataset.next; save(); render(); }
+      return closeMenu();
+    }
+    // a menu opened by a tap, as SwiftUI's Menu: the workplace of the next shift
+    if ("tapMenu" in b.dataset) return openMenu(b);
     if (b.dataset.reset) state.plan = null;
+    // (proposed) the pay and the workplaces: the page's switches, a workplace's page, and deleting one
+    else if (b.dataset.pay) state.pay = b.dataset.pay;
+    else if (b.dataset.places) { state.places = +b.dataset.places; if (state.places === 1) { state.next = 0; if (state.page === "1") state.page = null; } }
+    else if (b.dataset.del) { state.places = 1; state.next = 0; state.page = null; }
+    else if (b.dataset.page != null) { state.page = b.dataset.page || null; state.sheet = null; }
     else if ("sheet" in b.dataset) state.sheet = b.dataset.sheet || null;
     // the purchase and its restoring, pretended: Pro opens, the sheet closes
     else if (b.dataset.buy) { state.pro = true; state.sheet = null; }

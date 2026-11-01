@@ -5,7 +5,8 @@ before there is a build: the app's four tabs (Now, with a shift running, on a br
 period's net pay and the days off left; the shifts; the calendar; the settings, shortened), the Lock
 Screen's Live Activity, the Dynamic Island, the widgets, the notifications, Siri's answers and the
 period's summary, and the home screen's icon, in light and dark; a long press opens the menus the app
-has. What is proposed and not yet built is marked so on the page. It is one page with made-up shifts (the
+has. Switches over the device show the free version or Shifty Pro, a pay by the hour or global, and one
+workplace or two. What is proposed and not yet built is marked so on the page. It is one page with made-up shifts (the
 repository is public), published as a Claude artifact to open on the iPhone; it opens from the file in a
 browser too.
 
