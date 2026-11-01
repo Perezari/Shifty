@@ -305,6 +305,8 @@ enum Calc {
         var travel = 0.0
         for (id, worked) in daysAt {
             let place = s.workplaces.first { $0.id == id }
+            // travel as a fixed sum a month is the period's (periodTotals), not each day's
+            if (place == nil ? s.travelMonthly : place?.travelMonthly) != nil { continue }
             var amount = (place?.travelPerDay ?? s.travelPerDay) * Double(worked.count)
             let cap = place?.travelMonthlyCap ?? s.travelMonthlyCap
             if cap > 0 { amount = min(amount, cap) }

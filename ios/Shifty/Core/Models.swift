@@ -75,6 +75,8 @@ struct Settings: Hashable {
     /// Travel paid for each day worked, up to a cap for the period (0: no cap).
     var travelPerDay = 0.0
     var travelMonthlyCap = 0.0
+    /// Or travel as a fixed sum a month, for a period worked in (nil: by the day). The app's alone.
+    var travelMonthly: Double?
 
     /// 0: off.
     var monthlyIncomeGoal = 0.0
@@ -87,6 +89,12 @@ struct Settings: Hashable {
     /// for the pension. The app's alone, as are the leave's.
     var creditPoints = 2.25
     var pensionPercent = 6.0
+    /// What the employer saves besides, for the pension and for severance, and the study fund's two shares,
+    /// the employee's taken off the net. The app's alone.
+    var pensionEmployerPercent = 6.5
+    var severancePercent = 6.0
+    var studyFundPercent = 0.0
+    var studyFundEmployerPercent = 0.0
     /// The vacation and sick days left (Leave.swift): as the last payslip gives them, on its date (nil: not
     /// kept), and the vacation days a year of work adds.
     var vacationBalance = 0.0
@@ -268,6 +276,7 @@ extension Settings: Codable {
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, autoBreakMinutes, autoBreakAfterHours,
              travelPerDay, travelMonthlyCap, monthlyIncomeGoal, monthStartDay, weekStartsOn,
              creditPoints, pensionPercent, vacationBalance, sickBalance, balanceDate, vacationDaysPerYear,
+             pensionEmployerPercent, severancePercent, studyFundPercent, studyFundEmployerPercent, travelMonthly,
              payTerms, workplaces, updatedAt
     }
 
@@ -309,11 +318,16 @@ extension Settings: Codable {
         autoBreakAfterHours = value(.autoBreakAfterHours, d.autoBreakAfterHours)
         travelPerDay = value(.travelPerDay, d.travelPerDay)
         travelMonthlyCap = value(.travelMonthlyCap, d.travelMonthlyCap)
+        travelMonthly = (try? c.decodeIfPresent(Double.self, forKey: .travelMonthly)) ?? nil
         monthlyIncomeGoal = value(.monthlyIncomeGoal, d.monthlyIncomeGoal)
         monthStartDay = value(.monthStartDay, d.monthStartDay)
         weekStartsOn = value(.weekStartsOn, d.weekStartsOn)
         creditPoints = value(.creditPoints, d.creditPoints)
         pensionPercent = value(.pensionPercent, d.pensionPercent)
+        pensionEmployerPercent = value(.pensionEmployerPercent, d.pensionEmployerPercent)
+        severancePercent = value(.severancePercent, d.severancePercent)
+        studyFundPercent = value(.studyFundPercent, d.studyFundPercent)
+        studyFundEmployerPercent = value(.studyFundEmployerPercent, d.studyFundEmployerPercent)
         vacationBalance = value(.vacationBalance, d.vacationBalance)
         sickBalance = value(.sickBalance, d.sickBalance)
         balanceDate = ISODate.decodeIfPresent(c, .balanceDate)
@@ -355,11 +369,16 @@ extension Settings: Codable {
         try c.encode(autoBreakAfterHours, forKey: .autoBreakAfterHours)
         try c.encode(travelPerDay, forKey: .travelPerDay)
         try c.encode(travelMonthlyCap, forKey: .travelMonthlyCap)
+        try c.encodeIfPresent(travelMonthly, forKey: .travelMonthly)
         try c.encode(monthlyIncomeGoal, forKey: .monthlyIncomeGoal)
         try c.encode(monthStartDay, forKey: .monthStartDay)
         try c.encode(weekStartsOn, forKey: .weekStartsOn)
         try c.encode(creditPoints, forKey: .creditPoints)
         try c.encode(pensionPercent, forKey: .pensionPercent)
+        try c.encode(pensionEmployerPercent, forKey: .pensionEmployerPercent)
+        try c.encode(severancePercent, forKey: .severancePercent)
+        try c.encode(studyFundPercent, forKey: .studyFundPercent)
+        try c.encode(studyFundEmployerPercent, forKey: .studyFundEmployerPercent)
         try c.encode(vacationBalance, forKey: .vacationBalance)
         try c.encode(sickBalance, forKey: .sickBalance)
         try c.encodeIfPresent(balanceDate.map(ISODate.string), forKey: .balanceDate)

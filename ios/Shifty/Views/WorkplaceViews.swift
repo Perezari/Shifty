@@ -254,14 +254,38 @@ struct WorkplacePage: View {
                     }
                 }
 
-                SettingsSection(title: "פנסיה", note: "העובד מפריש לפנסיה בדרך כלל 6%. היא יורדת מהנטו המשוער.") {
-                    NumberRow(title: "הפרשה לפנסיה", value: rule(\.pensionPercent), unit: "%")
+                SettingsSection(title: "פנסיה",
+                                note: "העובד מפריש בדרך כלל 6%, והמעביד לפחות 6.5% ועוד 6% לפיצויים. החלק שלך יורד מהנטו המשוער, והחלק של המעביד מופיע בדף הנטו.") {
+                    NumberRow(title: "הפרשת עובד", value: rule(\.pensionPercent), unit: "%")
+                    Divider()
+                    NumberRow(title: "הפרשת מעביד", value: rule(\.pensionEmployerPercent), unit: "%")
+                    Divider()
+                    NumberRow(title: "פיצויים", value: rule(\.severancePercent), unit: "%")
                 }
 
-                SettingsSection(title: "נסיעות", note: "תקרה של 0 היא בלי תקרה.") {
-                    NumberRow(title: "החזר נסיעות ליום", value: field(\.travelPerDay), unit: s.currency)
+                SettingsSection(title: "קרן השתלמות",
+                                note: "משכר של עד " + Format.moneyShort(Calc.studyFundWage, s.currency) + " בחודש, התקרה הפטורה ממס ב־2026. החלק שלך יורד מהנטו המשוער.") {
+                    NumberRow(title: "הפרשת עובד", value: rule(\.studyFundPercent), unit: "%")
                     Divider()
-                    NumberRow(title: "תקרת נסיעות חודשית", value: field(\.travelMonthlyCap), unit: s.currency)
+                    NumberRow(title: "הפרשת מעביד", value: rule(\.studyFundEmployerPercent), unit: "%")
+                }
+
+                SettingsSection(title: "נסיעות",
+                                note: place.travelMonthly == nil ? "תקרה של 0 היא בלי תקרה." : "סכום קבוע בכל חודש שעבדת בו. נכנס למס, לא לפנסיה.") {
+                    Picker("נסיעות", selection: travelByMonth) {
+                        Text("לפי יום").tag(false)
+                        Text("לחודש").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.vertical, 12)
+                    Divider()
+                    if place.travelMonthly == nil {
+                        NumberRow(title: "החזר נסיעות ליום", value: field(\.travelPerDay), unit: s.currency)
+                        Divider()
+                        NumberRow(title: "תקרת נסיעות חודשית", value: field(\.travelMonthlyCap), unit: s.currency)
+                    } else {
+                        NumberRow(title: "סכום לחודש מלא", value: travelMonthly, unit: s.currency)
+                    }
                 }
 
                 SettingsSection(title: "תזכורת לפי מיקום", note: placeNote, pro: true) {
@@ -520,6 +544,28 @@ struct WorkplacePage: View {
                 let value = percent / 100
                 guard store.settings.place(placeID).rules[keyPath: key] != value else { return }
                 change { $0.rules[keyPath: key] = value }
+            }
+        )
+    }
+
+    /// Travel by the day, or a fixed sum a month.
+    private var travelByMonth: Binding<Bool> {
+        Binding(
+            get: { store.settings.place(placeID).travelMonthly != nil },
+            set: { monthly in
+                guard monthly != (store.settings.place(placeID).travelMonthly != nil) else { return }
+                change { $0.travelMonthly = monthly ? 0 : nil }
+            }
+        )
+    }
+
+    /// The month's sum of travel.
+    private var travelMonthly: Binding<Double> {
+        Binding(
+            get: { store.settings.place(placeID).travelMonthly ?? 0 },
+            set: { value in
+                guard store.settings.place(placeID).travelMonthly != value else { return }
+                change { $0.travelMonthly = value }
             }
         )
     }

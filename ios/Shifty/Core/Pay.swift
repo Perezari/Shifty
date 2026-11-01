@@ -80,6 +80,11 @@ struct EmployerRules: Hashable {
     var sickBalance = 0.0
     var balanceDate: Date?
     var vacationDaysPerYear = 12.0
+    /// What the employer saves besides (the law's least: 6.5% and 6%), and the study fund's shares.
+    var pensionEmployerPercent = 6.5
+    var severancePercent = 6.0
+    var studyFundPercent = 0.0
+    var studyFundEmployerPercent = 0.0
 }
 
 /// A workplace besides the settings' own (Shifty Pro): its name, its pay from each date, the standard hours of
@@ -96,6 +101,19 @@ struct Workplace: Hashable, Identifiable {
     var rules = EmployerRules()
     /// The day its payslip's month starts; nil as the own workplace's. The own one's is the app's pay period.
     var monthStartDay: Int?
+    /// Travel as a fixed sum a month instead of each day's, for a period worked in; nil: by the day.
+    var travelMonthly: Double?
+}
+
+/// A yearly bonus accrued since it was last paid, toward its next payment.
+struct AccruedBonus: Identifiable {
+    /// The workplace's id; "" for the own.
+    let id: String
+    let name: String
+    let accrued: Double
+    let amount: Double
+    /// The first of the month it is paid with.
+    let due: Date
 }
 
 extension Settings {
@@ -108,7 +126,9 @@ extension Settings {
                           holidayEveHours: holidayEveHours, vacationHours: vacationHours, sickDay1Pct: sickDay1Pct,
                           sickDay2Pct: sickDay2Pct, sickDay3Pct: sickDay3Pct, sickDay4Pct: sickDay4Pct,
                           pensionPercent: pensionPercent, vacationBalance: vacationBalance, sickBalance: sickBalance,
-                          balanceDate: balanceDate, vacationDaysPerYear: vacationDaysPerYear)
+                          balanceDate: balanceDate, vacationDaysPerYear: vacationDaysPerYear,
+                          pensionEmployerPercent: pensionEmployerPercent, severancePercent: severancePercent,
+                          studyFundPercent: studyFundPercent, studyFundEmployerPercent: studyFundEmployerPercent)
         }
         set {
             overtime1Hours = newValue.overtime1Hours
@@ -132,6 +152,10 @@ extension Settings {
             sickBalance = newValue.sickBalance
             balanceDate = newValue.balanceDate
             vacationDaysPerYear = newValue.vacationDaysPerYear
+            pensionEmployerPercent = newValue.pensionEmployerPercent
+            severancePercent = newValue.severancePercent
+            studyFundPercent = newValue.studyFundPercent
+            studyFundEmployerPercent = newValue.studyFundEmployerPercent
         }
     }
 
@@ -195,7 +219,7 @@ extension Settings {
         if let id, let place = workplaces.first(where: { $0.id == id }) { return place }
         return Workplace(id: "", name: workplaceName, pay: ownPay, standardByDay: standardByDay,
                          travelPerDay: travelPerDay, travelMonthlyCap: travelMonthlyCap, rules: rules,
-                         monthStartDay: monthStartDay)
+                         monthStartDay: monthStartDay, travelMonthly: travelMonthly)
     }
 
     /// The day a workplace's pay month starts: its own, or the own workplace's, which is the app's pay period.
@@ -220,6 +244,7 @@ extension Settings {
         travelMonthlyCap = place.travelMonthlyCap
         rules = place.rules
         if let day = place.monthStartDay { monthStartDay = day }
+        travelMonthly = place.travelMonthly
         if pay.count == 1 && pay[0].kind == .hourly && pay[0].bonus == 0 {
             payTerms = []
             hourlyWage = pay[0].hourlyWage
@@ -250,6 +275,9 @@ extension Calc {
     /// targets reached), and an annual bonus due in the period, on its month's first day.
     static func periodTotals(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double? = nil) -> Totals {
         var totals = aggregate(shifts, s, range: range, asOf: asOf)
+        let monthly = monthlyTravel(shifts, s, range: range)
+        totals.travel += monthly
+        totals.total += monthly
         let places = s.payPlaces
         guard places.contains(where: { place in place.pay.contains { $0.kind == .monthly || $0.bonus > 0 } }) else { return totals }
         let years = LocalTime.parts(range.start).year...LocalTime.parts(range.end).year
@@ -267,6 +295,36 @@ extension Calc {
         totals.extraOvertime = extraOvertime(shifts, s, range: range, asOf: asOf)
         totals.total = totals.pay + totals.travel + totals.salary + totals.extraOvertime + totals.bonus
         return totals
+    }
+
+    /// The travel paid as a fixed sum a month (Workplace.travelMonthly): each such workplace's, in a period with a
+    /// day's work there.
+    static func monthlyTravel(_ shifts: [Shift], _ s: Settings, range: TimeRange) -> Double {
+        let places: [String?] = [nil] + s.workplaces.map { Optional($0.id) }
+        var travel = 0.0
+        for id in places {
+            guard let monthly = s.place(id).travelMonthly, monthly > 0 else { continue }
+            let worked = shifts.contains { $0.type == .work && !$0.deleted && inRange($0, range) && s.workplace(of: $0)?.id == id }
+            if worked { travel += monthly }
+        }
+        return travel
+    }
+
+    /// Each workplace's yearly bonus in its pay at `date`, accrued since its month's first last came, as a share
+    /// of the year to the next (NowView's card).
+    static func accruedBonuses(_ s: Settings, at date: Date) -> [AccruedBonus] {
+        let places: [String?] = [nil] + s.workplaces.map { Optional($0.id) }
+        return places.compactMap { id -> AccruedBonus? in
+            let place = s.place(id)
+            guard let terms = Settings.terms(place.pay, at: date), terms.bonus > 0 else { return nil }
+            let year = LocalTime.parts(date).year
+            var last = LocalTime.date(year, terms.bonusMonth, 1)
+            if last > date { last = LocalTime.date(year - 1, terms.bonusMonth, 1) }
+            let due = LocalTime.date(LocalTime.parts(last).year + 1, terms.bonusMonth, 1)
+            // by whole days, across a change of the clocks
+            let share = max(0, min(1, Double(daysBetween(last, LocalTime.startOfDay(date))) / Double(max(1, daysBetween(last, due)))))
+            return AccruedBonus(id: id ?? "", name: place.name, accrued: terms.bonus * share, amount: terms.bonus, due: due)
+        }
     }
 
     /// A workplace's month's fixed pay in a period: each month's pay for the part of the period its terms hold, from
@@ -401,7 +459,8 @@ extension EmployerRules: Codable {
         case overtime1Hours, overtime1Mult, overtime2Mult, autoBreakMinutes, autoBreakAfterHours, holidayMult,
              nightEnabled, nightStart, nightEnd, nightMult, holidayEveHours, vacationHours,
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, pensionPercent,
-             vacationBalance, sickBalance, balanceDate, vacationDaysPerYear
+             vacationBalance, sickBalance, balanceDate, vacationDaysPerYear,
+             pensionEmployerPercent, severancePercent, studyFundPercent, studyFundEmployerPercent
     }
 
     /// A missing key takes the default, as the settings' do.
@@ -432,6 +491,10 @@ extension EmployerRules: Codable {
         sickBalance = value(.sickBalance, d.sickBalance)
         balanceDate = ISODate.decodeIfPresent(c, .balanceDate)
         vacationDaysPerYear = value(.vacationDaysPerYear, d.vacationDaysPerYear)
+        pensionEmployerPercent = value(.pensionEmployerPercent, d.pensionEmployerPercent)
+        severancePercent = value(.severancePercent, d.severancePercent)
+        studyFundPercent = value(.studyFundPercent, d.studyFundPercent)
+        studyFundEmployerPercent = value(.studyFundEmployerPercent, d.studyFundEmployerPercent)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -457,12 +520,16 @@ extension EmployerRules: Codable {
         try c.encode(sickBalance, forKey: .sickBalance)
         try c.encodeIfPresent(balanceDate.map(ISODate.string), forKey: .balanceDate)
         try c.encode(vacationDaysPerYear, forKey: .vacationDaysPerYear)
+        try c.encode(pensionEmployerPercent, forKey: .pensionEmployerPercent)
+        try c.encode(severancePercent, forKey: .severancePercent)
+        try c.encode(studyFundPercent, forKey: .studyFundPercent)
+        try c.encode(studyFundEmployerPercent, forKey: .studyFundEmployerPercent)
     }
 }
 
 extension Workplace: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules, monthStartDay
+        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules, monthStartDay, travelMonthly
     }
 
     init(from decoder: Decoder) throws {
@@ -477,6 +544,7 @@ extension Workplace: Codable {
         travelMonthlyCap = (try? c.decodeIfPresent(Double.self, forKey: .travelMonthlyCap)) ?? d.travelMonthlyCap
         rules = (try? c.decodeIfPresent(EmployerRules.self, forKey: .rules)) ?? d.rules
         monthStartDay = (try? c.decodeIfPresent(Int.self, forKey: .monthStartDay)) ?? nil
+        travelMonthly = (try? c.decodeIfPresent(Double.self, forKey: .travelMonthly)) ?? nil
     }
 
     func encode(to encoder: Encoder) throws {
@@ -489,5 +557,6 @@ extension Workplace: Codable {
         try c.encode(travelMonthlyCap, forKey: .travelMonthlyCap)
         try c.encode(rules, forKey: .rules)
         try c.encodeIfPresent(monthStartDay, forKey: .monthStartDay)
+        try c.encodeIfPresent(travelMonthly, forKey: .travelMonthly)
     }
 }

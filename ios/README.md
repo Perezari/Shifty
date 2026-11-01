@@ -24,8 +24,9 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   and the backup to a file and back), `WorkplaceViews` (the workplaces in the settings, each on its page
   with what its employer sets: its pay from each date, its pay month (the own one's is the app's pay
   period), standard hours, overtime, breaks, Shabbat and night,
-  a holiday's eve, vacation and sick days and the days left of them, the pension, travel and the place's
-  reminder; and the sheet of a pay: by the hour or global, what a global pay does with the overtime, all
+  a holiday's eve, vacation and sick days and the days left of them, the pension's shares (the employee's,
+  the employer's and severance) and the study fund's, travel by the day or a fixed sum a month, and the
+  place's reminder; and the sheet of a pay: by the hour or global, what a global pay does with the overtime, all
   of it covered, some hours, none, or a bonus at each target of hours a month, and an annual bonus) and
   `ShiftEditor` (a shift by hand). `Components` holds what they share: the period's bar and picker, the
   summary card, a shift's row, the settings' cards and the wheel of hours and minutes.
@@ -66,8 +67,10 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   reached) with an annual bonus; each shift is counted by its workplace's rules, standard hours and the
   wage of its day's pay (`Settings.effective`), and a period's income adds the months' pay, the overtime
   they do not cover, the bonuses of the targets reached (each workplace's by its own pay month, a month the
-  period holds in part for its share of the days) and a bonus due in it. `Leave` and `Net` keep the
-  days off left and the pension by workplace. With one workplace and one pay, the settings are as the web
+  period holds in part for its share of the days), travel as a fixed sum a month where it is one, and a
+  bonus due in it; `Calc.accruedBonuses` the yearly bonus accrued toward its payment. `Leave` and `Net` keep
+  the days off left, the pension and the study fund (up to its ceiling) by workplace, and `Net` what each
+  employer saves besides: its pension, severance and study fund. With one workplace and one pay, the settings are as the web
   app's and the engine gives its results.
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
   `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay

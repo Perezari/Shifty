@@ -142,6 +142,9 @@ struct NowView: View {
                 ForEach(leaves(shifts, settings, at: date)) { leave in
                     LeaveCard(balance: leave.balance, since: leave.since, place: leave.place)
                 }
+                ForEach(Calc.accruedBonuses(settings, at: date)) { bonus in
+                    BonusCard(bonus: bonus, named: !settings.workplaces.isEmpty, currency: settings.currency)
+                }
             }
         }
     }
@@ -1208,48 +1211,91 @@ private struct PeriodCard: View {
 }
 
 /// The period's net pay, line by line: the gross it is heading to, what a payslip takes off of it, and
-/// what is left (Net.swift).
+/// what is left (Net.swift); under it, what the employers save besides.
 private struct NetSheet: View {
     let title: String
     let pay: NetPay
     let settings: Settings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("נטו משוער")
-                    .font(.title3.weight(.bold))
-                Spacer()
-                Text(title)
-                    .font(.subheadline)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("נטו משוער")
+                        .font(.title3.weight(.bold))
+                    Spacer()
+                    Text(title)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                VStack(spacing: 0) {
+                    row("ברוטו צפוי", pay.gross, primary: true)
+                    row("מס הכנסה", pay.incomeTax)
+                    row("ביטוח לאומי", pay.nationalInsurance)
+                    row("מס בריאות", pay.health)
+                    row("פנסיה", pay.pension)
+                    if pay.studyFund > 0 {
+                        row("קרן השתלמות", pay.studyFund)
+                    }
+                }
+                Divider()
+                HStack(alignment: .firstTextBaseline) {
+                    Text("נטו")
+                        .font(.headline)
+                    Spacer()
+                    Text(Format.moneyShort(pay.net, settings.currency))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.accentColor)
+                }
+                if pay.employer.total > 0 {
+                    employer
+                }
+                Text(note)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            VStack(spacing: 0) {
-                row("ברוטו צפוי", pay.gross, primary: true)
-                row("מס הכנסה", pay.incomeTax)
-                row("ביטוח לאומי", pay.nationalInsurance)
-                row("מס בריאות", pay.health)
-                row("פנסיה", pay.pension)
-            }
-            Divider()
-            HStack(alignment: .firstTextBaseline) {
-                Text("נטו")
-                    .font(.headline)
-                Spacer()
-                Text(Format.moneyShort(pay.net, settings.currency))
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.accentColor)
-            }
-            Text(note)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
+            .padding(.horizontal, 22)
+            .padding(.top, 26)
+            .padding(.bottom, 16)
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 26)
+        .scrollBounceBehavior(.basedOnSize)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    /// What the employers save besides, in a box under the net.
+    private var employer: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("המעביד מפריש בשבילך")
+                Spacer()
+                Text(Format.moneyShort(pay.employer.total, settings.currency))
+                    .monospacedDigit()
+            }
+            .font(.subheadline.weight(.semibold))
+            .padding(.bottom, 4)
+            share("פנסיה", pay.employer.pension)
+            share("פיצויים", pay.employer.severance)
+            if pay.employer.studyFund > 0 {
+                share("קרן השתלמות", pay.employer.studyFund)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func share(_ title: String, _ amount: Double) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(Format.moneyShort(amount, settings.currency))
+                .monospacedDigit()
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .padding(.vertical, 3)
     }
 
     private func row(_ title: String, _ amount: Double, primary: Bool = false) -> some View {
@@ -1265,13 +1311,50 @@ private struct NetSheet: View {
 
     private var note: String {
         let points = Self.number(settings.creditPoints)
-        let pension = Self.number(settings.pensionPercent)
-        return "לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, \(points) נקודות זיכוי ו־\(pension)% לפנסיה מהשכר בלי שעות נוספות ונסיעות. אפשר לשנות בהגדרות."
+        return "לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026 ו־\(points) נקודות זיכוי. הפנסיה וקרן ההשתלמות מהשכר בלי שעות נוספות ונסיעות, כמו שנקבע בדף של כל מקום עבודה."
     }
 
     /// 6 as "6", 2.25 as "2.25".
     private static func number(_ value: Double) -> String {
         value == value.rounded() ? String(Int(value)) : String(value)
+    }
+}
+
+/// A yearly bonus accrued since it was last paid, toward its payment (Calc.accruedBonuses): how much of it, and
+/// when it is paid.
+private struct BonusCard: View {
+    let bonus: AccruedBonus
+    /// Its workplace's name shown, with more than one.
+    let named: Bool
+    let currency: String
+
+    var body: some View {
+        let due = LocalTime.parts(bonus.due)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(named ? "בונוס צבור · " + bonus.name : "בונוס צבור")
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer()
+                Text("ישולם ב" + Format.monthName(due.month0) + " " + String(due.year))
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Text(Format.moneyShort(bonus.accrued, currency))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Spacer()
+                Text("מתוך " + Format.moneyShort(bonus.amount, currency))
+                    .font(.subheadline)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            ProgressView(value: bonus.amount > 0 ? min(1, bonus.accrued / bonus.amount) : 0)
+                .tint(Color.accentColor)
+        }
+        .card()
     }
 }
 

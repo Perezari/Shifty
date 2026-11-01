@@ -298,5 +298,42 @@ tenth.workplaces[0].monthStartDay = 10
 let tenthBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(tenth))
 expect(tenthBack.workplaces[0].monthStartDay == 10 && twoBack.workplaces[0].monthStartDay == nil, "in JSON, and none until chosen")
 
+// what the employer saves besides, and the study fund taken off the net up to its ceiling of 15,712 a month
+var saving = s
+saving.studyFundPercent = 2.5
+saving.studyFundEmployerPercent = 7.5
+saving.severancePercent = 8.33
+let saved = Calc.netPay(gross: 20_000, pensionable: 20_000, saving)
+let unsaved = Calc.netPay(gross: 20_000, pensionable: 20_000, s)
+expect(near(saved.studyFund, 15_712 * 0.025) && near(saved.employer.studyFund, 15_712 * 0.075), "the study fund up to its ceiling")
+expect(near(saved.employer.pension, 20_000 * 0.065) && near(saved.employer.severance, 20_000 * 0.0833), "the employer's pension and severance")
+expect(near(unsaved.net - saved.net, 15_712 * 0.025) && unsaved.studyFund == 0, "the study fund off the net, none by default")
+
+// travel as a fixed sum a month: in a period worked in, instead of each day's
+var monthTravel = s
+monthTravel.travelPerDay = 20
+monthTravel.travelMonthly = 600
+expect(near(Calc.periodTotals([beforeRaise], monthTravel, range: november, asOf: now.ms).travel, 600), "the month's sum, not 20 a day")
+expect(Calc.periodTotals([], monthTravel, range: november, asOf: now.ms).travel == 0, "none in a period not worked in")
+monthTravel.travelMonthly = nil
+expect(near(Calc.periodTotals([beforeRaise], monthTravel, range: november, asOf: now.ms).travel, 20), "by the day again")
+
+// a yearly bonus of 12,000 with July's pay, accrued on 1 November 2026: 123 of the 365 days from 1 July
+var yearly = s
+yearly.payTerms = [PayTerms(id: "base", from: PayTerms.start, hourlyWage: 50, bonus: 12_000, bonusMonth: 6)]
+let accrued = Calc.accruedBonuses(yearly, at: LocalTime.date(2026, 10, 1))
+expect(accrued.count == 1 && abs(accrued[0].accrued - 12_000.0 * 123 / 365) < 1 && accrued[0].due == LocalTime.date(2027, 6, 1),
+       "123 days of the year to 1 July 2027")
+expect(Calc.accruedBonuses(s, at: now).isEmpty, "none without a bonus")
+
+// the letter's fields in JSON, as the own workplace's
+var letter = s
+letter.studyFundPercent = 2.5
+letter.severancePercent = 8.33
+letter.travelMonthly = 600
+let letterBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(letter))
+expect(letterBack.studyFundPercent == 2.5 && letterBack.severancePercent == 8.33 && letterBack.place(nil).travelMonthly == 600
+       && letterBack.place(nil).rules.studyFundPercent == 2.5 && Settings().travelMonthly == nil, "in JSON, as the own workplace's")
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)
