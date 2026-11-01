@@ -843,7 +843,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     }
     return `<div class="now">${statusBar(s.now)}
       <div class="now-scroll scroll" data-scroll="now"><div class="stack">${top}${dial(s, center, plan)}<div class="facts glass">${facts}</div>
-        <div class="actions">${actions}</div>${weekCard(s)}${monthCard()}${holidayBanner()}${state.pro ? leaveCard() + (isGlobal() ? bonusCard() : "") : ""}</div></div>
+        <div class="actions">${actions}</div>${weekCard(s)}${monthCard()}${holidayBanner()}${state.pro ? leaveCard() + (isGlobal() ? bonusCard() : "") + recoveryCard() : ""}</div></div>
       <div class="home-ind"></div>${state.sheet === "net" ? netSheet() : ""}</div>`;
   }
   const fact = (value, label, color) => `<div><b style="${color ? "color:" + color : ""}"><span class="ltr">${value}</span></b><span>${label}</span></div>`;
@@ -938,6 +938,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     return `<section class="card glass"><div class="card-head"><span class="title">בונוס צבור</span><span class="meta">ישולם במרץ <span class="num">${next.getFullYear()}</span></span></div>
       <div class="money-line"><b class="num"><span class="ltr">${moneyShort(BONUS * share)}</span></b><span>מתוך <b class="ltr num">${moneyShort(BONUS)}</b></span></div>
       <div class="accrued"><i style="width:${(share * 100).toFixed(1)}%"></i></div></section>`;
+  }
+
+  /** (proposed) The recuperation pay due by the seniority: its days, their worth, and when it is paid. */
+  function recoveryCard() {
+    return `<section class="card glass"><div class="card-head"><span class="title">דמי הבראה</span><span class="meta">ישולמו ביולי <span class="num">2027</span></span></div>
+      <div class="money-line"><b class="num"><span class="ltr">${moneyShort(7 * 451.5)}</span></b><span><b class="num">7</b> ימים · ותק של 5 שנים</span></div></section>`;
   }
 
   /** A shortened day or a holiday coming, from the Hebrew calendar (Holidays.swift): its standard. */
@@ -1123,7 +1129,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const sec = (title, rows, note) => `<section class="sec">${title ? `<div class="sec-title">${title}</div>` : ""}<div class="sec-card glass">${rows}</div>
       ${note ? `<p class="sec-note">${note}</p>` : ""}</section>`;
     // Pro's: marked without it, a tap opening Shifty Pro
-    const proSec = (title, rows) => state.pro ? sec(title, rows)
+    const proSec = (title, rows, note) => state.pro ? sec(title, rows, note)
       : `<button class="locked" type="button" data-sheet="pro"><section class="sec"><div class="sec-title">${title}<span class="pro-badge">Pro</span></div><div class="sec-card glass">${rows}</div></section></button>`;
     const pct = (v) => `<span class="num">${v}%</span>`;
     const term = (from, pay, now) => `<button class="setrow link" type="button" data-sheet="pay"><span class="when"><span>${pay}</span><small>מ־${from}</small></span>
@@ -1135,6 +1141,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div class="navbar" style="justify-content:flex-start"><button class="circle glass" type="button" data-page="" aria-label="הגדרות">${icon.back}</button></div>
       <div class="scroll" data-scroll="place${i}"><div class="scr"><h1 class="large">${name}</h1>
         ${sec("", row("שם", name))}
+        ${sec("ותק", row("תאריך תחילת עבודה", second ? "1 בספטמבר 2026" : "15 במרץ 2021"),
+          second ? "חודשיים. דמי הבראה מגיעים אחרי שנת עבודה."
+            : "5 שנים ו־7 חודשים. לפיו נקבעים ימי החופשה בשנה ודמי ההבראה.")}
         ${sec("שכר", terms + add, "משמרות שלפני כל תאריך נשארות בשכר שהיה אז.")}
         ${global ? sec("השכר עכשיו", row("שעות נוספות", coverText())
           + (state.cover === "upTo" || state.cover === "none" ? row("ערך שעה", `<span class="ltr num">${money(HOUR_VALUE)}</span>`) : "")
@@ -1150,7 +1159,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         ${sec("ערב חג", row("שעות עבודה בערב חג", `<span class="num">4:06</span>`))}
         ${sec("חופשה ומחלה", row("שעות ליום חופש", `<span class="num">${second ? "5:30" : "8:36"}</span>`) + row("מחלה, יום 1", pct(0))
           + row("מחלה, יום 2 ו־3", pct(50)) + row("מחלה, מיום 4", pct(100)))}
-        ${proSec("יתרת חופשה ומחלה", row("מעקב יתרות", "כבוי"))}
+        ${proSec("יתרת חופשה ומחלה", row("מעקב יתרות", "פועל") + row("ימי חופשה בשנה", `<span class="num">${second ? 12 : 17}</span> לפי הוותק`)
+          + row("צו ההרחבה חל", "פועל"),
+          second ? "שנה ראשונה: 12 ימים, לפי החלק היחסי של השנה." : "שנה 6 בשבוע של 5 ימים: 17 ימים לפי צו ההרחבה (14 לפי החוק). הצו חל על רוב מקומות העבודה, לא על מקום עם פחות מ־4 עובדים, חברות ממשלתיות ועירוניות ומשק בית. אם מקבלים יותר, אפשר לרשום.")}
+        ${proSec("דמי הבראה", row("תעריף ליום", `<span class="ltr num">${CUR} 451.5</span>`)
+          + `<div class="setrow"><div class="seg-in"><button type="button" class="on">פעם בשנה</button><button type="button">כל חודש</button></div></div>`
+          + row("בחודש", "יולי"),
+          second ? "מגיעים אחרי שנת עבודה, לפי היקף המשרה." : "7 ימים בשנה לפי הוותק, במשרה מלאה לפי שעות התקן. התעריף במגזר הפרטי ב־2026.")}
         ${sec("פנסיה", row("הפרשת עובד", pct(6)) + row("הפרשת מעביד", pct(6.5)) + row("פיצויים", pct(second ? 6 : 8.33)),
           "החלק שלך יורד מהנטו המשוער. החלק של המעביד מופיע בדף הנטו.")}
         ${sec("קרן השתלמות", row("הפרשת עובד", pct(second ? 0 : 2.5)) + row("הפרשת מעביד", pct(second ? 0 : 7.5)),
@@ -1431,10 +1446,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
+    now: '<span class="tag">הצעה</span>דמי הבראה (Pro, למטה): כמה ימים מגיעים לפי הוותק, כמה הם שווים ומתי ישולמו. <span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
     shifts: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
     calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
-    settings: '<span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: הפרשות המעביד לפנסיה ולפיצויים, קרן השתלמות עד התקרה, ונסיעות כסכום לחודש מלא. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
+    settings: '<span class="tag">הצעה</span>בדף של מקום העבודה: תאריך תחילת עבודה והוותק, ימי החופשה בשנה לפי הוותק (צו ההרחבה או החוק), ודמי הבראה (תעריף, פעם בשנה או כל חודש). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: הפרשות המעביד לפנסיה ולפיצויים, קרן השתלמות עד התקרה, ונסיעות כסכום לחודש מלא. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
