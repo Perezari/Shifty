@@ -119,7 +119,7 @@ extension Calc {
     static func projectedIncome(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> Double {
         let totals = periodTotals(shifts, s, range: range, asOf: now)
         guard totals.workedDays > 0 else { return totals.total }
-        let fixed = totals.salary + totals.bonus + monthlyTravel(shifts, s, range: range)
+        let fixed = totals.salary + totals.bonus + totals.recuperation + monthlyTravel(shifts, s, range: range)
         let variable = totals.total - fixed
         var day = LocalTime.addingDays(1, to: LocalTime.startOfDay(Date(ms: now)))
         var left = 0

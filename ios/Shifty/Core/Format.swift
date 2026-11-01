@@ -87,4 +87,17 @@ enum Format {
     static func monthName(_ month0: Int) -> String {
         months[month0]
     }
+
+    /// A seniority (Calc.seniority): "5 שנים ו־7 חודשים", "שנה וחודשיים", "חודש", "פחות מחודש". The app's own.
+    static func seniority(years: Int, months: Int) -> String {
+        func count(_ n: Int, _ one: String, _ two: String, _ many: String) -> String {
+            n == 1 ? one : n == 2 ? two : "\(n) " + many
+        }
+        let y = count(years, "שנה", "שנתיים", "שנים")
+        let m = count(months, "חודש", "חודשיים", "חודשים")
+        if years == 0 { return months == 0 ? "פחות מחודש" : m }
+        if months == 0 { return y }
+        // "ו" before a word, "ו־" before a number
+        return y + (months > 2 ? " ו־" : " ו") + m
+    }
 }

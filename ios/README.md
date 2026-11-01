@@ -70,7 +70,11 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   period holds in part for its share of the days), travel as a fixed sum a month where it is one, and a
   bonus due in it; `Calc.accruedBonuses` the yearly bonus accrued toward its payment. `Leave` and `Net` keep
   the days off left, the pension and the study fund (up to its ceiling) by workplace, and `Net` what each
-  employer saves besides: its pension, severance and study fund. With one workplace and one pay, the settings are as the web
+  employer saves besides: its pension, severance and study fund. Each workplace's start date gives its
+  seniority (`Calc.seniority`): the vacation days a year by the law (`legalVacationDays`, the extension order's
+  or the law's table, in a five- or six-day week) when more than its own number, and recuperation pay
+  (`recuperation`, by the years of work, its day's worth and the job's share of 42 hours) in the period of its
+  month, or each month's twelfth. With one workplace and one pay, the settings are as the web
   app's and the engine gives its results.
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
   `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay

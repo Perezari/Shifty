@@ -125,6 +125,26 @@ struct WorkplacePage: View {
                     TextRow(title: "שם", text: name, fallback: placeID == nil ? Settings().workplaceName : "מקום עבודה")
                 }
 
+                SettingsSection(title: "ותק", note: seniorityNote(place)) {
+                    if place.startDate == nil {
+                        Button {
+                            change { $0.startDate = LocalTime.startOfDay(Date()) }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "plus")
+                                Text("תאריך תחילת עבודה")
+                            }
+                            .foregroundStyle(.tint)
+                            .settingsRow()
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        DatePicker("תאריך תחילת עבודה", selection: startDate, in: ...Date(), displayedComponents: .date)
+                            .settingsRow()
+                    }
+                }
+
                 SettingsSection(title: "שכר", note: "משמרות שלפני כל תאריך נשארות בשכר שהיה אז.") {
                     ForEach(Array(place.pay.reversed())) { terms in
                         Button {
@@ -236,9 +256,7 @@ struct WorkplacePage: View {
                     PercentRow(title: "מחלה, יום 4 והלאה", value: rule(\.sickDay4Pct), range: 0...100)
                 }
 
-                SettingsSection(title: "יתרת חופשה ומחלה",
-                                note: "היתרות והתאריך מהתלוש האחרון של המעסיק הזה. מאז, בכל חודש נוסף חלק מימי החופשה של השנה ו-1.5 ימי מחלה (עד 90), ויורדים ימי החופשה והמחלה שרשמת כאן. לפי החוק, בשבוע עבודה של 5 ימים יש 12 ימי חופשה בשנה בחמש השנים הראשונות.",
-                                pro: true) {
+                SettingsSection(title: "יתרת חופשה ומחלה", note: leaveNote(place), pro: true) {
                     Toggle("מעקב יתרות", isOn: keepsBalance)
                         .settingsRow()
                     if place.rules.balanceDate != nil {
@@ -250,7 +268,43 @@ struct WorkplacePage: View {
                         Divider()
                         NumberRow(title: "יתרת מחלה", value: rule(\.sickBalance), unit: "ימים")
                         Divider()
-                        NumberRow(title: "ימי חופשה בשנה", value: rule(\.vacationDaysPerYear), unit: "ימים")
+                        NumberRow(title: "ימי חופשה בשנה", value: vacationDays, unit: "ימים")
+                        // the extension order for a shortened week: a five-day week's
+                        if place.startDate != nil && place.standardByDay.compactMap({ $0 }).count < 6 {
+                            Divider()
+                            Toggle("צו ההרחבה חל", isOn: rule(\.extensionOrder))
+                                .settingsRow()
+                        }
+                    }
+                }
+
+                SettingsSection(title: "דמי הבראה", note: recuperationNote(place), pro: true) {
+                    Toggle("חישוב דמי הבראה", isOn: rule(\.recuperationOn))
+                        .settingsRow()
+                    if place.rules.recuperationOn {
+                        Divider()
+                        NumberRow(title: "תעריף ליום", value: rule(\.recuperationRate), unit: s.currency)
+                        Divider()
+                        Picker("תשלום", selection: rule(\.recuperationMonthly)) {
+                            Text("פעם בשנה").tag(false)
+                            Text("כל חודש").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.vertical, 12)
+                        if !place.rules.recuperationMonthly {
+                            Divider()
+                            HStack {
+                                Text("בחודש")
+                                Spacer()
+                                Picker("בחודש", selection: rule(\.recuperationMonth)) {
+                                    ForEach(0..<12, id: \.self) { month in
+                                        Text(Format.monthName(month)).tag(month)
+                                    }
+                                }
+                                .labelsHidden()
+                            }
+                            .settingsRow()
+                        }
                     }
                 }
 
@@ -546,6 +600,60 @@ struct WorkplacePage: View {
                 change { $0.rules[keyPath: key] = value }
             }
         )
+    }
+
+    /// The day work began there, a day.
+    private var startDate: Binding<Date> {
+        Binding(
+            get: { store.settings.place(placeID).startDate ?? LocalTime.startOfDay(Date()) },
+            set: { date in
+                let day = LocalTime.startOfDay(date)
+                guard store.settings.place(placeID).startDate != day else { return }
+                change { $0.startDate = day }
+            }
+        )
+    }
+
+    /// The vacation days a year: its own number, or the law's by the seniority when more.
+    private var vacationDays: Binding<Double> {
+        Binding(
+            get: { Calc.vacationDaysPerYear(store.settings, at: placeID, on: Date()) },
+            set: { value in
+                guard store.settings.place(placeID).rules.vacationDaysPerYear != value else { return }
+                change { $0.rules.vacationDaysPerYear = value }
+            }
+        )
+    }
+
+    /// The seniority, and what it decides.
+    private func seniorityNote(_ place: Workplace) -> String {
+        guard let start = place.startDate else { return "לפי התאריך נקבעים הוותק, ימי החופשה בשנה ודמי ההבראה." }
+        let worked = Calc.seniority(from: start, to: Date())
+        return Format.seniority(years: worked.years, months: worked.months) + ". לפיו נקבעים ימי החופשה בשנה ודמי ההבראה."
+    }
+
+    /// The days off left, and the vacation days a year by the seniority.
+    private func leaveNote(_ place: Workplace) -> String {
+        let kept = "היתרות והתאריך מהתלוש האחרון של המעסיק הזה. מאז, בכל חודש נוסף חלק מימי החופשה של השנה ו-1.5 ימי מחלה (עד 90), ויורדים ימי החופשה והמחלה שרשמת כאן."
+        guard let start = place.startDate, let legal = Calc.legalVacationDays(store.settings, at: placeID, on: Date()) else {
+            return kept + " עם תאריך תחילת עבודה, ימי החופשה בשנה נקבעים לפי הוותק."
+        }
+        let year = max(1, LocalTime.parts(Date()).year - LocalTime.parts(start).year + 1)
+        let by = place.standardByDay.compactMap { $0 }.count >= 6 ? "לפי החוק, בשבוע של 6 ימים"
+            : place.rules.extensionOrder ? "לפי צו ההרחבה. הצו חל על רוב מקומות העבודה עם שבוע של 5 ימים, לא על מקום עם פחות מ־4 עובדים, חברות ממשלתיות ועירוניות ומשק בית"
+            : "לפי החוק, בשבוע של 5 ימים"
+        return kept + " בשנה \(year) לעבודה מגיעים לפחות \(Int(legal)) ימי חופשה \(by). אם המעסיק נותן יותר, אפשר לרשום."
+    }
+
+    /// The recuperation pay's days by the seniority, and the job's share.
+    private func recuperationNote(_ place: Workplace) -> String {
+        guard let start = place.startDate else {
+            return "צריך תאריך תחילת עבודה, בראש הדף: 5 ימים בשנה אחרי שנת העבודה הראשונה, ועד 10 מהשנה ה־20."
+        }
+        let years = Calc.seniority(from: start, to: Date()).years
+        let days = years < 1 ? "מגיעים אחרי שנת עבודה" : "\(Int(Calc.recuperationDays(year: years))) ימים בשנה לפי הוותק"
+        let share = Int(jsRound(Calc.jobShare(place) * 100))
+        return days + ", בהיקף משרה של \(share)% לפי שעות התקן. התעריף במגזר הפרטי ב־2026 הוא " + PayText.amount(451.5, store.settings.currency) + "."
     }
 
     /// Travel by the day, or a fixed sum a month.

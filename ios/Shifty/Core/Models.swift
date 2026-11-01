@@ -101,6 +101,16 @@ struct Settings: Hashable {
     var sickBalance = 0.0
     var balanceDate: Date?
     var vacationDaysPerYear = 12.0
+    /// The day work began at the own workplace, for its seniority: the vacation days by the law and the
+    /// recuperation pay (Pay.swift). Whether the extension order for a shortened week holds there; the
+    /// recuperation pay's day's worth (2026's in the private sector) and its month (0 January), or each month's
+    /// twelfth. The app's alone.
+    var startDate: Date?
+    var extensionOrder = true
+    var recuperationOn = true
+    var recuperationRate = 451.5
+    var recuperationMonthly = false
+    var recuperationMonth = 6
 
     /// The own workplace's pay from each date, the oldest first (Pay.swift); empty: by the hour at
     /// `hourlyWage`, from the start. And the other workplaces, with Shifty Pro. The app's alone.
@@ -277,6 +287,7 @@ extension Settings: Codable {
              travelPerDay, travelMonthlyCap, monthlyIncomeGoal, monthStartDay, weekStartsOn,
              creditPoints, pensionPercent, vacationBalance, sickBalance, balanceDate, vacationDaysPerYear,
              pensionEmployerPercent, severancePercent, studyFundPercent, studyFundEmployerPercent, travelMonthly,
+             startDate, extensionOrder, recuperationOn, recuperationRate, recuperationMonthly, recuperationMonth,
              payTerms, workplaces, updatedAt
     }
 
@@ -328,6 +339,12 @@ extension Settings: Codable {
         severancePercent = value(.severancePercent, d.severancePercent)
         studyFundPercent = value(.studyFundPercent, d.studyFundPercent)
         studyFundEmployerPercent = value(.studyFundEmployerPercent, d.studyFundEmployerPercent)
+        startDate = ISODate.decodeIfPresent(c, .startDate)
+        extensionOrder = value(.extensionOrder, d.extensionOrder)
+        recuperationOn = value(.recuperationOn, d.recuperationOn)
+        recuperationRate = value(.recuperationRate, d.recuperationRate)
+        recuperationMonthly = value(.recuperationMonthly, d.recuperationMonthly)
+        recuperationMonth = value(.recuperationMonth, d.recuperationMonth)
         vacationBalance = value(.vacationBalance, d.vacationBalance)
         sickBalance = value(.sickBalance, d.sickBalance)
         balanceDate = ISODate.decodeIfPresent(c, .balanceDate)
@@ -379,6 +396,12 @@ extension Settings: Codable {
         try c.encode(severancePercent, forKey: .severancePercent)
         try c.encode(studyFundPercent, forKey: .studyFundPercent)
         try c.encode(studyFundEmployerPercent, forKey: .studyFundEmployerPercent)
+        try c.encodeIfPresent(startDate.map(ISODate.string), forKey: .startDate)
+        try c.encode(extensionOrder, forKey: .extensionOrder)
+        try c.encode(recuperationOn, forKey: .recuperationOn)
+        try c.encode(recuperationRate, forKey: .recuperationRate)
+        try c.encode(recuperationMonthly, forKey: .recuperationMonthly)
+        try c.encode(recuperationMonth, forKey: .recuperationMonth)
         try c.encode(vacationBalance, forKey: .vacationBalance)
         try c.encode(sickBalance, forKey: .sickBalance)
         try c.encodeIfPresent(balanceDate.map(ISODate.string), forKey: .balanceDate)

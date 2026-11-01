@@ -54,6 +54,8 @@ struct Totals {
     var salary = 0.0
     var extraOvertime = 0.0
     var bonus = 0.0
+    /// The recuperation pay due in it (Calc.recuperation).
+    var recuperation = 0.0
 }
 
 /// The hours missing ("שעות חוסר"): each day's net hours against the standard it is expected to meet.

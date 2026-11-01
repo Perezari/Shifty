@@ -34,7 +34,7 @@ extension Calc {
             }
         }
         let months = monthsBetween(since, now)
-        return LeaveBalance(vacation: rules.vacationBalance + rules.vacationDaysPerYear / 12 * Double(months) - Double(vacation.count),
+        return LeaveBalance(vacation: rules.vacationBalance + vacationDaysPerYear(s, at: place, on: now) / 12 * Double(months) - Double(vacation.count),
                             sick: min(sickDaysMost, rules.sickBalance + sickDaysPerMonth * Double(months)) - Double(sick.count),
                             months: months, vacationTaken: vacation.count, sickTaken: sick.count)
     }

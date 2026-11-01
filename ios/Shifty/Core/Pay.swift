@@ -85,6 +85,13 @@ struct EmployerRules: Hashable {
     var severancePercent = 6.0
     var studyFundPercent = 0.0
     var studyFundEmployerPercent = 0.0
+    /// Whether the extension order for a shortened week holds (its vacation days, in a five-day week), and the
+    /// recuperation pay: its day's worth, and its month (0 January) or each month's twelfth.
+    var extensionOrder = true
+    var recuperationOn = true
+    var recuperationRate = 451.5
+    var recuperationMonthly = false
+    var recuperationMonth = 6
 }
 
 /// A workplace besides the settings' own (Shifty Pro): its name, its pay from each date, the standard hours of
@@ -103,6 +110,23 @@ struct Workplace: Hashable, Identifiable {
     var monthStartDay: Int?
     /// Travel as a fixed sum a month instead of each day's, for a period worked in; nil: by the day.
     var travelMonthly: Double?
+    /// The day work began there, for its seniority; nil: not given.
+    var startDate: Date?
+}
+
+/// A workplace's next recuperation pay (NowView's card).
+struct RecuperationDue: Identifiable {
+    /// The workplace's id; "" for the own.
+    let id: String
+    let name: String
+    /// The days of the year of work it pays.
+    let days: Double
+    /// The year's, or each month's twelfth of it.
+    let amount: Double
+    /// The first of the month it is paid with; nil when it is paid each month.
+    let due: Date?
+    /// The whole years of work now.
+    let years: Int
 }
 
 /// A yearly bonus accrued since it was last paid, toward its next payment.
@@ -128,7 +152,9 @@ extension Settings {
                           pensionPercent: pensionPercent, vacationBalance: vacationBalance, sickBalance: sickBalance,
                           balanceDate: balanceDate, vacationDaysPerYear: vacationDaysPerYear,
                           pensionEmployerPercent: pensionEmployerPercent, severancePercent: severancePercent,
-                          studyFundPercent: studyFundPercent, studyFundEmployerPercent: studyFundEmployerPercent)
+                          studyFundPercent: studyFundPercent, studyFundEmployerPercent: studyFundEmployerPercent,
+                          extensionOrder: extensionOrder, recuperationOn: recuperationOn, recuperationRate: recuperationRate,
+                          recuperationMonthly: recuperationMonthly, recuperationMonth: recuperationMonth)
         }
         set {
             overtime1Hours = newValue.overtime1Hours
@@ -156,6 +182,11 @@ extension Settings {
             severancePercent = newValue.severancePercent
             studyFundPercent = newValue.studyFundPercent
             studyFundEmployerPercent = newValue.studyFundEmployerPercent
+            extensionOrder = newValue.extensionOrder
+            recuperationOn = newValue.recuperationOn
+            recuperationRate = newValue.recuperationRate
+            recuperationMonthly = newValue.recuperationMonthly
+            recuperationMonth = newValue.recuperationMonth
         }
     }
 
@@ -219,7 +250,7 @@ extension Settings {
         if let id, let place = workplaces.first(where: { $0.id == id }) { return place }
         return Workplace(id: "", name: workplaceName, pay: ownPay, standardByDay: standardByDay,
                          travelPerDay: travelPerDay, travelMonthlyCap: travelMonthlyCap, rules: rules,
-                         monthStartDay: monthStartDay, travelMonthly: travelMonthly)
+                         monthStartDay: monthStartDay, travelMonthly: travelMonthly, startDate: startDate)
     }
 
     /// The day a workplace's pay month starts: its own, or the own workplace's, which is the app's pay period.
@@ -245,6 +276,7 @@ extension Settings {
         rules = place.rules
         if let day = place.monthStartDay { monthStartDay = day }
         travelMonthly = place.travelMonthly
+        startDate = place.startDate
         if pay.count == 1 && pay[0].kind == .hourly && pay[0].bonus == 0 {
             payTerms = []
             hourlyWage = pay[0].hourlyWage
@@ -278,6 +310,8 @@ extension Calc {
         let monthly = monthlyTravel(shifts, s, range: range)
         totals.travel += monthly
         totals.total += monthly
+        totals.recuperation = recuperation(s, range: range)
+        totals.total += totals.recuperation
         let places = s.payPlaces
         guard places.contains(where: { place in place.pay.contains { $0.kind == .monthly || $0.bonus > 0 } }) else { return totals }
         let years = LocalTime.parts(range.start).year...LocalTime.parts(range.end).year
@@ -293,7 +327,7 @@ extension Calc {
             }
         }
         totals.extraOvertime = extraOvertime(shifts, s, range: range, asOf: asOf)
-        totals.total = totals.pay + totals.travel + totals.salary + totals.extraOvertime + totals.bonus
+        totals.total = totals.pay + totals.travel + totals.salary + totals.extraOvertime + totals.bonus + totals.recuperation
         return totals
     }
 
@@ -324,6 +358,111 @@ extension Calc {
             // by whole days, across a change of the clocks
             let share = max(0, min(1, Double(daysBetween(last, LocalTime.startOfDay(date))) / Double(max(1, daysBetween(last, due)))))
             return AccruedBonus(id: id ?? "", name: place.name, accrued: terms.bonus * share, amount: terms.bonus, due: due)
+        }
+    }
+
+    /// The vacation days a calendar year of work gives by the seniority in calendar years (the first, 1), as
+    /// kolzchut.org.il gives them in 2026: in a five-day week by the extension order for a shortened week (12, 17
+    /// from the 6th, 23 from the 9th) or else by the law (12, then 14 up to 20); in a six-day week by the law (14,
+    /// then 16 up to 24).
+    static func legalVacationDays(year: Int, sixDays: Bool, extensionOrder: Bool) -> Double {
+        if sixDays {
+            let days: [Double] = [16, 18, 19, 20, 21, 22, 23]
+            return year <= 5 ? 14 : year - 6 < days.count ? days[year - 6] : 24
+        }
+        if extensionOrder { return year <= 5 ? 12 : year <= 8 ? 17 : 23 }
+        let days: [Double] = [14, 15, 16, 17, 18, 19]
+        return year <= 5 ? 12 : year - 6 < days.count ? days[year - 6] : 20
+    }
+
+    /// The law's vacation days a year at a workplace on `date`, by its seniority in calendar years; nil without its
+    /// start date.
+    static func legalVacationDays(_ s: Settings, at id: String?, on date: Date) -> Double? {
+        let place = s.place(id)
+        guard let start = place.startDate else { return nil }
+        return legalVacationDays(year: max(1, LocalTime.parts(date).year - LocalTime.parts(start).year + 1),
+                                 sixDays: place.standardByDay.compactMap { $0 }.count >= 6,
+                                 extensionOrder: place.rules.extensionOrder)
+    }
+
+    /// A workplace's vacation days a year at `date`: its own number, or the law's by its seniority when more.
+    static func vacationDaysPerYear(_ s: Settings, at id: String?, on date: Date) -> Double {
+        let own = s.place(id).rules.vacationDaysPerYear
+        return legalVacationDays(s, at: id, on: date).map { max(own, $0) } ?? own
+    }
+
+    /// The whole years and months of work from `start` to `date`.
+    static func seniority(from start: Date, to date: Date) -> (years: Int, months: Int) {
+        let a = LocalTime.parts(start)
+        let b = LocalTime.parts(date)
+        let months = max(0, (b.year - a.year) * 12 + b.month0 - a.month0 - (b.day < a.day ? 1 : 0))
+        return (months / 12, months % 12)
+    }
+
+    /// The recuperation days for a year of work, by the extension order: 5 for the first, 6 for the 2nd and 3rd,
+    /// 7 up to the 10th, 8 up to the 15th, 9 up to the 19th, 10 from the 20th.
+    static func recuperationDays(year: Int) -> Double {
+        switch year {
+        case ..<1: 0
+        case 1: 5
+        case 2...3: 6
+        case 4...10: 7
+        case 11...15: 8
+        case 16...19: 9
+        default: 10
+        }
+    }
+
+    /// A workplace's job as a share of a full one: its standard week over 42 hours.
+    static func jobShare(_ place: Workplace) -> Double {
+        min(1, place.standardByDay.compactMap { $0 }.reduce(0, +) / 42)
+    }
+
+    /// A workplace's recuperation pay for the years of work completed by `date`; none before the first.
+    static func recuperationPay(_ place: Workplace, at date: Date) -> (days: Double, amount: Double)? {
+        guard place.rules.recuperationOn, let start = place.startDate else { return nil }
+        let years = seniority(from: start, to: date).years
+        guard years >= 1 else { return nil }
+        let days = recuperationDays(year: years)
+        return (days, days * place.rules.recuperationRate * jobShare(place))
+    }
+
+    /// The recuperation pay in a period: each workplace's year's with the pay of its month, or a twelfth of it
+    /// each month.
+    static func recuperation(_ s: Settings, range: TimeRange) -> Double {
+        let places: [String?] = [nil] + s.workplaces.map { Optional($0.id) }
+        var sum = 0.0
+        for id in places {
+            let place = s.place(id)
+            if place.rules.recuperationMonthly {
+                if let pay = recuperationPay(place, at: range.start) { sum += pay.amount / 12 }
+                continue
+            }
+            for year in LocalTime.parts(range.start).year...LocalTime.parts(range.end).year {
+                let due = LocalTime.date(year, place.rules.recuperationMonth, 1)
+                if due >= range.start && due < range.end, let pay = recuperationPay(place, at: due) { sum += pay.amount }
+            }
+        }
+        return sum
+    }
+
+    /// Each workplace's next recuperation pay from `date` (NowView's card): its year's, on the first of its month,
+    /// or a twelfth of it each month.
+    static func upcomingRecuperation(_ s: Settings, at date: Date) -> [RecuperationDue] {
+        let places: [String?] = [nil] + s.workplaces.map { Optional($0.id) }
+        return places.compactMap { id -> RecuperationDue? in
+            let place = s.place(id)
+            guard let start = place.startDate else { return nil }
+            let years = seniority(from: start, to: date).years
+            if place.rules.recuperationMonthly {
+                guard let pay = recuperationPay(place, at: date) else { return nil }
+                return RecuperationDue(id: id ?? "", name: place.name, days: pay.days, amount: pay.amount / 12, due: nil, years: years)
+            }
+            let year = LocalTime.parts(date).year
+            var due = LocalTime.date(year, place.rules.recuperationMonth, 1)
+            if due < LocalTime.startOfDay(date) { due = LocalTime.date(year + 1, place.rules.recuperationMonth, 1) }
+            guard let pay = recuperationPay(place, at: due) else { return nil }
+            return RecuperationDue(id: id ?? "", name: place.name, days: pay.days, amount: pay.amount, due: due, years: years)
         }
     }
 
@@ -460,7 +599,8 @@ extension EmployerRules: Codable {
              nightEnabled, nightStart, nightEnd, nightMult, holidayEveHours, vacationHours,
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, pensionPercent,
              vacationBalance, sickBalance, balanceDate, vacationDaysPerYear,
-             pensionEmployerPercent, severancePercent, studyFundPercent, studyFundEmployerPercent
+             pensionEmployerPercent, severancePercent, studyFundPercent, studyFundEmployerPercent,
+             extensionOrder, recuperationOn, recuperationRate, recuperationMonthly, recuperationMonth
     }
 
     /// A missing key takes the default, as the settings' do.
@@ -495,6 +635,11 @@ extension EmployerRules: Codable {
         severancePercent = value(.severancePercent, d.severancePercent)
         studyFundPercent = value(.studyFundPercent, d.studyFundPercent)
         studyFundEmployerPercent = value(.studyFundEmployerPercent, d.studyFundEmployerPercent)
+        extensionOrder = value(.extensionOrder, d.extensionOrder)
+        recuperationOn = value(.recuperationOn, d.recuperationOn)
+        recuperationRate = value(.recuperationRate, d.recuperationRate)
+        recuperationMonthly = value(.recuperationMonthly, d.recuperationMonthly)
+        recuperationMonth = value(.recuperationMonth, d.recuperationMonth)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -524,12 +669,17 @@ extension EmployerRules: Codable {
         try c.encode(severancePercent, forKey: .severancePercent)
         try c.encode(studyFundPercent, forKey: .studyFundPercent)
         try c.encode(studyFundEmployerPercent, forKey: .studyFundEmployerPercent)
+        try c.encode(extensionOrder, forKey: .extensionOrder)
+        try c.encode(recuperationOn, forKey: .recuperationOn)
+        try c.encode(recuperationRate, forKey: .recuperationRate)
+        try c.encode(recuperationMonthly, forKey: .recuperationMonthly)
+        try c.encode(recuperationMonth, forKey: .recuperationMonth)
     }
 }
 
 extension Workplace: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules, monthStartDay, travelMonthly
+        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules, monthStartDay, travelMonthly, startDate
     }
 
     init(from decoder: Decoder) throws {
@@ -545,6 +695,7 @@ extension Workplace: Codable {
         rules = (try? c.decodeIfPresent(EmployerRules.self, forKey: .rules)) ?? d.rules
         monthStartDay = (try? c.decodeIfPresent(Int.self, forKey: .monthStartDay)) ?? nil
         travelMonthly = (try? c.decodeIfPresent(Double.self, forKey: .travelMonthly)) ?? nil
+        startDate = ISODate.decodeIfPresent(c, .startDate)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -558,5 +709,6 @@ extension Workplace: Codable {
         try c.encode(rules, forKey: .rules)
         try c.encodeIfPresent(monthStartDay, forKey: .monthStartDay)
         try c.encodeIfPresent(travelMonthly, forKey: .travelMonthly)
+        try c.encodeIfPresent(startDate.map(ISODate.string), forKey: .startDate)
     }
 }

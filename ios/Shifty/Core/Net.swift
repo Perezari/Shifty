@@ -112,7 +112,7 @@ extension Calc {
         guard projected, gross > 0 else { return netPay(gross: gross, saved: saved(1), creditPoints: s.creditPoints) }
         // the wages head on with the rest of the income that is not fixed
         let ahead = projectedIncome(shifts, s, range: range, asOf: now)
-        let fixed = totals.salary + totals.bonus + monthlyTravel(shifts, s, range: range)
+        let fixed = totals.salary + totals.bonus + totals.recuperation + monthlyTravel(shifts, s, range: range)
         let pace = gross - fixed > 0 ? (ahead - fixed) / (gross - fixed) : 1
         return netPay(gross: ahead, saved: saved(pace), creditPoints: s.creditPoints)
     }

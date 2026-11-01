@@ -145,6 +145,9 @@ struct NowView: View {
                 ForEach(Calc.accruedBonuses(settings, at: date)) { bonus in
                     BonusCard(bonus: bonus, named: !settings.workplaces.isEmpty, currency: settings.currency)
                 }
+                ForEach(Calc.upcomingRecuperation(settings, at: date)) { due in
+                    RecuperationCard(due: due, named: !settings.workplaces.isEmpty, currency: settings.currency)
+                }
             }
         }
     }
@@ -1355,6 +1358,48 @@ private struct BonusCard: View {
                 .tint(Color.accentColor)
         }
         .card()
+    }
+}
+
+/// A workplace's next recuperation pay (Calc.upcomingRecuperation): its sum, its days by the seniority, and when it
+/// is paid, or each month's.
+private struct RecuperationCard: View {
+    let due: RecuperationDue
+    /// Its workplace's name shown, with more than one.
+    let named: Bool
+    let currency: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(named ? "דמי הבראה · " + due.name : "דמי הבראה")
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer()
+                Text(when)
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Text(Format.moneyShort(due.amount, currency))
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Spacer()
+                Text("\(Int(due.days)) ימים\(due.due == nil ? " בשנה" : "") · ותק של " + Format.seniority(years: due.years, months: 0))
+                    .font(.subheadline)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .card()
+    }
+
+    /// "ישולמו ביולי 2027", or "בכל חודש".
+    private var when: String {
+        guard let date = due.due else { return "בכל חודש" }
+        let p = LocalTime.parts(date)
+        return "ישולמו ב" + Format.monthName(p.month0) + " " + String(p.year)
     }
 }
 

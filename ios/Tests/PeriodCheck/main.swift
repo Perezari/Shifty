@@ -335,5 +335,41 @@ let letterBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder
 expect(letterBack.studyFundPercent == 2.5 && letterBack.severancePercent == 8.33 && letterBack.place(nil).travelMonthly == 600
        && letterBack.place(nil).rules.studyFundPercent == 2.5 && Settings().travelMonthly == nil, "in JSON, as the own workplace's")
 
+// seniority: the vacation days a year by the law, and recuperation pay
+expect(Calc.legalVacationDays(year: 1, sixDays: false, extensionOrder: true) == 12
+       && Calc.legalVacationDays(year: 6, sixDays: false, extensionOrder: true) == 17
+       && Calc.legalVacationDays(year: 9, sixDays: false, extensionOrder: true) == 23, "the extension order's 12, 17 and 23")
+expect(Calc.legalVacationDays(year: 6, sixDays: false, extensionOrder: false) == 14
+       && Calc.legalVacationDays(year: 12, sixDays: false, extensionOrder: false) == 20
+       && Calc.legalVacationDays(year: 13, sixDays: true, extensionOrder: true) == 24, "the law's, in a five-day week and a six-day one")
+var senior = s
+senior.startDate = LocalTime.date(2021, 2, 15) // 15 March 2021
+let worked = Calc.seniority(from: LocalTime.date(2021, 2, 15), to: LocalTime.date(2026, 10, 1))
+expect(worked.years == 5 && worked.months == 7, "5 years and 7 months on 1 November 2026")
+expect(Calc.vacationDaysPerYear(senior, at: nil, on: LocalTime.date(2026, 10, 1)) == 17, "2026, the 6th calendar year: 17")
+let july = Calc.period(around: LocalTime.date(2026, 6, 15), monthStartDay: 1)
+expect(near(Calc.recuperation(senior, range: july), 7 * 451.5) && Calc.recuperation(senior, range: november) == 0,
+       "July's: 5 years done, 7 days at 451.5; none in November")
+expect(near(Calc.periodTotals([], senior, range: july).recuperation, 7 * 451.5), "in July's income")
+expect(Calc.upcomingRecuperation(senior, at: LocalTime.date(2026, 10, 1)).first.map { $0.due == LocalTime.date(2027, 6, 1) && $0.days == 7 } == true,
+       "the next, with July 2027's pay")
+senior.extensionOrder = false
+expect(Calc.vacationDaysPerYear(senior, at: nil, on: LocalTime.date(2026, 10, 1)) == 14, "without the extension order: 14")
+senior.vacationDaysPerYear = 20
+expect(Calc.vacationDaysPerYear(senior, at: nil, on: LocalTime.date(2026, 10, 1)) == 20, "more of the employer's")
+expect(Calc.recuperationDays(year: 1) == 5 && Calc.recuperationDays(year: 3) == 6 && Calc.recuperationDays(year: 10) == 7
+       && Calc.recuperationDays(year: 20) == 10, "recuperation days by the years of work")
+senior.recuperationMonthly = true
+expect(near(Calc.recuperation(senior, range: november), 7 * 451.5 / 12), "or a twelfth each month")
+senior.standardByDay = [4, 4, 4, 4, 4, nil, nil]
+expect(near(Calc.recuperation(senior, range: november), 7 * 451.5 * 20 / 42 / 12), "a part-time job's share: 20 hours of 42")
+var fresh = s
+fresh.startDate = LocalTime.date(2026, 8, 1)
+expect(Calc.recuperation(fresh, range: july) == 0 && Calc.upcomingRecuperation(fresh, at: LocalTime.date(2026, 10, 1)).isEmpty,
+       "none in the first year")
+let seniorBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(senior))
+expect(seniorBack.startDate == senior.startDate && !seniorBack.extensionOrder && seniorBack.recuperationMonthly
+       && seniorBack.place(nil).startDate == senior.startDate && Settings().startDate == nil, "in JSON, as the own workplace's")
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)
