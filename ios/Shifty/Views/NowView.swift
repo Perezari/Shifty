@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The running shift on a twelve-hour dial (Core/Dial.swift): an arc from its start to the day's goal, with the
 /// time worked, its breaks and overtime, and now; in the middle the time worked and the wage. The goal's flag
@@ -425,7 +426,10 @@ struct NowView: View {
         HoldToEnd(menu: {
             [LiftSection(header: "לסיום עכשיו, להחזיק את הכפתור עד שיתמלא", items: [])]
                 + late("סיימתי כבר", .end, minutes: [15, 30], other: true)
-        }, end: end)
+        }, end: {
+            // with taps of its own as it fills, and when it is full (HoldToEnd)
+            withAnimation { _ = store.endShift() }
+        })
     }
 
     /// A button of the shift that a long press lifts as it is, with its menu.
@@ -500,12 +504,6 @@ struct NowView: View {
         tapped += 1
     }
 
-    private func end() {
-        guard lifter?.isShowing != true else { return }
-        withAnimation { _ = store.endShift() }
-        tapped += 1
-    }
-
     private func startBreak() {
         guard lifter?.isShowing != true else { return }
         withAnimation { store.startBreak() }
@@ -566,8 +564,14 @@ private struct HoldToEnd: View {
     @State private var pressedAt: Date?
     @State private var lastPress: (at: Date, held: Double)?
     @State private var spot = LiftSpot()
+    /// The taps as it fills.
+    @State private var ticking: Task<Void, Never>?
 
     private static let seconds = 1.5
+    /// The iPhone's taps: ten as it fills, each harder than the one before, and a success once it is full (UIKit's
+    /// generators, readied as the finger presses).
+    private static let charge = UIImpactFeedbackGenerator(style: .rigid)
+    private static let full = UINotificationFeedbackGenerator()
 
     var body: some View {
         Self.look(filled: filled)
@@ -618,7 +622,19 @@ private struct HoldToEnd: View {
             done = false
             pressedAt = now
             withAnimation(.linear(duration: Self.seconds)) { filled = 1 }
+            Self.charge.prepare()
+            Self.full.prepare()
+            ticking?.cancel()
+            ticking = Task {
+                for i in 0..<10 {
+                    Self.charge.impactOccurred(intensity: 0.3 + 0.07 * CGFloat(i))
+                    try? await Task.sleep(for: .seconds(Self.seconds / 10))
+                    if Task.isCancelled { return }
+                }
+            }
         } else {
+            ticking?.cancel()
+            ticking = nil
             if let pressedAt { lastPress = (now, now.timeIntervalSince(pressedAt)) }
             pressedAt = nil
             guard !done else { return }
@@ -627,6 +643,9 @@ private struct HoldToEnd: View {
     }
 
     private func finish() {
+        ticking?.cancel()
+        ticking = nil
+        Self.full.notificationOccurred(.success)
         done = true
         end()
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The shifts of a pay period, the newest first: the period's hours, hours missing, shifts and income, and
 /// each shift's hours and pay, a running one's going up each second (app.js renderShifts). A shift opens in the
@@ -29,14 +30,21 @@ struct ShiftsView: View {
             .onDisappear { shown = false }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        AddMenu(shift: { adding = true }, dayOff: { dayOff = $0 })
-                    } label: {
+                    // a long press lifts it with a day off, as the Now screen's plus: sooner than a menu of iOS's,
+                    // and with the iPhone's tap
+                    Button(action: add) {
                         Image(systemName: "plus")
-                    } primaryAction: {
-                        adding = true
                     }
                     .accessibilityLabel("הוספת משמרת")
+                    .liftable(card: false) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .glassEffect(.regular, in: Circle())
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } sections: {
+                        [.adding(shift: { adding = true }, dayOff: { dayOff = $0 })]
+                    }
                 }
             }
             .sheet(isPresented: $adding) {
@@ -60,6 +68,13 @@ struct ShiftsView: View {
                     offset = Calc.periodOffset(year: year, month0: month, monthStartDay: store.settings.monthStartDay, now: Date())
                 }
             }
+    }
+
+    /// A shift by hand, with the iPhone's tap; not the finger lifted after a long press.
+    private func add() {
+        guard lifter?.isShowing != true else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        adding = true
     }
 
     private func list(_ range: TimeRange, at date: Date) -> some View {

@@ -660,19 +660,6 @@ extension ShiftStore {
     }
 }
 
-/// What a plus adds, its menu on a long press: a shift by hand, or a paid vacation or sick day (the toolbar's
-/// plus, a menu of iOS's; LiftSection.adding for the others).
-struct AddMenu: View {
-    let shift: () -> Void
-    let dayOff: (ShiftType) -> Void
-
-    var body: some View {
-        Button("משמרת", systemImage: "timer", action: shift)
-        Button("יום חופש", systemImage: "sun.max") { dayOff(.vacation) }
-        Button("יום מחלה", systemImage: "cross.case") { dayOff(.sick) }
-    }
-}
-
 extension View {
     /// A shift's menu on a long press (Lift.swift), the shift lifted with how its pay adds up: editing it, its
     /// hours again today (in the editor, `copy`), its summary copied, and deleting it.
