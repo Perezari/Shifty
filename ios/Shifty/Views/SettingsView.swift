@@ -216,7 +216,7 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(title: "נעילה",
-                                note: "Shifty ננעלת בפתיחה ואחרי דקה ברקע, ונפתחת ב-\(AppLock.biometryName) או בקוד של האייפון. הנעילה היא של האייפון הזה בלבד.") {
+                                note: "האפליקציה ננעלת בפתיחה ואחרי דקה ברקע, ונפתחת ב-\(AppLock.biometryName) או בקוד של האייפון. הנעילה היא של האייפון הזה בלבד.") {
                     Toggle("נעילה עם \(AppLock.biometryName)", isOn: $lockSwitch)
                         .settingsRow()
                 }
@@ -258,7 +258,8 @@ struct SettingsView: View {
                     Link(destination: AppInfo.privacy) { actionRow("מדיניות פרטיות") }
                 }
 
-                Text("Shifty · גרסה \(AppInfo.version)")
+                // a right-to-left mark first: iOS lays out a line by its first letter, and Shifty's is English
+                Text("\u{200F}Shifty · גרסה \(AppInfo.version)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
