@@ -166,8 +166,9 @@ private struct Liftable: ViewModifier {
 }
 
 /// Where a liftable thing is on the screen, kept out of its view's state: it changes as the screen scrolls, and
-/// should draw nothing again. (Place is the workplace's, Live/Place.swift.)
-private final class LiftSpot {
+/// should draw nothing again (also the shift's end's, NowView's HoldToEnd). (Place is the workplace's,
+/// Live/Place.swift.)
+final class LiftSpot {
     var frame: CGRect = .zero
 }
 

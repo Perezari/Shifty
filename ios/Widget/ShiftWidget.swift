@@ -38,6 +38,8 @@ struct ShiftEntry: TimelineEntry {
     let currency: String
     /// Shifty Pro bought (ProFlag): without it, the widget asks for it.
     let pro: Bool
+    /// Whether a break is pressed at the running shift's workplace: not where it takes an automatic break.
+    let breaks: Bool
 
     static func now(_ date: Date = Date()) -> ShiftEntry {
         let files = ShiftStore.snapshot()
@@ -48,7 +50,8 @@ struct ShiftEntry: TimelineEntry {
         return ShiftEntry(date: date, start: active?.start, breakSince: status.activeBreak?.start,
                           workingSince: Date(ms: date.ms - status.netMs), worked: status.netMs / 1000,
                           goalAt: goalAt, goalHours: status.goal, pay: status.pay, currency: files.settings.currency,
-                          pro: ProFlag.on)
+                          pro: ProFlag.on,
+                          breaks: active.map { files.settings.effective(for: $0).autoBreakMinutes == 0 } ?? true)
     }
 
     var running: Bool { start != nil }
@@ -190,13 +193,16 @@ struct ShiftWidgetView: View {
         }
     }
 
-    /// While a shift runs, a break (or back from it) and the end; else, the start.
+    /// While a shift runs, a break (or back from it; none where the workplace takes an automatic break) and the
+    /// end; else, the start.
     @ViewBuilder
     private func buttons(size: CGFloat) -> some View {
         Group {
             if entry.running {
-                Button(intent: ToggleBreakIntent()) {
-                    RoundIcon(symbol: breakSymbol, color: breakColor, size: size)
+                if entry.onBreak || entry.breaks {
+                    Button(intent: ToggleBreakIntent()) {
+                        RoundIcon(symbol: breakSymbol, color: breakColor, size: size)
+                    }
                 }
                 Button(intent: EndShiftIntent()) {
                     RoundIcon(symbol: "stop.fill", color: .red, size: size)

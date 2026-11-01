@@ -342,9 +342,10 @@ struct NowView: View {
         return cells
     }
 
-    /// Start, or add by hand; while working, a break and the end; on a break, back to work and the end. Their
-    /// corners are the cards' (Theme.swift), not a capsule's. A long press lifts one (Lift.swift) with its press
-    /// made minutes back, the time each makes under it, for a press made too late; the plus, with a day off.
+    /// Start, or add by hand; while working, a break (none where the workplace takes an automatic break) and the
+    /// end; on a break, back to work and the end. Their corners are the cards' (Theme.swift), not a capsule's. A
+    /// long press lifts one (Lift.swift) with its press made minutes back, the time each makes under it, for a
+    /// press made too late; the end, held until it fills (HoldToEnd), is lifted by a tap; the plus, with a day off.
     private func actions() -> some View {
         actionButtons()
             .controlSize(.large)
@@ -364,8 +365,11 @@ struct NowView: View {
                 .controlSize(.large)
             } else {
                 HStack(spacing: 10) {
-                    lifting(ShiftButton(title: "הפסקה", systemImage: "pause.fill", color: .orange, action: startBreak)) {
-                        late("יצאתי להפסקה", .startBreak, minutes: [10, 20, 30])
+                    // an automatic break is taken off by itself: none is pressed
+                    if store.settings.effective(for: active).autoBreakMinutes == 0 {
+                        lifting(ShiftButton(title: "הפסקה", systemImage: "pause.fill", color: .orange, action: startBreak)) {
+                            late("יצאתי להפסקה", .startBreak, minutes: [10, 20, 30])
+                        }
                     }
                     endButton()
                 }
@@ -400,10 +404,12 @@ struct NowView: View {
         }
     }
 
+    /// The end, held until it fills; a tap lifts it with the end pressed too late, and a line on holding it.
     private func endButton() -> some View {
-        lifting(ShiftButton(title: "סיום משמרת", systemImage: "stop.fill", color: .red, action: end)) {
-            late("סיימתי כבר", .end, minutes: [15, 30], other: true)
-        }
+        HoldToEnd(menu: {
+            [LiftSection(header: "לסיום עכשיו, להחזיק את הכפתור עד שיתמלא", items: [])]
+                + late("סיימתי כבר", .end, minutes: [15, 30], other: true)
+        }, end: end)
     }
 
     /// A button of the shift that a long press lifts as it is, with its menu.
@@ -526,6 +532,107 @@ private struct ShiftButton: View {
             Label(title, systemImage: systemImage)
                 .frame(maxWidth: .infinity)
         }
+    }
+}
+
+/// The shift's end, held three seconds until it fills from its start, against a tap by mistake: let go before, it
+/// empties (designed in ios/preview). The fill is the same button, prominent in red, shown as far as the hold has
+/// come. A tap lifts it with its menu (Lift.swift), as a long press lifts the other buttons.
+private struct HoldToEnd: View {
+    let menu: () -> [LiftSection]
+    let end: () -> Void
+    @Environment(\.lifter) private var lifter
+    /// How far the hold has come, from 0 to 1.
+    @State private var filled = 0.0
+    @State private var done = false
+    /// When the press began; once let go, when and how long it was held: a tap is short, a hold let go is not.
+    @State private var pressedAt: Date?
+    @State private var lastPress: (at: Date, held: Double)?
+    @State private var spot = LiftSpot()
+
+    private static let seconds = 3.0
+
+    var body: some View {
+        ZStack {
+            button(filled: false)
+            button(filled: true)
+                .mask {
+                    GeometryReader { proxy in
+                        Rectangle()
+                            .frame(width: proxy.size.width * filled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+        }
+        .allowsHitTesting(false)
+        .overlay {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(perform: tap)
+                .onLongPressGesture(minimumDuration: Self.seconds, maximumDistance: 30, perform: finish, onPressingChanged: press)
+        }
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            spot.frame = frame
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("סיום משמרת")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { lift() }
+        .accessibilityAction(named: "סיום עכשיו", end)
+    }
+
+    /// Red on glass; filled, white on red.
+    @ViewBuilder
+    private func button(filled: Bool) -> some View {
+        if filled {
+            ShiftButton(title: "סיום משמרת", systemImage: "stop.fill", prominent: true) {}
+                .tint(.red)
+        } else {
+            ShiftButton(title: "סיום משמרת", systemImage: "stop.fill", color: .red) {}
+        }
+    }
+
+    private func press(_ pressing: Bool) {
+        let now = Date()
+        if pressing {
+            done = false
+            pressedAt = now
+            withAnimation(.linear(duration: Self.seconds)) { filled = 1 }
+        } else {
+            if let pressedAt { lastPress = (now, now.timeIntervalSince(pressedAt)) }
+            pressedAt = nil
+            guard !done else { return }
+            withAnimation(.easeOut(duration: 0.25)) { filled = 0 }
+        }
+    }
+
+    private func finish() {
+        done = true
+        end()
+    }
+
+    /// A tap, and not a hold let go: lifted with its menu.
+    private func tap() {
+        let now = Date()
+        let held = pressedAt.map { now.timeIntervalSince($0) }
+            ?? lastPress.flatMap { now.timeIntervalSince($0.at) < 0.5 ? $0.held : nil } ?? 0
+        guard !done, held < 0.4 else { return }
+        lift()
+    }
+
+    private func lift() {
+        let sections = menu()
+        guard let lifter, !lifter.isShowing, !sections.isEmpty else { return }
+        lifter.show(Lift(source: spot.frame, card: false, preview: AnyView(lifted), sections: sections))
+    }
+
+    /// As it looks lifted, over the blur.
+    private var lifted: some View {
+        button(filled: false)
+            .controlSize(.large)
+            .buttonBorderShape(.roundedRectangle(radius: 24))
     }
 }
 

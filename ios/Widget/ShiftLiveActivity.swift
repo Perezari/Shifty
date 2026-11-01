@@ -215,17 +215,20 @@ private struct ActivityBar: View {
     }
 }
 
-/// A break, or back from it, and the end, as round buttons.
+/// A break, or back from it, and the end, as round buttons; no break where the workplace takes an automatic one,
+/// unless one runs.
 private struct ActivityButtons: View {
     let state: ShiftActivityAttributes.ContentState
     let size: CGFloat
 
     var body: some View {
         HStack(spacing: 10) {
-            Button(intent: ToggleBreakIntent()) {
-                RoundIcon(symbol: breakSymbol, color: breakColor, size: size)
+            if state.breakSince != nil || state.breaks != false {
+                Button(intent: ToggleBreakIntent()) {
+                    RoundIcon(symbol: breakSymbol, color: breakColor, size: size)
+                }
+                .accessibilityLabel(breakLabel)
             }
-            .accessibilityLabel(breakLabel)
             Button(intent: EndShiftIntent()) {
                 RoundIcon(symbol: "stop.fill", color: .red, size: size)
             }

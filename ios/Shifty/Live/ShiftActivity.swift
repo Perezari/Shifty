@@ -24,6 +24,9 @@ struct ShiftActivityAttributes: ActivityAttributes {
         /// Whether the Lock Screen's activity is dark, as Shifty looks: iOS draws it light or dark by the
         /// wallpaper, not by the iPhone's appearance. Missing in an activity of an earlier build.
         var dark: Bool?
+        /// Whether a break is pressed at the shift's workplace: not where it takes an automatic break. Missing (as
+        /// pressed) in an activity of an earlier build.
+        var breaks: Bool?
     }
 
     /// The shift's id, to tell it from a shift that ran before.

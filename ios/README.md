@@ -15,7 +15,9 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   and `Demo.swift` the made-up shifts the screenshots show (debug builds only).
 - `Shifty/Views/`: the screens. `NowView` (the running shift on a twelve-hour dial, `Core/Dial.swift`: its
   goal's flag dragged to see the wage of leaving later, a global pay's overtime and the hours left to its
-  next bonus; then the week, the pay period, a holiday coming and each workplace's days off left), `ShiftsView`
+  next bonus; its end held three seconds until the button fills, and no break button where the workplace
+  takes an automatic break; then the week, the pay period, a holiday coming and each workplace's days off
+  left), `ShiftsView`
   (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
   of the work, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (the user's own
   settings: the holidays, the pay period, the credit points, the look, the notifications, the lock, iCloud,

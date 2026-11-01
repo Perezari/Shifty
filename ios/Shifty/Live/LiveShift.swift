@@ -88,12 +88,14 @@ enum LiveShift {
     /// The running shift now, for its Live Activity.
     static func state(_ store: ShiftStore, _ shift: Shift, at now: Date = Date()) -> ShiftActivityAttributes.ContentState {
         let status = Calc.nowStatus(store.shifts, store.settings, active: shift, at: now.ms)
+        let place = store.settings.effective(for: shift)
         var goalAt: Date? = nil
         if let finish = status.finishMs { goalAt = Date(ms: finish) }
         return ShiftActivityAttributes.ContentState(workingSince: Date(ms: now.ms - status.netMs), goalAt: goalAt,
                                                     breakSince: status.activeBreak?.start, worked: status.netMs / 1000,
                                                     goalHours: status.goal, start: shift.start,
-                                                    workplace: store.settings.effective(for: shift).workplaceName, dark: dark(store.settings))
+                                                    workplace: place.workplaceName, dark: dark(store.settings),
+                                                    breaks: place.autoBreakMinutes == 0)
     }
 
     /// Whether the Lock Screen's activity is dark: as Shifty looks, by its setting or by the iPhone's. iOS
@@ -214,6 +216,8 @@ enum Alerts {
 
     private static func plan(_ store: ShiftStore, _ shift: Shift, now: Date) -> [Planned] {
         let s = store.settings
+        // the shift's workplace's rules: its overtime and its automatic break
+        let rules = s.effective(for: shift)
         let status = Calc.nowStatus(store.shifts, s, active: shift, at: now.ms)
         var planned: [Planned] = []
         // the goal and the overtime move with a break: they are planned again when it ends
@@ -223,15 +227,16 @@ enum Alerts {
             let pay = s.isMonthly(shift) ? "" : Format.money(b.pay, s.currency) + " · "
             planned.append(Planned(id: "shifty.goal", date: Date(ms: finish), title: "🎯 הגעת ליעד היומי",
                                    body: Format.hoursToHM(b.netHours) + " שעות · " + pay + "מעכשיו שעות נוספות"))
-            if !shift.isHoliday && s.overtime1Hours > 0 && s.overtime2Mult != s.overtime1Mult {
-                let percent = Int(jsRound(s.overtime2Mult * 100))
-                planned.append(Planned(id: "shifty.overtime", date: Date(ms: finish + s.overtime1Hours * Calc.hour),
-                                       title: "⏱️ " + Format.hoursToHM(s.overtime1Hours) + " שעות נוספות",
+            if !shift.isHoliday && rules.overtime1Hours > 0 && rules.overtime2Mult != rules.overtime1Mult {
+                let percent = Int(jsRound(rules.overtime2Mult * 100))
+                planned.append(Planned(id: "shifty.overtime", date: Date(ms: finish + rules.overtime1Hours * Calc.hour),
+                                       title: "⏱️ " + Format.hoursToHM(rules.overtime1Hours) + " שעות נוספות",
                                        body: "מעכשיו כל שעה ב־\(percent)%."))
             }
         }
-        // six hours on end without a break, from the start or from the last break's end
-        if on(breakKey) && status.activeBreak == nil {
+        // six hours on end without a break, from the start or from the last break's end; none where the workplace
+        // takes an automatic break, as no break is pressed there
+        if on(breakKey) && status.activeBreak == nil && rules.autoBreakMinutes == 0 {
             let since = max(shift.start, shift.breaks.compactMap(\.end).max() ?? shift.start)
             planned.append(Planned(id: "shifty.break", date: since.addingTimeInterval(6 * 3600), title: "⏸️ שש שעות ברצף",
                                    body: "זה זמן טוב לעצור להפסקה.", category: Place.breakCategory))
