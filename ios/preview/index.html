@@ -157,6 +157,11 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .capsule svg { width: 17px; height: 17px; }
 .capsule.prominent { background: var(--accent); color: #fff; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 8px 22px color-mix(in srgb, var(--accent) 32%, transparent); }
 .square { flex: none; width: 56px; padding: 0; }
+/* (proposed) the shift's end held until its button fills from its start, against a tap by mistake; let go before, it empties */
+.capsule.hold { position: relative; overflow: hidden; touch-action: none; }
+.capsule.hold .fill { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--red); color: #fff; clip-path: inset(0 0 0 100%); transition: clip-path .25s ease-out; pointer-events: none; }
+.capsule.hold.holding .fill { clip-path: inset(0); transition: clip-path 1s linear; }
 
 .card { width: 100%; border-radius: 24px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -519,6 +524,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         <button type="button" id="places-1" data-places="1">מקום עבודה אחד</button>
         <button type="button" id="places-2" data-places="2">שניים</button>
       </div>
+      <div class="seg" role="group" aria-label="הפסקה">
+        <button type="button" id="auto-on" data-autobreak="1">הפסקה אוטומטית</button>
+        <button type="button" id="auto-off" data-autobreak="0">בלי</button>
+      </div>
     </div>
     <p class="note" id="note"></p>
   </div>
@@ -545,7 +554,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   // pay: the main workplace's pay now, "hourly" or "global"; places: one workplace or two; next: where the next shift is;
   // page: a workplace's page open in Settings
   // cover: what a global pay does with overtime ("all", "upTo", "none", or "tiers": a bonus at each target)
-  const state = { screen: "now", state: "work", theme: null, tab: "now", pro: false, pay: "hourly", places: 1, next: 0, cover: "tiers",
+  // autoBreak: (proposed) the main workplace takes an automatic break, so the Now screen has no break button
+  const state = { screen: "now", state: "work", theme: null, tab: "now", pro: false, pay: "hourly", places: 1, next: 0, cover: "tiers", autoBreak: true,
     plan: null, sheet: null, page: null };
   try { Object.assign(state, JSON.parse(localStorage.getItem("shifty-preview") || "{}")); } catch (e) {}
   state.plan = null;
@@ -569,9 +579,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   /** The wage of a day of `net` hours: its standard at the wage, then 125% for two hours and 150% after (Calc.breakdown). */
   const payFor = (net) => (Math.min(net, GOAL_H) + Math.min(Math.max(0, net - GOAL_H), 2) * 1.25 + Math.max(0, net - GOAL_H - 2) * 1.5) * WAGE;
   /** The net hours of the shift if it ends at `end`: its breaks, or the automatic break once it is six hours long. */
+  const autoBreakMs = () => state.autoBreak ? AUTO_BREAK_MIN * 60000 : 0;
   const netAt = (start, breakMs, end) => {
     const gross = end - start;
-    return Math.max(0, gross - (gross >= 6 * 3600000 ? Math.max(breakMs, AUTO_BREAK_MIN * 60000) : breakMs)) / 3600000;
+    return Math.max(0, gross - (gross >= 6 * 3600000 ? Math.max(breakMs, autoBreakMs()) : breakMs)) / 3600000;
   };
 
   // ---- the net pay, as Net.swift gives it at 2026's rates: the period heading to ₪ 8,640, ₪ 8,200 of it pensionable ----
@@ -606,7 +617,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   /** "בונוס ב־20 וב־40 שעות", "עד 30 שעות בחודש": what the pay does with overtime, in a row. */
   const coverText = () => ({ all: "כלולות בשכר", upTo: `עד ${OT_IN} שעות בחודש`, none: "משולמות כולן",
     tiers: `בונוס ב־${TIERS.map(([h]) => h).join(" וב־")} שעות` })[state.cover];
-  const SECOND = { name: "קפה אגם", wage: 42 };
+  const SECOND = { name: "קפה אגם", wage: 42, start: 10 };
   const isGlobal = () => state.pay === "global";
   const NET_GLOBAL = netPay(SALARY, SALARY);
   const netNow = () => isGlobal() ? NET_GLOBAL : NET;
@@ -629,11 +640,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const start = START;
     let breakMs = 0, open = null; const breaks = [];
     for (const [after, minutes] of scene.breaks) {
+      // (proposed) with an automatic break, none is logged: there is no button for it
+      if (minutes != null && state.autoBreak) continue;
       if (minutes == null) { const since = now - (scene.breakFor + elapsed) * 1000; open = since; breaks.push([since, now]); breakMs += now - since; }
       else { const bs = start + after * 60000; breaks.push([bs, bs + minutes * 60000]); breakMs += minutes * 60000; }
     }
     const net = netAt(start, breakMs, now), pay = payFor(net);
-    const finish = start + GOAL_H * 3600000 + Math.max(breakMs, AUTO_BREAK_MIN * 60000);
+    const finish = start + GOAL_H * 3600000 + Math.max(breakMs, autoBreakMs());
     return { now, running: true, start, breaks, breakMs, open, netMs: net * 3600000, net, pay, overtime: Math.max(0, net - GOAL_H),
       remaining: GOAL_H - net, finish, projected: net > 0.001 ? pay * (GOAL_H / net) : 0 };
   }
@@ -807,12 +820,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         : fact(clock(new Date(s.finish)), "יעד · עוד " + hm(s.remaining));
       facts = fact(clock(new Date(s.start)), "התחלה") + middle
         + (isGlobal() ? fact(hm(MONTH_HOURS + s.net), "שעות החודש") : fact(moneyShort(s.projected), "צפי ביעד"));
-      // as on the iPhone now (a39a6cd): the icon and the word in the button's color, on glass
+      // as on the iPhone now (a39a6cd): the icon and the word in the button's color, on glass. (proposed) The end held until
+      // its button fills, a tap opening what a long press opened; and with an automatic break, no break button
+      const endButton = `<button class="capsule glass hold" type="button" data-hold="end" data-menu="act:end" data-tap-menu style="color:var(--red)">${icon.stop}סיום משמרת<span class="fill" aria-hidden="true">${icon.stop}סיום משמרת</span></button>`;
       actions = onBreak
-        ? `<button class="capsule prominent" type="button" data-menu="act:back">${icon.play}חזרה לעבודה</button>
-           <button class="capsule glass" type="button" data-menu="act:end" style="color:var(--red)">${icon.stop}סיום משמרת</button>`
-        : `<button class="capsule glass" type="button" data-menu="act:brk" style="color:var(--orange)">${icon.pause}הפסקה</button>
-           <button class="capsule glass" type="button" data-menu="act:end" style="color:var(--red)">${icon.stop}סיום משמרת</button>`;
+        ? `<button class="capsule prominent" type="button" data-menu="act:back">${icon.play}חזרה לעבודה</button>${endButton}`
+        : (state.autoBreak ? "" : `<button class="capsule glass" type="button" data-menu="act:brk" style="color:var(--orange)">${icon.pause}הפסקה</button>`) + endButton;
     }
     return `<div class="now">${statusBar(s.now)}
       <div class="now-scroll scroll" data-scroll="now"><div class="stack">${top}${dial(s, center, plan)}<div class="facts glass">${facts}</div>
@@ -1065,7 +1078,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         ${sec("מקומות עבודה", places)}
         <p class="sec-note" style="margin-top:-2px">השכר, השעות, השעות הנוספות, החופשה, הפנסיה והתזכורת של כל מעסיק נמצאים בדף שלו.</p>
         ${sec("חגי ישראל", row("זיהוי חגים אוטומטי", "פועל"))}
-        ${sec("תקופת השכר", row("יום תחילת החודש", `<span class="num">1</span>`) + row("יעד הכנסה חודשי", "אין"))}
+        ${sec("יעד הכנסה", row("יעד הכנסה חודשי", "אין"))}
+        <p class="sec-note" style="margin-top:-2px">היעד שלך, מכל מקומות העבודה יחד. תקופת השכר נקבעת בדף של כל מקום עבודה.</p>
         ${proSec("נטו משוער", row("נקודות זיכוי", `<span class="num">2.25</span>`))}
         ${sec("תצוגה", row("מראה", "כמו האייפון"))}
         ${sec("התראות", row("התראות על המשמרת", "פועל"))}
@@ -1099,10 +1113,13 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
           + (state.cover === "upTo" || state.cover === "none" ? row("ערך שעה", `<span class="ltr num">${money(HOUR_VALUE)}</span>`) : "")
           + row("בונוס שנתי", `<span class="ltr num">${moneyShort(BONUS)}</span> במרץ`),
           state.cover === "tiers" ? "כל יעד שמגיעים אליו בחודש מוסיף את הבונוס שלו." : "ערך שעה הוא השכר החודשי חלקי 182.") : ""}
+        ${sec("תקופת השכר", row("יום תחילת החודש", `<span class="num">${second ? SECOND.start : 1}</span>`),
+          second ? "החודש שבתלוש של המעסיק הזה. לפיו נספרים השכר החודשי והיעדים שלו."
+            : "החודש שבתלוש של המעסיק. לפיו מקובצות המשמרות ונספרים השכר החודשי והיעדים.")}
         ${sec("שעות תקן ליום", second ? row("ו׳", `<span class="num">5:30</span>`) : row("א׳–ד׳", `<span class="num">9:06</span>`) + row("ה׳", `<span class="num">8:06</span>`))}
         ${sec("שעות נוספות", row("שעתיים ראשונות", pct(125)) + row("מעבר לכך", pct(150)))}
-        ${sec("הפסקות, שבת ולילה", row("הפסקה אוטומטית", second ? "אין" : `<span class="num">30</span> דק׳`) + row("תוספת שבת וחג", pct(150))
-          + row("חישוב שעות לילה", "כבוי"))}
+        ${sec("הפסקות, שבת ולילה", row("הפסקה אוטומטית", second || !state.autoBreak ? "אין" : `<span class="num">30</span> דק׳`) + row("תוספת שבת וחג", pct(150))
+          + row("חישוב שעות לילה", "כבוי"), "כשיש הפסקה אוטומטית, היא יורדת לבד מכל משמרת ארוכה, ואין כפתור הפסקה במסך עכשיו.")}
         ${sec("ערב חג", row("שעות עבודה בערב חג", `<span class="num">4:06</span>`))}
         ${sec("חופשה ומחלה", row("שעות ליום חופש", `<span class="num">${second ? "5:30" : "8:36"}</span>`) + row("מחלה, יום 1", pct(0))
           + row("מחלה, יום 2 ו־3", pct(50)) + row("מחלה, מיום 4", pct(100)))}
@@ -1203,7 +1220,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       const sections = {
         start: [{ head: "התחלתי כבר", items: [ago(15), ago(30), ago(60)] }, other],
         brk: [{ head: "יצאתי להפסקה", items: [ago(10), ago(20), ago(30)] }],
-        end: [{ head: "סיימתי כבר", items: [ago(15), ago(30)] }, other],
+        end: [{ head: "לסיום עכשיו, להחזיק את הכפתור עד שיתמלא", items: [] }, { head: "סיימתי כבר", items: [ago(15), ago(30)] }, other],
         back: [{ head: "חזרתי מההפסקה", items: [ago(5), ago(10)] }],
       }[arg];
       return sections ? { sections } : null;
@@ -1381,10 +1398,10 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
+    now: '<span class="tag">הצעה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". <span class="tag">הצעה</span>כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). <span class="tag built">כמו שבבנייה</span>בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
     shifts: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
     calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
-    settings: '<span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, תקופת השכר, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
+    settings: '<span class="tag">הצעה</span>תקופת השכר עוברת לדף של כל מקום עבודה, ובהגדרות נשאר יעד ההכנסה. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, תקופת השכר, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
@@ -1466,6 +1483,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     for (const b of document.querySelectorAll("[data-pro]")) b.setAttribute("aria-pressed", String((b.dataset.pro === "1") === state.pro));
     for (const b of document.querySelectorAll(".bar [data-pay]")) b.setAttribute("aria-pressed", String(b.dataset.pay === state.pay));
     for (const b of document.querySelectorAll(".bar [data-places]")) b.setAttribute("aria-pressed", String(+b.dataset.places === state.places));
+    for (const b of document.querySelectorAll(".bar [data-autobreak]")) b.setAttribute("aria-pressed", String((b.dataset.autobreak === "1") === state.autoBreak));
   }
 
   // dragging the flag along the dial: the time is the angle's on the twelve hours after the start, by five minutes
@@ -1496,7 +1514,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   let press = null, suppress = 0;
   device.addEventListener("pointerdown", (e) => {
     const el = e.target.closest("[data-menu]");
-    if (!el || state.menu || e.button > 0) return;
+    if (!el || state.menu || e.button > 0 || el.dataset.hold) return;
     touch();
     el.classList.add("pressing");
     press = { el, x: e.clientX, y: e.clientY, opened: false };
@@ -1512,10 +1530,39 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   device.addEventListener("pointermove", (e) => { if (press && !press.opened && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) release(); });
   device.addEventListener("pointerup", release);
   device.addEventListener("pointercancel", release);
+
+  // (proposed) held to end: the button fills from its start in a second, and then the shift ends; let go before, it empties.
+  // A tap opens its menu (data-tap-menu); a hold let go is no tap
+  let hold = null;
+  device.addEventListener("pointerdown", (e) => {
+    const el = e.target.closest("[data-hold]");
+    if (!el || state.menu || e.button > 0) return;
+    touch();
+    el.classList.add("holding");
+    hold = { el, x: e.clientX, y: e.clientY, at: Date.now() };
+    hold.timer = setTimeout(() => {
+      hold = null;
+      suppress = Date.now() + 400;
+      state.state = "idle";
+      state.plan = null;
+      save(); render();
+    }, 1000);
+  });
+  function letGo() {
+    if (!hold) return;
+    clearTimeout(hold.timer);
+    hold.el.classList.remove("holding");
+    if (Date.now() - hold.at > 250) suppress = Date.now() + 400;
+    hold = null;
+  }
+  device.addEventListener("pointermove", (e) => { if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 24) letGo(); });
+  device.addEventListener("pointerup", letGo);
+  device.addEventListener("pointercancel", letGo);
   device.addEventListener("contextmenu", (e) => {
     const el = e.target.closest("[data-menu]");
     if (!el) return;
     e.preventDefault();
+    if (el.dataset.hold) return;
     if (press) { clearTimeout(press.timer); press.el.classList.remove("pressing"); press = null; }
     if (!state.menu) { openMenu(el); suppress = Date.now() + 400; }
   });
@@ -1527,7 +1574,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const sections = def.sections.map((sec) => `<div class="cm-sec">${sec.head ? `<div class="cm-head">${sec.head}</div>` : ""}${sec.items.map((it) =>
       `<button class="cm-item${it.red ? " red" : ""}" type="button" data-cm-close${it.data ? " " + it.data : ""}><span>${it.title}${it.sub ? `<small class="num">${it.sub}</small>` : ""}</span>${it.svg || ""}</button>`).join("")}</div>`).join("");
     const lifted = def.preview ? `<div class="cm-preview cm-card">${def.preview}</div>`
-      : `<div class="cm-preview cm-src">${el.outerHTML.replace(/ data-menu="[^"]*"/, "").replace(" pressing", "")}</div>`;
+      : `<div class="cm-preview cm-src">${el.outerHTML.replace(/ data-menu="[^"]*"/, "").replace(/ data-hold="[^"]*"/, "").replace(" data-tap-menu", "").replace(" pressing", "").replace(" holding", "")}</div>`;
     layer.innerHTML = `<div class="cm"><button class="cm-dim" type="button" data-cm-close aria-label="סגירה"></button>${lifted}<div class="cm-menu" role="menu">${sections}</div></div>`;
     state.menu = el.dataset.menu;
     // a shift or a day lifted where it was, its menu under it; a button where it is, its menu over it when it is low on the
@@ -1562,7 +1609,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   function save() {
     try {
       localStorage.setItem("shifty-preview", JSON.stringify({ screen: state.screen, state: state.state, theme: state.theme, tab: state.tab, pro: state.pro,
-        pay: state.pay, places: state.places, next: state.next, cover: state.cover }));
+        pay: state.pay, places: state.places, next: state.next, cover: state.cover, autoBreak: state.autoBreak }));
     } catch (e) {}
   }
 
@@ -1583,6 +1630,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     // (proposed) the pay and the workplaces: the page's switches, a workplace's page, and deleting one
     else if (b.dataset.pay) state.pay = b.dataset.pay;
     else if (b.dataset.cover) state.cover = b.dataset.cover;
+    else if (b.dataset.autobreak) state.autoBreak = b.dataset.autobreak === "1";
     else if (b.dataset.places) { state.places = +b.dataset.places; if (state.places === 1) { state.next = 0; if (state.page === "1") state.page = null; } }
     else if (b.dataset.del) { state.places = 1; state.next = 0; state.page = null; }
     else if (b.dataset.page != null) { state.page = b.dataset.page || null; state.sheet = null; }
@@ -1601,6 +1649,6 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   document.documentElement.lang = "he";
   addEventListener("resize", fit);
   fit(); render();
-  setInterval(() => { if (!dragging && !press && Date.now() - touched > 1200) render(); }, 1000);
+  setInterval(() => { if (!dragging && !press && !hold && Date.now() - touched > 1200) render(); }, 1000);
 })();
 </script>
