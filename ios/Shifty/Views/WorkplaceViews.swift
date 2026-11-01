@@ -75,14 +75,9 @@ struct WorkplacesSection: View {
         }
         let id = ShiftStore.newID()
         let own = store.settings
-        var rules = own.rules
-        // a new employer's payslip, not the own one's
-        rules.balanceDate = nil
-        rules.vacationBalance = 0
-        rules.sickBalance = 0
         let place = Workplace(id: id, name: "מקום עבודה \(own.workplaces.count + 2)",
                               pay: [PayTerms(id: id + "-pay", from: PayTerms.start, hourlyWage: own.hourlyWage)],
-                              standardByDay: own.standardByDay, rules: rules)
+                              standardByDay: own.standardByDay, rules: own.startingRules)
         store.updateSettings { $0.workplaces.append(place) }
         added = id
     }

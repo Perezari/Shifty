@@ -252,5 +252,22 @@ expect(twoBack.workplaces == two.workplaces && globalBack.payTerms == global.pay
        "the workplaces, the pay's terms and a shift's workplace")
 expect((try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(s))).payTerms.isEmpty, "none by default")
 
+// a workplace saved before each employer's rules were its own keeps the own one's, without its payslip's days off
+var ruled = Settings()
+ruled.autoBreakMinutes = 30
+ruled.vacationBalance = 5
+ruled.balanceDate = LocalTime.date(2026, 9, 30)
+ruled.workplaces = [Workplace(id: "cafe", name: "קפה", pay: [PayTerms(id: "cafe-pay", from: PayTerms.start)])]
+var olderJSON = try! JSONSerialization.jsonObject(with: try! JSONEncoder().encode(ruled)) as! [String: Any]
+var olderPlaces = olderJSON["workplaces"] as! [[String: Any]]
+olderPlaces[0]["rules"] = nil
+olderJSON["workplaces"] = olderPlaces
+let older = try! JSONDecoder().decode(Settings.self, from: try! JSONSerialization.data(withJSONObject: olderJSON))
+expect(older.workplaces[0].rules.autoBreakMinutes == 30 && older.workplaces[0].rules.balanceDate == nil
+       && older.workplaces[0].rules.vacationBalance == 0 && older.rules == ruled.rules,
+       "an older workplace takes the own rules, not the own payslip")
+let kept = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(ruled))
+expect(kept.workplaces[0].rules.autoBreakMinutes == 0 && kept.workplaces == ruled.workplaces, "a workplace's own rules stay its own")
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

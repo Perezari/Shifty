@@ -133,6 +133,15 @@ extension Settings {
         }
     }
 
+    /// The rules another workplace starts with: the own one's, without its payslip's days off.
+    var startingRules: EmployerRules {
+        var rules = rules
+        rules.balanceDate = nil
+        rules.vacationBalance = 0
+        rules.sickBalance = 0
+        return rules
+    }
+
     /// The settings' own workplace's pay: its terms from each date, or by the hour at `hourlyWage` from the
     /// start.
     var ownPay: [PayTerms] {

@@ -321,6 +321,10 @@ extension Settings: Codable {
         payTerms = value(.payTerms, d.payTerms)
         workplaces = value(.workplaces, d.workplaces)
         updatedAt = ISODate.decodeIfPresent(c, .updatedAt)
+        // a workplace saved before each employer's rules were its own was counted by the own one's: it keeps them
+        for (i, place) in value(.workplaces, [RulesKept]()).enumerated() where !place.kept && i < workplaces.count {
+            workplaces[i].rules = startingRules
+        }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -363,5 +367,18 @@ extension Settings: Codable {
         if !payTerms.isEmpty { try c.encode(payTerms, forKey: .payTerms) }
         if !workplaces.isEmpty { try c.encode(workplaces, forKey: .workplaces) }
         try c.encodeIfPresent(updatedAt.map(ISODate.string), forKey: .updatedAt)
+    }
+}
+
+/// Whether a workplace's JSON holds its employer's rules: one saved before they were each its own has none.
+private struct RulesKept: Decodable {
+    let kept: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case rules
+    }
+
+    init(from decoder: Decoder) throws {
+        kept = (try? decoder.container(keyedBy: CodingKeys.self))?.contains(.rules) ?? false
     }
 }
