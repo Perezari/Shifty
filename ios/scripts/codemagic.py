@@ -10,6 +10,7 @@ A build takes some of the month's free minutes, so one is started only when the 
     python ios/scripts/codemagic.py wait <build id>
     python ios/scripts/codemagic.py errors <build id>
     python ios/scripts/codemagic.py artifacts <build id> [folder]   # into ios/build/screenshots
+    python ios/scripts/codemagic.py cancel <build id>
 """
 import json
 import os
@@ -116,6 +117,9 @@ elif command == "wait":
         errors(current)
 elif command == "errors":
     errors(build(sys.argv[2]))
+elif command == "cancel":
+    call("POST", f"/builds/{sys.argv[2]}/cancel")
+    print(line(build(sys.argv[2])))
 elif command == "artifacts":
     here = os.path.dirname(os.path.abspath(__file__))
     folder = sys.argv[3] if len(sys.argv) > 3 else os.path.join(here, "..", "build", "screenshots")

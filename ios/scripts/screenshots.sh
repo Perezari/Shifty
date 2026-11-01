@@ -34,6 +34,12 @@ xcrun simctl install "$udid" build/derived/Build/Products/Debug-iphonesimulator/
 xcrun simctl status_bar "$udid" override --dataNetwork wifi --wifiMode active --wifiBars 3 \
   --cellularMode active --cellularBars 4 --operatorName "" --batteryState discharging --batteryLevel 100 || true
 
+# A first launch, not photographed: the simulator's own notices on a new boot (an Apple Intelligence banner)
+# come and go before the pictures.
+SIMCTL_CHILD_TZ=Asia/Jerusalem xcrun simctl launch "$udid" com.perezari.shifty -screenshot settings >/dev/null
+sleep 30
+xcrun simctl terminate "$udid" com.perezari.shifty || true
+
 mkdir -p build/screenshots
 # shoot <screen> <file> [seconds to wait]. The app runs on Israel's clock and the status bar shows the same
 # minute, so the running shift's start agrees with the time at the top.

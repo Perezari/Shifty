@@ -15,12 +15,13 @@ struct ProSheet: View {
         let text: String
     }
 
-    /// What Shifty Pro opens, each with its line (the preview's PRO).
+    /// What Shifty Pro opens, each with its line (the preview's PRO). A title that begins in English begins
+    /// with a right-to-left mark: iOS lays out a line by its first letter, and Siri's would read backwards.
     private static let features = [
         Feature(symbol: "banknote", title: "נטו משוער", text: "כמה ייכנס לחשבון בסוף התקופה, אחרי מס, ביטוח לאומי ופנסיה."),
         Feature(symbol: "sun.max", title: "יתרות חופשה ומחלה", text: "לפי התלוש האחרון, ומתעדכנות כל חודש."),
         Feature(symbol: "iphone", title: "מסך הנעילה והווידג׳טים", text: "המשמרת שרצה ב-Live Activity, ב-Dynamic Island ובמסך הבית."),
-        Feature(symbol: "mic", title: "Siri ומרכז הבקרה", text: "להתחיל ולסיים משמרת, ולשאול כמה הרווחת, בלי לפתוח את Shifty."),
+        Feature(symbol: "mic", title: "\u{200F}Siri ומרכז הבקרה", text: "להתחיל ולסיים משמרת, ולשאול כמה הרווחת, בלי לפתוח את Shifty."),
         Feature(symbol: "icloud", title: "סנכרון ב-iCloud", text: "אותן משמרות והגדרות בכל מכשיר עם אותו Apple ID."),
         Feature(symbol: "mappin.and.ellipse", title: "תזכורת לפי מיקום", text: "שאלה כשמגיעים לעבודה וכשיוצאים ממנה."),
     ]

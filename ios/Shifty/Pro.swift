@@ -75,7 +75,7 @@ final class Pro {
         do {
             try await AppStore.sync()
             await refresh()
-            message = unlocked ? "Shifty Pro שוחזר. תודה!" : "לא נמצאה רכישה קודמת ב-Apple ID הזה."
+            message = unlocked ? "הרכישה שוחזרה. תודה!" : "לא נמצאה רכישה קודמת ב-Apple ID הזה."
         } catch StoreKitError.userCancelled {
             // closing Apple's sign-in is not a failure
             message = nil
