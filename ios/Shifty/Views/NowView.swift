@@ -48,6 +48,8 @@ struct NowView: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: tapped)
         .sensoryFeedback(.success, trigger: celebrations)
         .sensoryFeedback(.selection, trigger: planQuarter)
+        // the goal reached: a good moment to ask for a rating, now and then (Review.swift)
+        .reviewRequest(on: celebrations)
         .sheet(isPresented: $adding) {
             ShiftEditor(shift: nil, day: nil)
                 .environment(store)

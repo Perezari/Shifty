@@ -10,8 +10,9 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   on the build Mac and not kept in git.
 - `Shifty/`: the app. `ShiftyApp.swift` holds the store and the tabs, `Theme.swift` the glass card and
   the screens' colors, `Lock.swift` the lock (Face ID, or the iPhone's passcode, on launch and after a
-  minute away: the web app's four digits the iPhone's way, this device's alone), and `Demo.swift` the
-  made-up shifts the screenshots show (debug builds only).
+  minute away: the web app's four digits the iPhone's way, this device's alone), `Review.swift` the App
+  Store's rating, asked for when the day's goal is reached, after a week and ten shifts, once a version,
+  and `Demo.swift` the made-up shifts the screenshots show (debug builds only).
 - `Shifty/Views/`: the screens. `NowView` (the running shift on a twelve-hour dial, `Core/Dial.swift`: its
   goal's flag dragged to see the wage of leaving later; then the week, the pay period and a holiday coming), `ShiftsView`
   (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
