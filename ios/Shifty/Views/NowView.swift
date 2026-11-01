@@ -11,6 +11,7 @@ import SwiftUI
 /// minute; out of sight, the dial waits.
 struct NowView: View {
     @Environment(ShiftStore.self) private var store
+    @Environment(Pro.self) private var pro
     @Environment(\.lifter) private var lifter
     @State private var adding = false
     @State private var dayOff: ShiftType?
@@ -102,7 +103,7 @@ struct NowView: View {
         }
     }
 
-    /// The week, the pay period, a holiday coming and the days off left.
+    /// The week, the pay period, a holiday coming and, with Shifty Pro, the days off left.
     private func cards(at date: Date) -> some View {
         Perf.drew("כרטיסים")
         let settings = store.settings
@@ -122,7 +123,7 @@ struct NowView: View {
             if settings.holidaysEnabled, let coming = Calc.nextHoliday(after: date, within: 14) {
                 HolidayBanner(date: coming.date, info: coming.info, settings: settings, today: date)
             }
-            if let since = settings.balanceDate, let leave = Calc.leave(shifts, settings, asOf: date) {
+            if pro.unlocked, let since = settings.balanceDate, let leave = Calc.leave(shifts, settings, asOf: date) {
                 LeaveCard(balance: leave, since: since)
             }
         }
@@ -786,7 +787,7 @@ private struct WeekColumn: View {
 }
 
 /// The pay period: its income so far, where it is heading, its shifts, overtime and hours missing, and the
-/// net pay it is heading to, which opens line by line.
+/// net pay it is heading to, which opens line by line; without Shifty Pro, the net's line marked Pro opens Pro.
 private struct PeriodCard: View {
     let range: TimeRange
     let totals: Totals
@@ -795,6 +796,7 @@ private struct PeriodCard: View {
     let net: NetPay
     let settings: Settings
     let now: Date
+    @Environment(Pro.self) private var pro
     @State private var showsNet = false
 
     var body: some View {
@@ -831,17 +833,21 @@ private struct PeriodCard: View {
             if net.gross > 0 {
                 Divider()
                 Button {
-                    showsNet = true
+                    if pro.unlocked { showsNet = true } else { pro.offer() }
                 } label: {
                     HStack(spacing: 6) {
                         Text("נטו משוער לסוף התקופה")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Text(Format.moneyShort(net.net, settings.currency))
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(Color.accentColor)
+                        if pro.unlocked {
+                            Text(Format.moneyShort(net.net, settings.currency))
+                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(Color.accentColor)
+                        } else {
+                            ProBadge()
+                        }
                         Image(systemName: "chevron.forward")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.tertiary)

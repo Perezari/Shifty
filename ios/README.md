@@ -30,6 +30,14 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   the shifts from the App Group: the shift's widget for the home screen and the lock screen, the Live
   Activity on the Lock Screen and in the Dynamic Island, and the shift's switch for the Control Center
   and the Action button.
+- `Shifty/Pro.swift`: Shifty Pro, the one in-app purchase (`com.perezari.shifty.pro`, a non-consumable
+  paid once): StoreKit 2's transactions followed from launch, the purchase, and restoring it. It opens the
+  net pay estimate, the vacation and sick days left, the Live Activity and the widgets, Siri and the
+  Control Center, iCloud and the place's reminder; everything else is free. What it finds is kept in
+  `Core/ProFlag.swift`, in the App Group's defaults, where the widgets and the app's launches in the
+  background read it. `Views/ProSheet.swift` holds its sheet, its card at the top of the settings and the
+  "Pro" badge; without it, its settings are dimmed and marked, the widgets show a lock, Siri says where to
+  get it, and a tap on any of them opens the sheet.
 - `Shifty/ICloud.swift`: the shifts and the settings in iCloud's key-value store, on the user's other
   devices and back after a reinstall. The merging is `Core/CloudMirror.swift`: each shift by its
   `updatedAt`, the settings as the web app's cloud.js merges them. (The web app and the desktop widget
@@ -83,7 +91,9 @@ a failed step's errors, and the screenshots downloaded into `build/screenshots`.
 - "Shifty · screenshots" builds for the simulator and photographs the App Store's screens with made-up
   shifts (`Shifty/Demo.swift`), 1206 × 2622, numbered in the store's order: the running shift, the
   shifts, the calendar, a shift's menu on a long press, a day, a new shift, the settings, and three of
-  them in dark. The app runs on Israel's clock, and the status bar shows the same minute.
+  them in dark, Shifty Pro bought; then `iap-pro.png`, Pro's sheet over the free settings, the in-app
+  purchase's screenshot for its review. The app runs on Israel's clock, and the status bar shows the same
+  minute.
 
 `scripts/testflight.sh` archives without signing (the team has no registered devices, so there is no
 development profile), signs the archive for no one with the app's entitlements (an unsigned archive

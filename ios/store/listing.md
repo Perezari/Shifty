@@ -32,8 +32,8 @@ in-app purchase `com.perezari.shifty.pro`, a non-consumable at ₪24.90.
 
 ## App privacy
 
-**Privacy Policy URL:** `https://perezari.github.io/shifty-app/privacy.html` (the site to come, as
-Forge's and Sogia's).
+**Privacy Policy URL:** `https://perezari.github.io/shifty-app/privacy.html` (the public repository
+`Perezari/shifty-app` on GitHub Pages, as Forge's and Sogia's; Settings links to it too).
 
 **Data collection:** none ("No, we do not collect data from this app"). The shifts and settings stay on
 the iPhone and in the user's own iCloud; the workplace's place stays on the iPhone, watched by iOS;
@@ -79,7 +79,7 @@ Shifty Pro: תשלום אחד, בלי מנוי, ושלך לתמיד.
 מחשבון,משמרת,דיווח,תלוש,נטו,ברוטו,עבודה,שעתי,חופשה,מחלה,שבת,חג,לילה,נסיעות,shift,overtime,wage
 ```
 
-**Support URL:** `https://perezari.github.io/shifty-app/` (the site to come).
+**Support URL:** `https://perezari.github.io/shifty-app/`
 
 **Copyright:**
 
@@ -89,10 +89,10 @@ Shifty Pro: תשלום אחד, בלי מנוי, ושלך לתמיד.
 
 **Screenshots:** from the "Shifty · screenshots" workflow on Codemagic, 1206 by 2622, App Store
 Connect's first iPhone slot, in their numbered order (the first run, 30 October 2026). The app is for the
-iPhone alone, so there are no iPad screenshots.
+iPhone alone, so there are no iPad screenshots. The same run's `iap-pro.png`, Pro's sheet, is the in-app
+purchase's review screenshot (the purchase's page, Review Information).
 
-**App Review notes** (the answers App Review asked of Sogia, given before it asks; item 7 to be checked
-against the app once Shifty Pro is built):
+**App Review notes** (the answers App Review asked of Sogia, given before it asks):
 
 ```
 1. Purpose and audience: Shifty is a Hebrew app for hourly and shift workers in Israel, to record their working hours and see the wage they earn. A shift is started and ended with a tap; the app computes the regular hours, overtime at 125% and 150%, Shabbat and holiday hours, night hours and travel pay, as Israeli payslips do, and adds them up by pay period. Israel's holidays are found by the app itself.
@@ -114,5 +114,5 @@ against the app once Shifty Pro is built):
 
 6. Third-party material: none. This is not a regulated industry; the net pay is shown as an estimate.
 
-7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro), paid once. It opens the net pay estimate, the vacation and sick-day balances, the Live Activity and widgets, Siri and the Control Center, iCloud sync and the location reminder; everything else is free. To reach it: the Shifty Pro card at the top of Settings, or any row marked Pro. Its screen shows the price, the buy button and "שחזור רכישה" (restore purchase).
+7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro), paid once. It opens the net pay estimate, the vacation and sick-day balances, the Live Activity and widgets, Siri and the Control Center, iCloud sync and the location reminder; everything else is free. To reach it: the Shifty Pro card at the top of Settings (הגדרות), any section there marked Pro, or the net pay line marked Pro on the Now tab. Its sheet shows what it opens, the price, the buy button and "שחזור רכישה" (Restore Purchase), which is also on the Settings card. Without it, the widgets show a lock and Siri answers that the action is in Shifty Pro.
 ```

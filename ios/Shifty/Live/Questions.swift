@@ -3,14 +3,14 @@ import Foundation
 
 /// Questions for Siri and the Shortcuts app, answered aloud without opening the app (Shortcuts.swift has
 /// their phrases): today's hours and wage, the time left to the day's goal, and the pay period so far and
-/// where it is heading, gross and net.
+/// where it is heading, gross and net. With Shifty Pro alone.
 struct TodayQuestion: AppIntent {
     static let title: LocalizedStringResource = "כמה הרווחתי היום"
     static let description = IntentDescription("השעות והשכר של היום.")
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        .result(dialog: "\(Answers.today(ShiftStore.shared))")
+        .result(dialog: "\(Answers.pro { Answers.today(ShiftStore.shared) })")
     }
 }
 
@@ -20,7 +20,7 @@ struct GoalQuestion: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        .result(dialog: "\(Answers.goal(ShiftStore.shared))")
+        .result(dialog: "\(Answers.pro { Answers.goal(ShiftStore.shared) })")
     }
 }
 
@@ -30,13 +30,18 @@ struct PeriodQuestion: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        .result(dialog: "\(Answers.period(ShiftStore.shared))")
+        .result(dialog: "\(Answers.pro { Answers.period(ShiftStore.shared) })")
     }
 }
 
 /// The answers, a sentence or two each, with the times as Siri says them.
 @MainActor
 enum Answers {
+    /// The answer with Shifty Pro; without it, where to get it.
+    static func pro(_ answer: () -> String) -> String {
+        ProFlag.on ? answer() : ProFlag.lockedAnswer
+    }
+
     static func today(_ store: ShiftStore, at now: Date = Date()) -> String {
         let s = store.settings
         let day = LocalTime.startOfDay(now)

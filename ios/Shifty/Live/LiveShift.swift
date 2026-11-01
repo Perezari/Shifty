@@ -116,9 +116,10 @@ enum LiveShift {
     }
 
     /// Starts the running shift's activity, updates it, or ends it; and ends any of a shift no longer running.
+    /// With Shifty Pro alone: without it, no activity.
     private static func updateActivity(_ store: ShiftStore) async {
         let activities = Activity<ShiftActivityAttributes>.activities
-        guard let shift = store.active else {
+        guard ProFlag.on, let shift = store.active else {
             for activity in activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
@@ -199,10 +200,12 @@ enum Alerts {
             let totals = Calc.aggregate(store.shifts, s, range: range, asOf: now.ms)
             guard morning > now, totals.total > 0 else { return nil }
             let hours = Format.hoursToHM(totals.netHours)
-            let gross = Format.moneyShort(totals.total, s.currency)
-            let net = Format.moneyShort(Calc.periodNet(store.shifts, s, range: range, asOf: now.ms, projected: false).net, s.currency)
-            return Planned(id: summaryPrefix + LocalTime.dayKey(range.start), date: morning,
-                           title: "סיכום " + Calc.periodTitle(range), body: "\(hours) שעות · \(gross) ברוטו · כ־\(net) נטו")
+            var body = "\(hours) שעות · \(Format.moneyShort(totals.total, s.currency)) ברוטו"
+            // the net pay, Shifty Pro's
+            if ProFlag.on {
+                body += " · כ־" + Format.moneyShort(Calc.periodNet(store.shifts, s, range: range, asOf: now.ms, projected: false).net, s.currency) + " נטו"
+            }
+            return Planned(id: summaryPrefix + LocalTime.dayKey(range.start), date: morning, title: "סיכום " + Calc.periodTitle(range), body: body)
         }
     }
 

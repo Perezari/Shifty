@@ -5,9 +5,11 @@ import UIKit
 /// The settings (app.js renderSettings): the wage and the workplace, each weekday's standard hours, the
 /// holidays, vacation and sick days and the days left of them, overtime, breaks, Shabbat and night, travel
 /// and the pay period, the net pay's estimate, the look, the notifications, the lock, iCloud and the
-/// backup. Each change is saved as it is made, and goes to iCloud.
+/// backup; Shifty Pro on top, and its sections marked without it. Each change is saved as it is made, and goes
+/// to iCloud.
 struct SettingsView: View {
     @Environment(ShiftStore.self) private var store
+    @Environment(Pro.self) private var pro
     @AppStorage(AppLock.key) private var lockOn = false
     @AppStorage(Alerts.key) private var alerts = true
     @AppStorage(Alerts.breakKey) private var breakReminder = true
@@ -37,6 +39,8 @@ struct SettingsView: View {
         let _ = Perf.drew("הגדרות")
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
+                ProCard()
+
                 SettingsSection(title: "שכר ומקום עבודה") {
                     TextRow(title: "שם מקום העבודה", text: setting(\.workplaceName), fallback: Settings().workplaceName)
                     Divider()
@@ -73,7 +77,8 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(title: "יתרת חופשה ומחלה",
-                                note: "היתרות והתאריך מהתלוש האחרון. מאז, בכל חודש נוסף חלק מימי החופשה של השנה ו-1.5 ימי מחלה (עד 90), ויורדים ימי החופשה והמחלה שרשמת. לפי החוק, בשבוע עבודה של 5 ימים יש 12 ימי חופשה בשנה בחמש השנים הראשונות.") {
+                                note: "היתרות והתאריך מהתלוש האחרון. מאז, בכל חודש נוסף חלק מימי החופשה של השנה ו-1.5 ימי מחלה (עד 90), ויורדים ימי החופשה והמחלה שרשמת. לפי החוק, בשבוע עבודה של 5 ימים יש 12 ימי חופשה בשנה בחמש השנים הראשונות.",
+                                pro: true) {
                     Toggle("מעקב יתרות", isOn: keepsBalance)
                         .settingsRow()
                     if s.balanceDate != nil {
@@ -137,7 +142,8 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(title: "נטו משוער",
-                                note: "לכל תושב 2.25 נקודות זיכוי, ולאישה 2.75. העובד מפריש לפנסיה בדרך כלל 6%. החישוב לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, ולכן התלוש יכול להיות שונה מעט.") {
+                                note: "לכל תושב 2.25 נקודות זיכוי, ולאישה 2.75. העובד מפריש לפנסיה בדרך כלל 6%. החישוב לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, ולכן התלוש יכול להיות שונה מעט.",
+                                pro: true) {
                     NumberRow(title: "נקודות זיכוי", value: setting(\.creditPoints), unit: "נק׳")
                     Divider()
                     NumberRow(title: "הפרשה לפנסיה", value: setting(\.pensionPercent), unit: "%")
@@ -160,8 +166,7 @@ struct SettingsView: View {
                         .settingsRow()
                 }
 
-                SettingsSection(title: "מסך הנעילה והתראות",
-                                note: "המשמרת שרצה מופיעה במסך הנעילה וב-Dynamic Island, עם כפתורים להפסקה ולסיום. ההתראות: כשמגיעים ליעד היומי, כשמתחילות השעות הנוספות של 150%, אחרי 6 שעות ברצף בלי הפסקה, ואחרי 12 שעות של משמרת פתוחה. הסיכום מגיע בבוקר שאחרי סוף התקופה.") {
+                SettingsSection(title: pro.unlocked ? "מסך הנעילה והתראות" : "התראות", note: alertsNote) {
                     Toggle("התראות על המשמרת", isOn: $alerts)
                         .settingsRow()
                     Divider()
@@ -173,7 +178,7 @@ struct SettingsView: View {
                         .settingsRow()
                 }
 
-                SettingsSection(title: "תזכורת לפי מיקום", note: placeNote) {
+                SettingsSection(title: "תזכורת לפי מיקום", note: placeNote, pro: true) {
                     Toggle("כשמגיעים לעבודה ויוצאים ממנה", isOn: $placeOn)
                         .settingsRow()
                     if placeOn {
@@ -216,7 +221,7 @@ struct SettingsView: View {
                         .settingsRow()
                 }
 
-                SettingsSection(title: "iCloud", note: cloudNote) {
+                SettingsSection(title: "iCloud", note: cloudNote, pro: true) {
                     HStack {
                         Text("גיבוי ב-iCloud")
                         Spacer()
@@ -245,6 +250,12 @@ struct SettingsView: View {
                     .fileImporter(isPresented: $importing, allowedContentTypes: [.json]) { result in
                         read(result)
                     }
+                }
+
+                SettingsSection(title: nil) {
+                    Link(destination: AppInfo.support) { actionRow("תמיכה ושאלות נפוצות") }
+                    Divider()
+                    Link(destination: AppInfo.privacy) { actionRow("מדיניות פרטיות") }
                 }
 
                 Text("Shifty · גרסה \(AppInfo.version)")
@@ -455,6 +466,15 @@ struct SettingsView: View {
         })
     }
 
+    // MARK: The notifications
+
+    /// The notifications, and the Lock Screen's shift with Shifty Pro.
+    private var alertsNote: String {
+        let alerts = "ההתראות: כשמגיעים ליעד היומי, כשמתחילות השעות הנוספות של 150%, אחרי 6 שעות ברצף בלי הפסקה, ואחרי 12 שעות של משמרת פתוחה. הסיכום מגיע בבוקר שאחרי סוף התקופה."
+        guard pro.unlocked else { return alerts + " המשמרת במסך הנעילה וב-Dynamic Island: ב-Shifty Pro." }
+        return "המשמרת שרצה מופיעה במסך הנעילה וב-Dynamic Island, עם כפתורים להפסקה ולסיום. " + alerts
+    }
+
     // MARK: The place
 
     private var placeButton: String {
@@ -463,7 +483,7 @@ struct SettingsView: View {
 
     /// What the place's reminder does, and what it still needs.
     private var placeNote: String {
-        guard placeOn else {
+        guard placeOn && pro.unlocked else {
             return "האייפון ישאל אם להתחיל משמרת כשמגיעים לעבודה, ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה. מקום העבודה נשמר רק באייפון הזה."
         }
         if !placeSet { return "עמוד במקום העבודה ולחץ על הכפתור." }
@@ -491,10 +511,13 @@ struct SettingsView: View {
     }
 
     private var cloudStatus: String {
-        cloudSignedIn ? "פעיל" : "כבוי"
+        pro.unlocked && cloudSignedIn ? "פעיל" : "כבוי"
     }
 
     private var cloudNote: String {
+        guard pro.unlocked else {
+            return "המשמרות וההגדרות נשמרות גם ב-iCloud, כמו שהן בכל המכשירים שלך, וחוזרות באייפון חדש או בהתקנה מחדש."
+        }
         if cloudSignedIn {
             return "המשמרות וההגדרות נשמרות באייפון וב-iCloud, וחוזרות באייפון חדש או בהתקנה מחדש."
         }

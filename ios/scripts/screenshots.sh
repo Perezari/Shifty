@@ -2,7 +2,8 @@
 # Builds the app for the iPhone simulator and photographs the App Store's screens with made-up shifts
 # (Shifty/Demo.swift) into ios/build/screenshots, kept by codemagic.yaml as the build's artifacts. They are
 # numbered in the store's order: the running shift, the shifts, the calendar, a shift's menu, a day, a new
-# shift, the settings, and three of them in dark.
+# shift, the settings, and three of them in dark. Then, unnumbered, Shifty Pro's sheet: the in-app purchase's
+# screenshot for its review (App Store Connect, the purchase's Review Information).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -56,4 +57,6 @@ xcrun simctl ui "$udid" appearance dark
 shoot now 08-now-dark
 shoot shifts 09-shifts-dark
 shoot calendar 10-calendar-dark
+xcrun simctl ui "$udid" appearance light
+shoot pro iap-pro 9
 ls -la build/screenshots

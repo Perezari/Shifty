@@ -5,7 +5,7 @@ import UserNotifications
 /// The workplace as a place on the map: on arriving there the iPhone asks whether to start a shift, and on
 /// leaving it whether to end the one running, in notifications whose buttons do it without opening the app.
 /// iOS watches the place and wakes the app when it is crossed, also when the app is closed, once the location
-/// is allowed "always". The place is this iPhone's (UserDefaults), as the lock is.
+/// is allowed "always". The place is this iPhone's (UserDefaults), as the lock is. With Shifty Pro alone.
 final class Place: NSObject, CLLocationManagerDelegate {
     static let shared = Place()
     static let enabledKey = "placeEnabled"
@@ -47,7 +47,7 @@ final class Place: NSObject, CLLocationManagerDelegate {
         for region in manager.monitoredRegions where region.identifier == Self.region {
             manager.stopMonitoring(for: region)
         }
-        guard Self.enabled, let center = Self.coordinate,
+        guard ProFlag.on, Self.enabled, let center = Self.coordinate,
               CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
         let region = CLCircularRegion(center: center, radius: Self.radius, identifier: Self.region)
         region.notifyOnEntry = true
@@ -127,14 +127,14 @@ final class Place: NSObject, CLLocationManagerDelegate {
     /// Arrived at work: whether to start, unless a shift runs.
     @MainActor
     static func arrived() async {
-        guard ShiftStore.shared.active == nil else { return }
+        guard ProFlag.on, ShiftStore.shared.active == nil else { return }
         await ask(arriveCategory, title: "הגעת ל" + placeName, body: "להתחיל משמרת עכשיו?")
     }
 
     /// Left work: whether to end the shift running, if one runs.
     @MainActor
     static func left() async {
-        guard let active = ShiftStore.shared.active else { return }
+        guard ProFlag.on, let active = ShiftStore.shared.active else { return }
         await ask(leaveCategory, title: "יצאת מ" + placeName, body: "המשמרת פתוחה מ־" + Format.clock(active.start) + ". לסיים אותה?")
     }
 

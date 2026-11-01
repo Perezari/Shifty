@@ -376,23 +376,51 @@ private struct DateBadge: View {
     }
 }
 
-/// A section of the settings: a small title over a glass card of rows, and a note under it (Sogia's).
+/// A section of the settings: a small title over a glass card of rows, and a note under it (Sogia's). One of
+/// Shifty Pro's, without it, is marked Pro and its rows dimmed, and a tap on it opens Pro's sheet.
 struct SettingsSection<Content: View>: View {
     let title: String?
     var note: String?
+    var pro = false
     @ViewBuilder var content: Content
+    @Environment(Pro.self) private var purchase: Pro?
+
+    private var locked: Bool {
+        pro && purchase?.unlocked != true
+    }
 
     var body: some View {
+        if locked {
+            section
+                .contentShape(Rectangle())
+                .onTapGesture { purchase?.offer() }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("זמין ב-Shifty Pro")
+        } else {
+            section
+        }
+    }
+
+    private var section: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
-                Text(title)
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    if locked {
+                        ProBadge()
+                    }
+                }
+                .padding(.horizontal, 16)
             }
             VStack(spacing: 0) {
                 content
             }
+            .disabled(locked)
+            .allowsHitTesting(!locked)
+            .opacity(locked ? 0.42 : 1)
             .padding(.horizontal, 16)
             .card(padding: 0)
             if let note {

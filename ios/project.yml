@@ -79,6 +79,7 @@ targets:
       - path: Shifty/Core/LocalTime.swift
       - path: Shifty/Core/Models.swift
       - path: Shifty/Core/Now.swift
+      - path: Shifty/Core/ProFlag.swift
       - path: Shifty/Core/ShiftStore.swift
       - path: Shifty/Live/ShiftActivity.swift
       - path: Shifty/Live/ShiftIntents.swift

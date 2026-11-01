@@ -3,7 +3,8 @@ import SwiftUI
 import WidgetKit
 
 /// The shift as a switch: in the Control Center, among the Lock Screen's controls, and on the Action button
-/// (Settings, Action Button, Controls). On starts a shift, off ends the one running.
+/// (Settings, Action Button, Controls). On starts a shift, off ends the one running. Without Shifty Pro it
+/// shows a lock, and its intent does nothing (ShiftIntents).
 struct ShiftControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "com.perezari.shifty.shift", provider: ShiftControlValue()) { running in
@@ -17,19 +18,21 @@ struct ShiftControl: ControlWidget {
     }
 
     private static func title(_ on: Bool) -> String {
-        on ? "במשמרת" : "לא במשמרת"
+        guard ProFlag.on else { return "ב-Shifty Pro" }
+        return on ? "במשמרת" : "לא במשמרת"
     }
 
     private static func symbol(_ on: Bool) -> String {
-        on ? "timer" : "play.fill"
+        guard ProFlag.on else { return "lock.fill" }
+        return on ? "timer" : "play.fill"
     }
 }
 
-/// Whether a shift runs, from the app's files.
+/// Whether a shift runs, from the app's files; off without Shifty Pro.
 struct ShiftControlValue: ControlValueProvider {
     var previewValue: Bool { false }
 
     func currentValue() async throws -> Bool {
-        ShiftStore.running(in: ShiftStore.snapshot().shifts) != nil
+        ProFlag.on && ShiftStore.running(in: ShiftStore.snapshot().shifts) != nil
     }
 }

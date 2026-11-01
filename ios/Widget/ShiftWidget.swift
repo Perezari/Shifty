@@ -4,13 +4,14 @@ import WidgetKit
 
 /// The shift on the home screen and the lock screen, in the Live Activity's look: the running shift's clock
 /// in the app's color (a break's in orange), its way toward the day's goal, and round buttons for a break
-/// and the end; with none running, today's hours and a button to start.
+/// and the end; with none running, today's hours and a button to start. Without Shifty Pro, a lock, and a tap
+/// opens Pro in the app.
 struct ShiftWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "shift", provider: ShiftTimeline()) { entry in
             ShiftWidgetView(entry: entry)
                 .containerBackground(for: .widget) { WidgetStyle.background }
-                .widgetURL(URL(string: "shifty://now"))
+                .widgetURL(URL(string: entry.pro ? "shifty://now" : "shifty://pro"))
                 .environment(\.layoutDirection, .rightToLeft)
         }
         .configurationDisplayName("משמרת")
@@ -35,6 +36,8 @@ struct ShiftEntry: TimelineEntry {
     /// Today's income, with none running.
     let pay: Double
     let currency: String
+    /// Shifty Pro bought (ProFlag): without it, the widget asks for it.
+    let pro: Bool
 
     static func now(_ date: Date = Date()) -> ShiftEntry {
         let files = ShiftStore.snapshot()
@@ -44,7 +47,8 @@ struct ShiftEntry: TimelineEntry {
         if let finish = status.finishMs { goalAt = Date(ms: finish) }
         return ShiftEntry(date: date, start: active?.start, breakSince: status.activeBreak?.start,
                           workingSince: Date(ms: date.ms - status.netMs), worked: status.netMs / 1000,
-                          goalAt: goalAt, goalHours: status.goal, pay: status.pay, currency: files.settings.currency)
+                          goalAt: goalAt, goalHours: status.goal, pay: status.pay, currency: files.settings.currency,
+                          pro: ProFlag.on)
     }
 
     var running: Bool { start != nil }
@@ -82,17 +86,58 @@ struct ShiftWidgetView: View {
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
+        if !entry.pro {
+            locked
+        } else {
+            switch family {
+            case .accessoryInline:
+                inline
+            case .accessoryCircular:
+                circular
+            case .accessoryRectangular:
+                rectangular
+            case .systemMedium:
+                medium
+            default:
+                small
+            }
+        }
+    }
+
+    // MARK: Without Shifty Pro
+
+    /// A lock and Shifty Pro, as the preview's: a tap opens its sheet in the app (widgetURL).
+    @ViewBuilder
+    private var locked: some View {
         switch family {
         case .accessoryInline:
-            inline
+            Label("Shifty Pro", systemImage: "lock.fill")
         case .accessoryCircular:
-            circular
+            ZStack {
+                AccessoryWidgetBackground()
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 18, weight: .semibold))
+            }
         case .accessoryRectangular:
-            rectangular
-        case .systemMedium:
-            medium
+            VStack(alignment: .leading, spacing: 2) {
+                Label("Shifty Pro", systemImage: "lock.fill")
+                    .font(.headline)
+                    .widgetAccentable()
+                Text("המשמרת במסך הנעילה")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         default:
-            small
+            VStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 26, weight: .semibold))
+                    .foregroundStyle(WidgetStyle.accent)
+                Text(verbatim: "Shifty Pro")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

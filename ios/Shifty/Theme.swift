@@ -57,10 +57,11 @@ private struct Surface<S: Shape>: ViewModifier {
 
 #if DEBUG
 /// The screens the build photographs in the simulator (ios/scripts/screenshots.sh): `-screenshot shifts`.
-/// They show made-up shifts (Demo.swift). `now` is a shift running, `idle` none, `editor` a new shift, `menu` a
-/// shift lifted by a long press with its menu, `day` the sheet of the last day worked on the calendar.
+/// They show made-up shifts (Demo.swift), with Shifty Pro bought. `now` is a shift running, `idle` none, `editor`
+/// a new shift, `menu` a shift lifted by a long press with its menu, `day` the sheet of the last day worked on
+/// the calendar, and `pro` Shifty Pro's sheet over the free version's settings, for the purchase's review.
 enum Screenshot: String {
-    case now, idle, editor, shifts, menu, calendar, day, settings
+    case now, idle, editor, shifts, menu, calendar, day, settings, pro
 
     static let current: Screenshot? = {
         let arguments = ProcessInfo.processInfo.arguments
@@ -73,7 +74,7 @@ enum Screenshot: String {
         case .now, .idle, .editor: .now
         case .shifts, .menu: .shifts
         case .calendar, .day: .calendar
-        case .settings: .settings
+        case .settings, .pro: .settings
         }
     }
 }
