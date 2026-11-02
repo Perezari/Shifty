@@ -1082,8 +1082,9 @@ private struct PlaceLeave: Identifiable {
     let place: String?
 }
 
-/// The pay period: its income so far, where it is heading, its shifts, overtime and hours missing, and the
-/// net pay it is heading to, which opens line by line; without Shifty Pro, the net's line marked Pro opens Pro.
+/// The pay period: its dates and the days left, its income so far and where it is heading, each over its name,
+/// its shifts, overtime and hours missing, and the net pay it is heading to, which opens line by line; without
+/// Shifty Pro, the net's line marked Pro opens Pro.
 private struct PeriodCard: View {
     let range: TimeRange
     let totals: Totals
@@ -1103,39 +1104,46 @@ private struct PeriodCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text(Calc.periodTitle(range))
+                Text(Calc.periodTitle(range, year: false))
                     .font(.headline)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Spacer()
                 Text(closes)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-            HStack(alignment: .firstTextBaseline) {
-                Text(Format.moneyShort(totals.total, settings.currency))
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(aside.title)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            // the income and the aside on one line, each one's name under it, as the numbers under them
+            VStack(spacing: 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(Format.moneyShort(totals.total, settings.currency))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    Spacer()
                     Text(aside.value)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                 }
+                HStack {
+                    Text(global ? "שכר גלובלי" : "עד עכשיו")
+                    Spacer()
+                    Text(aside.title)
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             HStack(spacing: 0) {
-                mini(String(totals.count), "משמרות", .primary)
+                mini(String(totals.count), "משמרות", totals.count > 0 ? .primary : .secondary)
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 30)
                 if let overtime, let target = overtime.target {
                     // a global pay's overtime against the hours it covers, or the next bonus's target
-                    mini(Format.hoursToHM(overtime.hours), "נוספות", Color("Holiday"),
+                    mini(Format.hoursToHM(overtime.hours), "נוספות", shown(overtime.hours, in: Color("Holiday")),
                          of: "מתוך " + (target == target.rounded() ? String(Int(target)) : Format.hoursToHM(target)))
                 } else {
-                    mini(Format.hoursToHM(totals.overtimeHours), "נוספות", Color("Holiday"))
+                    mini(Format.hoursToHM(totals.overtimeHours), "נוספות", shown(totals.overtimeHours, in: Color("Holiday")))
                 }
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 30)
-                mini(Format.hoursToHM(missing), "חוסר", missing > 0.01 ? .red : .primary)
+                mini(Format.hoursToHM(missing), "חוסר", shown(missing, in: .red))
             }
             if net.gross > 0 {
                 Divider()
@@ -1143,7 +1151,7 @@ private struct PeriodCard: View {
                     if pro.unlocked { showsNet = true } else { pro.offer() }
                 } label: {
                     HStack(spacing: 6) {
-                        Text("נטו משוער לסוף התקופה")
+                        Text("נטו משוער")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
@@ -1193,23 +1201,31 @@ private struct PeriodCard: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// The income is a month's fixed pay: named so, with its hour beside it.
+    private var global: Bool { hourValue != nil && totals.salary > 0 }
+
     /// Beside the income: a bonus in the period; a global pay's hour; or where the income is heading.
     private var aside: (title: String, value: String) {
         if totals.bonus > 0 {
             return ("כולל בונוס שנתי", Format.moneyShort(totals.bonus, settings.currency))
         }
-        if let hourValue, totals.salary > 0 {
-            return ("שכר גלובלי · ערך שעה", Format.money(hourValue, settings.currency))
+        if global, let hourValue {
+            return ("ערך שעה", Format.money(hourValue, settings.currency))
         }
         return ("צפי לסוף התקופה", Format.moneyShort(projected, settings.currency))
     }
 
-    /// "נסגרת בעוד 3 ימים", or tomorrow, or today.
+    /// Hours in their color, or gray while they show as 0:00, so the eye goes to what is there.
+    private func shown(_ hours: Double, in color: Color) -> Color {
+        hours * 60 < 0.5 ? .secondary : color
+    }
+
+    /// "עוד 3 ימים", or "נסגרת מחר", or "נסגרת היום".
     private var closes: String {
         let days = Int(((range.end.ms - now.ms) / 86_400_000).rounded(.up))
         if days <= 1 { return "נסגרת היום" }
         if days == 2 { return "נסגרת מחר" }
-        return "נסגרת בעוד \(days) ימים"
+        return "עוד \(days) ימים"
     }
 }
 

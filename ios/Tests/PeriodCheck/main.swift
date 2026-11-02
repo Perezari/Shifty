@@ -31,6 +31,8 @@ expect(fromThe25thDays.count == 35 && LocalTime.dayKey(fromThe25thDays[0]) == "2
 // the period's name
 expect(Calc.periodTitle(october) == "אוקטובר 2026", "a calendar month by its name")
 expect(Calc.periodTitle(fromThe25th) == "25 באוקטובר – 24 בנובמבר 2026", "a period from the 25th by its days")
+expect(Calc.periodTitle(october, year: false) == "אוקטובר" && Calc.periodTitle(fromThe25th, year: false) == "25 באוקטובר – 24 בנובמבר",
+       "on the Now screen's card, without the year")
 
 // the period picker: the month a period mostly lies in, and back from a month to its period
 expect(Calc.periodMonth(october) == (2026, 9) && Calc.periodMonth(fromThe25th) == (2026, 10), "the month in the middle")

@@ -76,15 +76,16 @@ extension Calc {
         return (target.year * 12 + target.month0) - (base.year * 12 + base.month0)
     }
 
-    /// The period's name: "אוקטובר 2026" when it is a calendar month, else "25 בספטמבר – 24 באוקטובר 2026".
-    static func periodTitle(_ range: TimeRange) -> String {
+    /// The period's name: "אוקטובר 2026" when it is a calendar month, else "25 בספטמבר – 24 באוקטובר 2026";
+    /// without the year, the Now screen's card's, on one line beside the days left.
+    static func periodTitle(_ range: TimeRange, year: Bool = true) -> String {
         let first = LocalTime.parts(range.start)
         let lastDay = Date(ms: range.end.ms - 1)
         let last = LocalTime.parts(lastDay)
         if first.day == 1 && first.month0 == last.month0 {
-            return Format.monthName(first.month0) + " \(first.year)"
+            return Format.monthName(first.month0) + (year ? " \(first.year)" : "")
         }
-        return Format.dateLong(range.start) + " – " + Format.dateLong(lastDay) + " \(last.year)"
+        return Format.dateLong(range.start) + " – " + Format.dateLong(lastDay) + (year ? " \(last.year)" : "")
     }
 
     /// The month the period mostly lies in, the period picker's: its middle's (app.js openPeriodPicker).
