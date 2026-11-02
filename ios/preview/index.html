@@ -180,6 +180,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .money-line > b { font: 700 30px/1 var(--font-round); font-variant-numeric: tabular-nums; }
 .money-line > span { font-size: 13px; color: var(--ink-2); }
 .money-line > span b { font: 600 15px/1 var(--font-round); color: var(--ink); }
+/* (proposed) the period's income and where it is heading on one line, each over its name, as the numbers under them */
+.money { display: grid; grid-template-columns: 1fr auto; align-items: baseline; row-gap: 3px; }
+.money > b { font: 600 17px/1 var(--font-round); font-variant-numeric: tabular-nums; }
+.money > b.big { font: 700 30px/1 var(--font-round); }
+.money > span { font-size: 12px; color: var(--ink-2); }
+.money > :nth-child(even) { text-align: end; }
 .mini { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; padding-top: 4px; }
 .mini div + div { border-inline-start: 1px solid var(--track); }
 .mini b { display: block; font: 600 17px/1.3 var(--font-round); font-variant-numeric: tabular-nums; }
@@ -210,8 +216,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   align-items: center; justify-content: center; color: var(--accent); cursor: pointer; opacity: 0; transform: scale(.5); pointer-events: none;
   transition: transform .38s cubic-bezier(.3, 1.2, .4, 1), opacity .2s; }
 .tab-mini svg { width: 24px; height: 24px; }
-.device.mini .tabs { opacity: 0; transform: scale(.3, .8); pointer-events: none; }
-.device.mini .tab-mini { opacity: 1; transform: none; pointer-events: auto; }
+/* the device's own class, not "mini": the period card's numbers are a .mini, whose rules would then reach every card */
+.device.tabs-min .tabs { opacity: 0; transform: scale(.3, .8); pointer-events: none; }
+.device.tabs-min .tab-mini { opacity: 1; transform: none; pointer-events: auto; }
 
 /* ---- the Lock Screen and the home screen ---- */
 .wall { position: absolute; inset: 0; background:
@@ -876,20 +883,22 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       <div class="week">${cols}</div></section>`;
   }
 
-  /** The pay period: the income so far, where it is heading, and its overtime and hours missing. A global pay's: the month's
-   *  pay and its hour's value, and the overtime against the hours it covers. */
+  /** The pay period: its dates and the days left, the income so far and where it is heading, its shifts, overtime and hours
+   *  missing, and the net it is heading to. A global pay's: the month's pay and its hour's value, and the overtime against the
+   *  hours it covers. (proposed) The dates on one line, without the year (a month from its 1st is its name alone); the two sums
+   *  on one line and each one's name under it, as the numbers under them; a number that is zero in gray. */
   function monthCard() {
-    const head = isGlobal()
-      ? `<b class="num"><span class="ltr">${moneyShort(SALARY)}</span></b><span>שכר גלובלי · ערך שעה <b class="ltr num">${money(HOUR_VALUE)}</b></span>`
-      : `<b class="num"><span class="ltr">${moneyShort(6075.4)}</span></b><span>צפי לסוף החודש <b class="ltr num">${moneyShort(8640)}</b></span>`;
+    const [income, incomeName, aside, asideName] = isGlobal()
+      ? [moneyShort(SALARY), "שכר גלובלי", money(HOUR_VALUE), "ערך שעה"]
+      : [moneyShort(6075.4), "עד עכשיו", moneyShort(8640), "צפי לסוף התקופה"];
     // a global pay's overtime against the hours it covers, or against the next bonus's target
     const target = !isGlobal() ? null : state.cover === "upTo" ? OT_IN : state.cover === "tiers" ? (nextTier(MONTH_OT) || [null])[0] : null;
     const overtime = target ? `${hm(MONTH_OT)}<small> מתוך ${target}</small>` : hm(MONTH_OT);
-    return `<section class="card glass"><div class="card-head"><span class="title">אוקטובר</span><span class="meta">נסגר בעוד 2 ימים</span></div>
-      <div class="money-line">${head}</div>
+    return `<section class="card glass"><div class="card-head"><span class="title">20 באוקטובר – 19 בנובמבר</span><span class="meta">עוד 18 ימים</span></div>
+      <div class="money"><b class="big"><span class="ltr">${income}</span></b><b><span class="ltr">${aside}</span></b><span>${incomeName}</span><span>${asideName}</span></div>
       <div class="mini"><div><b class="num">14</b><span>משמרות</span></div><div><b class="num" style="color:var(--amber)">${overtime}</b><span>נוספות</span></div><div><b class="num" style="color:var(--red)">2:10</b><span>חוסר</span></div></div>
-      ${state.pro ? `<button class="net-row" type="button" data-sheet="net">נטו משוער לסוף התקופה<b class="ltr">${moneyShort(netNow().net)}</b><span class="chev">${sized(icon.chevron, 14)}</span></button>`
-        : `<button class="net-row" type="button" data-sheet="pro">נטו משוער לסוף התקופה<span class="pro-badge">Pro</span><span class="chev">${sized(icon.chevron, 14)}</span></button>`}
+      ${state.pro ? `<button class="net-row" type="button" data-sheet="net">נטו משוער<b class="ltr">${moneyShort(netNow().net)}</b><span class="chev">${sized(icon.chevron, 14)}</span></button>`
+        : `<button class="net-row" type="button" data-sheet="pro">נטו משוער<span class="pro-badge">Pro</span><span class="chev">${sized(icon.chevron, 14)}</span></button>`}
       </section>`;
   }
 
@@ -1446,7 +1455,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag built">כמו שבבנייה</span>דמי הבראה (Pro, למטה): כמה ימים מגיעים לפי הוותק, כמה הם שווים ומתי ישולמו. <span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
+    now: '<span class="tag">הצעה</span>כרטיס התקופה, מסודר: התאריכים בשורה אחת ובלי השנה, הסכום עד עכשיו והצפי לסוף התקופה באותה שורה ומתחת לכל אחד השם שלו, כמו המספרים שמתחתם. מספר שהוא אפס, כמו "0:00 חוסר", באפור. <span class="tag built">כמו שבבנייה</span>דמי הבראה (Pro, למטה): כמה ימים מגיעים לפי הוותק, כמה הם שווים ומתי ישולמו. <span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
     shifts: '<span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
     calendar: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
     settings: '<span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: תאריך תחילת עבודה והוותק, ימי החופשה בשנה לפי הוותק (צו ההרחבה או החוק), ודמי הבראה (תעריף, פעם בשנה או כל חודש). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: הפרשות המעביד לפנסיה ולפיצויים, קרן השתלמות עד התקרה, ונסיעות כסכום לחודש מלא. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
@@ -1476,7 +1485,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   function updateChrome() {
     const app = state.screen === "now";
     chrome.hidden = !app;
-    device.classList.toggle("mini", app && mini);
+    device.classList.toggle("tabs-min", app && mini);
     if (!app) return;
     chrome.style.setProperty("--i", TABS.indexOf(state.tab));
     for (const b of chrome.querySelectorAll("[data-tab]")) b.classList.toggle("on", b.dataset.tab === state.tab);
@@ -1504,7 +1513,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   function setMini(on) {
     if (mini === on) return;
     mini = on;
-    device.classList.toggle("mini", state.screen === "now" && on);
+    device.classList.toggle("tabs-min", state.screen === "now" && on);
   }
   function render() {
     const old = view.querySelector(".scroll");
