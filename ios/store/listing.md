@@ -94,27 +94,27 @@ Connect's first iPhone slot, in their numbered order (the first run, 30 October 
 iPhone alone, so there are no iPad screenshots. The same run's `iap-pro.png`, Pro's sheet, is the in-app
 purchase's review screenshot (the purchase's page, Review Information).
 
-**App Review notes** (the answers App Review asked of Sogia, given before it asks):
+**App Review notes** (App Review asked for them on 2 November 2026, with a screen recording; the same
+text is the reply to its message and the Notes field of App Review Information, under that field's 4000
+characters):
 
 ```
-1. Purpose and audience: Shifty is a Hebrew app for hourly and shift workers in Israel, to record their working hours and see the wage they earn. A shift is started and ended with a tap; the app computes the regular hours, overtime at 125% and 150%, Shabbat and holiday hours, night hours and travel pay, as Israeli payslips do, and adds them up by pay period. Israel's holidays are found by the app itself.
+1. Screen recording: attached, made on an iPhone with the latest iOS. It begins at the app's launch and shows a shift from its start to its end, its Live Activity, the net pay and each tab. The app has no account, login or user-generated content. The iPhone's Apple ID bought Shifty Pro in TestFlight, so the recording shows Pro as active (its card in Settings: "Shifty Pro, פעיל. תודה!") and its features in use. Pro's purchase sheet is the in-app purchase's review screenshot.
 
-2. Setup and main features: no account, login or setup. The hourly wage and the hours of each day are set in Settings. The tabs:
-- Now (עכשיו): start a shift, take a break, end it; the dial shows the time worked and the pay rising each second. A long press on these buttons starts or ends a shift a few minutes ago, or at another time.
-- Shifts (משמרות): the pay period's shifts and totals. Tap a shift to edit it, swipe to delete it, long press for its menu; the plus adds a shift, or a paid day off on a long press.
+2. Purpose and audience: Shifty is a Hebrew app for hourly and shift workers in Israel, at any employer; it is not a business's internal app. It records the hours worked and shows the wage they earn. A shift is started and ended with a tap, and the app computes the regular hours, overtime at 125% and 150%, Shabbat and holiday hours, night hours and travel, as Israeli payslips do, and adds them up by pay period. Workers see what they have earned before the payslip comes, and check the payslip against it.
+
+3. Setup and main features: no account, login, setup or sample files. The app opens with an hourly wage of ₪50, changed on the workplace's page in Settings. The tabs, right to left:
+- Now (עכשיו): "התחל משמרת" starts a shift; the dial shows the time worked and the pay rising each second; "הפסקה" takes a break; holding "סיום משמרת" until the button fills ends the shift. A long press on start or break, or a tap on end, sets it some minutes earlier or at another time.
+- Shifts (משמרות): the pay period's shifts and totals. Tap a shift to edit it, swipe to delete it, long press for its menu; the plus adds a shift, or a day off on a long press.
 - Calendar (לוח): the period's days, each filled by its hours; tap a day for its shifts.
-- Settings (הגדרות): the wage and the workplace, each day's hours, overtime, holidays, night hours, notifications, the lock and the backup.
+- Settings (הגדרות): the workplaces (מקומות עבודה), each with its pay (by the hour or monthly), pay period, hours, overtime, vacation, pension and travel; then holidays, notifications, the lock and a backup to a file.
+Permissions, all optional and asked only when a feature needs them: notifications (the day's hours done, a break reminder, the period's summary); location, When In Use then Always, only for a workplace's reminder (on arriving and on leaving, a notification asks whether to start or end the shift; the location never leaves the device); Face ID for the lock.
 
-3. Permissions, all optional and asked only when the user turns on what needs them:
-- Location (When In Use, then Always): only for the reminder in Settings, "כשמגיעים לעבודה ויוצאים ממנה". The user saves the workplace's place; iOS region monitoring then wakes the app on arriving and on leaving, and a notification asks whether to start or end the shift, with buttons that do it. It needs Always because the user is rarely in the app when arriving at work or leaving it. The location never leaves the device.
-- Notifications: the day's hours completed, a break reminder after six hours, a pay period's summary, and the location reminder.
-- Face ID: the optional lock in Settings.
+4. External services: none: no server, account, analytics, advertising or AI. Only Apple's: StoreKit for the in-app purchase, iCloud key-value storage to sync the user's own devices, Live Activities and widgets, App Intents for Siri, the Control Center and the Action button, region monitoring and local notifications.
 
-4. External services: none: no server, account, analytics, advertising or AI. Apple services only: StoreKit for the in-app purchase, iCloud key-value storage to keep the shifts the same on the user's own devices, Live Activities and widgets, App Intents for Siri, the Control Center and the Action button, and local notifications.
+5. Regional differences: none. The app is offered in Israel only, in Hebrew, and its holidays, overtime rules and tax estimate are Israel's.
 
-5. Regional differences: the app is in Hebrew and offered in Israel only; its holidays, overtime rules and tax estimate are Israel's.
+6. Regulated industry or third-party material: neither. The app computes the user's own wage from the hours they record; it moves no money and gives no financial advice, and it shows the net pay as an estimate.
 
-6. Third-party material: none. This is not a regulated industry; the net pay is shown as an estimate.
-
-7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro.lifetime), paid once. It opens the net pay estimate, the vacation and sick-day balances, the Live Activity and widgets, Siri and the Control Center, iCloud sync and the location reminder; everything else is free. To reach it: the Shifty Pro card at the top of Settings (הגדרות), any section there marked Pro, or the net pay line marked Pro on the Now tab. Its sheet shows what it opens, the price, the buy button and "שחזור רכישה" (Restore Purchase), which is also on the Settings card. Without it, the widgets show a lock and Siri answers that the action is in Shifty Pro.
+7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro.lifetime), paid once. It opens the net pay estimate, the vacation and sick-day balances, the bonus and recuperation pay cards, more workplaces, the Live Activity and widgets, Siri and the Control Center, iCloud sync and the location reminder; everything else is free. To reach it: the Shifty Pro card at the top of Settings (הגדרות), anything marked Pro there (such as "הוספת מקום עבודה"), or the net pay line marked Pro on the Now tab. Its sheet has the price, the buy button and "שחזור רכישה" (Restore Purchase), also on the Settings card. Without it, the widgets show a lock and Siri answers that the action is in Shifty Pro.
 ```
