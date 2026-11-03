@@ -171,6 +171,13 @@ enum Calc {
         let wage = s.hourlyWage
         let startMs = shift.start.ms
 
+        // a day of reserve duty, for the record: no hours and no pay
+        if shift.type == .reserve {
+            return Breakdown(id: shift.id, type: .reserve, startMs: startMs, endMs: startMs, ongoing: false,
+                             grossMs: 0, breakMs: 0, netMs: 0, netHours: 0, regularHours: 0, ot1Hours: 0, ot2Hours: 0,
+                             overtimeHours: 0, nightHours: 0, isHoliday: false, basePay: 0, otPay: 0, nightPremium: 0, pay: 0)
+        }
+
         // a paid day off: a flat amount, no overtime, night or break
         if shift.type == .vacation || shift.type == .sick {
             var hours = s.vacationHours
@@ -293,7 +300,7 @@ enum Calc {
         for shift in list {
             let b = breakdown(shift, s, asOf: asOf, sickDates: sick)
             if !s.isMonthly(shift) { pay += b.pay } // vacation and sick days are paid…
-            if b.type == .vacation || b.type == .sick { continue } // …but not hours or days worked
+            if b.type != .work { continue } // …but not hours or days worked
             netHours += b.netHours
             overtimeHours += b.overtimeHours
             nightHours += b.nightHours
@@ -329,7 +336,7 @@ enum Calc {
         var net: [String: Double] = [:]
         var dates: [String: Date] = [:]
         for shift in shifts where inRange(shift, range) {
-            if shift.type == .vacation || shift.type == .sick { continue }
+            if shift.type != .work { continue }
             let key = LocalTime.dayKey(shift.start)
             if net[key] == nil { keys.append(key) }
             net[key] = (net[key] ?? 0) + breakdown(shift, s, asOf: asOf, sickDates: sick).netHours

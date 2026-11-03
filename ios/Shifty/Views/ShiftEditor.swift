@@ -43,7 +43,7 @@ struct ShiftEditor: View {
                     Section {
                         LabeledContent("תאריך", value: Format.dateFull(dayOff.start))
                     } footer: {
-                        Text("יום חופש או מחלה אפשר רק למחוק, ולהוסיף מחדש מהלוח.")
+                        Text("יום חופש, מחלה או מילואים אפשר רק למחוק, ולהוסיף מחדש מהלוח.")
                     }
                 } else {
                     Section {
@@ -117,6 +117,7 @@ struct ShiftEditor: View {
         switch shift.type {
         case .vacation: return "יום חופש"
         case .sick: return "יום מחלה"
+        case .reserve: return "יום מילואים"
         case .work: return "עריכת משמרת"
         }
     }

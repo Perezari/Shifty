@@ -15,6 +15,8 @@ enum ShiftActions {
         let message = apply(action, to: store)
         ICloud.start(store)
         ICloud.syncNow()
+        // the icon's quick actions too, for the shift's state now
+        QuickActions.update(store)
         await LiveShift.apply(store)
         return message
     }

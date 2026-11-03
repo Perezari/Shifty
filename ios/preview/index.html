@@ -566,13 +566,6 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .pbar .pt small { font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
 .pv-head small { display: block; font-size: 13px; font-weight: 500; color: var(--ink-2); margin-top: 3px; }
 
-/* (proposed) reserve duty's pay, as Bituach Leumi counts it */
-.est { display: flex; flex-direction: column; gap: 4px; padding: 12px 16px; border-radius: 18px; background: var(--track); }
-.est > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; color: var(--ink-2); }
-.est > div:first-child { color: var(--ink); font-weight: 600; font-size: 15px; padding-bottom: 4px; }
-.est > div:first-child b { font: 700 22px/1 var(--font-round); color: var(--accent); }
-.est > div > span:last-child { font-family: var(--font-round); font-variant-numeric: tabular-nums; }
-
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 </style>
 
@@ -1081,19 +1074,9 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   const midnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
   /** The month the Shifts and Calendar tabs show: this one, or in its first week the one before, which has days to show. */
   const periodStart = () => { const t = midnight(); return new Date(t.getFullYear(), t.getMonth() - (t.getDate() < 8 ? 1 : 0), 1); };
-  /** (proposed) Reserve duty from the 13th to the 17th of the month shown, Friday and Shabbat too, paid as Bituach Leumi pays a
-   *  worker in 2026: the income of the three months before the month it began, by 90, between ₪ 328.76 and ₪ 1,730.33 a day;
-   *  and the days that make no whole week paid 40% more, five days as seven. `base`: the three months' income by the hour. */
-  const RESERVE = { from: 13, to: 17, base: 25500, min: 328.76, max: 1730.33 };
-  RESERVE.days = RESERVE.to - RESERVE.from + 1;
-  /** The days paid for `n` days of service: each day of a week not whole adds 0.4 of a day, six of them a whole one. */
-  const paidDays = (n) => { const r = n % 7; return n + (r === 6 ? 1 : 0.4 * r); };
-  /** The service's pay from three months' income: their average day, the day's pay within the floor and the cap, the days paid
-   *  and the whole. */
-  const reservePay = (base) => {
-    const average = base / 90, daily = Math.min(RESERVE.max, Math.max(RESERVE.min, average)), paid = paidDays(RESERVE.days);
-    return { average, daily, paid, total: daily * paid };
-  };
+  /** Days of reserve duty, the 13th to the 17th of the month shown, Friday and Shabbat too: each marked as a sick day is, for the
+   *  record, without pay of its own (Bituach Leumi's pay changes every year, and is not counted). */
+  const RESERVE = { from: 13, to: 17 };
   /** The period's shifts and days off, the newest first: back from yesterday (or the month's last day), thirteen shifts with a
    *  sick day and three days of vacation among them (with today's, the Now screen's fourteen), and none on the days before. With
    *  two workplaces, the second's Fridays too. A global pay's shifts earn nothing each (`hourly` false): the month's pay is the
@@ -1107,8 +1090,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       d.setDate(d.getDate() - 1);
       if (d < first) break;
       if (d.getDate() >= RESERVE.from && d.getDate() <= RESERVE.to) {
-        list.push({ day: new Date(d), type: "reserve", start: +d, net: 0, pay: hourly ? reservePay(RESERVE.base).total / RESERVE.days : 0, hourly, place,
-          nth: d.getDate() - RESERVE.from + 1, of: RESERVE.days });
+        list.push({ day: new Date(d), type: "reserve", start: +d, net: 0, pay: 0, hourly, place });
         continue;
       }
       if (d.getDay() === 5 && state.places === 2) {
@@ -1184,18 +1166,18 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
    *  global pay's shift has its hours where the pay was; with two workplaces, each row names its own. */
   function shiftRow(e, i) {
     const off = e.type !== "work", byHours = e.hourly === false, reserve = e.type === "reserve";
-    const time = e.type === "vacation" ? "חופשה בתשלום" : e.type === "sick" ? "יום מחלה" : reserve ? "מילואים"
+    const time = e.type === "vacation" ? "חופשה בתשלום" : e.type === "sick" ? "יום מחלה" : reserve ? "יום מילואים"
       : e.end == null ? `התחלה <span class="num">${clock(new Date(e.start))}</span>` : `<span class="num">${range(e)}</span>`;
     const tag = e.running ? `<span class="rtag${e.onBreak ? " brk" : ""}">${e.onBreak ? "בהפסקה" : "פעילה"}</span>` : "";
     const where = e.place ? `<span class="wp-name">${e.place}</span>` : "";
-    // (proposed) a day of reserve duty: which of how many, and its pay, by the average or the month's pay going on
+    // (proposed) a day of reserve duty, for the record: its pay is not counted, a global pay's month going on
     const meta = e.type === "vacation" ? [where, `${hm(e.net)} שע׳ בתשלום`].filter(Boolean).join(" · ") : e.type === "sick" ? "יום 1 · 0% מהתקן"
-      : reserve ? `יום ${e.nth} מתוך ${e.of} · ${byHours ? "השכר החודשי ממשיך" : "תגמול משוער"}`
+      : reserve ? (byHours ? "המשכורת ממשיכה" : "התגמול לא נכלל בחישוב")
       : [where, byHours ? "" : hm(e.net) + " שע׳", e.breakMin ? `הפסקה ${e.breakMin}׳` : "", e.overtime > 0.01 ? "נ.ש " + hm(e.overtime) : ""]
         .filter(Boolean).join(" · ");
     return `<div class="srow glass" data-menu="shift:${i}">
       <span class="badge${e.short ? " short" : ""}${off ? " off" : ""}"><b>${e.day.getDate()}</b><small>${days[e.day.getDay()].replace("׳", "")}</small></span>
-      <div class="sbody"><div class="sline"><b>${time}</b>${tag}<span class="spay num"><span class="ltr">${reserve && byHours ? "" : byHours ? hm(e.net) : money(e.pay)}</span></span></div>
+      <div class="sbody"><div class="sline"><b>${time}</b>${tag}<span class="spay num"><span class="ltr">${reserve ? "" : byHours ? hm(e.net) : money(e.pay)}</span></span></div>
         <div class="smeta num">${meta}</div>${e.note ? `<div class="snote">${e.note}</div>` : ""}</div></div>`;
   }
 
@@ -1366,38 +1348,6 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         <p>סכום קבוע שמגיע פעם בשנה, עם השכר של החודש שבחרת. הוא נכנס להכנסה ולנטו המשוער של אותו חודש.</p></div>`;
   }
 
-  /** (proposed) Reserve duty, from a date to a date, on a sheet: each of its days a day of its own, Friday and Shabbat too. Its
-   *  pay as Bituach Leumi counts it: by the hour, in the period's income; with a global pay, the month's pay goes on, and what
-   *  the pay counted is above it comes later. */
-  function reserveSheet() {
-    const first = periodStart(), y = first.getFullYear(), m = first.getMonth(), count = RESERVE.days;
-    const row = (title, value) => `<div class="setrow"><span>${title}</span>${value}</div>`;
-    const chip = (value) => `<span class="vchip">${value}</span>`;
-    const date = (day) => chip(`${day} ב${months[m]} ${y}`);
-    // the three months before the month it began: the hours' income, or three months of the global pay
-    const before = (k) => months[(m - k + 12) % 12];
-    const r = reservePay(isGlobal() ? SALARY * 3 : RESERVE.base);
-    const daily = `<span class="ltr">${money(r.daily)}</span>${r.daily === RESERVE.min ? " · המינימום" : ""}`;
-    const lines = `<div><span>ליום שירות</span><span>${daily}</span></div>
-      <div><span>ימים בתשלום</span><span><span class="num">${+r.paid.toFixed(1)}</span> · ${count} ועוד ${Math.round((r.paid / count - 1) * 100)}%</span></div>
-      <div><span>ממוצע ${before(3)}–${before(1)}</span><span><span class="ltr">${money(r.average)}</span> ליום</span></div>`;
-    const rule = `כמו שביטוח לאומי מחשב לשכירים ב־2026: ההכנסה ב־3 החודשים שלפני החודש שבו התחיל השירות, חלקי 90, ולפחות
-      <span class="ltr num">${money(RESERVE.min)}</span> ליום. ימים שלא משלימים שבוע שלם מקבלים תוספת של 40%.`;
-    const pay = isGlobal()
-      ? `<div class="est"><div><span>המשכורת</span><span>ממשיכה כרגיל</span></div>
-          <div><span>תגמול משוער</span><span class="ltr">${moneyShort(r.total)}</span></div>${lines}</div>
-        <p>${rule} המעסיק ממשיך לשלם את המשכורת. אם התגמול גבוה מהשכר של ימי השירות, ההפרש מגיע אחר כך, בתלוש נפרד.</p>`
-      : `<div class="est"><div><span>תגמול משוער</span><b class="ltr">${moneyShort(r.total)}</b></div>${lines}</div>
-        <p>${rule} המעסיק משלם אותו עם השכר ומקבל החזר. הוא נכנס להכנסה של התקופה.</p>`;
-    return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
-      <div class="sheet"><span class="grab"></span>
-        <div class="sheet-bar"><button class="circle glass" type="button" data-sheet="" aria-label="ביטול">${icon.close}</button><b>מילואים</b>
-          <button class="circle prominent" type="button" data-sheet="" aria-label="שמירה">${icon.check}</button></div>
-        <div class="sec-card glass">${row("מתאריך", date(RESERVE.from))}${row("עד", date(RESERVE.to))}</div>
-        <p><span class="num">${count}</span> ימים, גם שישי ושבת. כל יום מסומן בלוח וברשימה, ולא יורד מימי החופשה.</p>
-        ${pay}</div>`;
-  }
-
   // ---- the menus of a long press: what was pressed lifted, with what can be done to it ----
   const line = (a, b, c) => `<div><span>${a}</span><span class="num">${b}</span><span class="num"><span class="ltr">${c}</span></span></div>`;
   /** A shift lifted: its day and hours, its pay by rate, its break and its note; a global pay's, its hours alone. */
@@ -1410,32 +1360,30 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         + (a > 0.01 ? line("נוספות 125%", hm(a), pay(a * wage * 1.25)) : "") + (b > 0.01 ? line("נוספות 150%", hm(b), pay(b * wage * 1.5)) : "")
         + (e.breakMin ? line("הפסקה", hm(e.breakMin / 60), "") : "");
     } else if (e.type === "reserve") {
-      // (proposed) a day of reserve duty: by the hour, the day's pay and its share of the days added; a global pay goes on
-      const r = reservePay(RESERVE.base);
-      lines = byHours ? line("מילואים", `יום ${e.nth} מתוך ${e.of}`, "")
-        : line("תגמול ליום", "", money(r.daily)) + line(`תוספת ${Math.round((r.paid / RESERVE.days - 1) * 100)}%`, "", money(e.pay - r.daily));
+      // (proposed) a day of reserve duty, for the record: no pay counted, and no total
+      lines = line("יום מילואים", "", "");
     } else {
       lines = e.type === "vacation" ? line("חופשה בתשלום", hm(e.net), pay(e.pay)) : line("יום מחלה 1", "0%", pay(0));
     }
     const when = e.type !== "work" ? "" : e.end == null ? `מ־${clock(new Date(e.start))}` : range(e);
-    const avg = reservePay(RESERVE.base);
     const note = e.type === "reserve" ? (byHours ? "המשכורת ממשיכה גם בימי המילואים."
-      : `ממוצע ההכנסה ב־3 החודשים שלפני: <span class="ltr num">${money(avg.average)}</span> ליום${avg.average < RESERVE.min
-        ? `, פחות מהמינימום של <span class="ltr num">${money(RESERVE.min)}</span>` : ""}.`) : e.note;
-    const total = e.type === "reserve" && byHours ? "השכר החודשי" : `<span class="ltr">${byHours ? hm(e.net) : money(e.pay)}</span>`;
+      : "לתיעוד. התגמול משולם לפי כללי ביטוח לאומי, שמשתנים כל שנה, ולכן לא נכלל בחישוב.") : e.note;
+    const total = e.type === "reserve" ? "" : `<div class="pv-total"><span>${e.running ? "עד עכשיו" : "סה״כ"}</span><b class="num"><span class="ltr">${byHours ? hm(e.net) : money(e.pay)}</span></b></div>`;
     return `<div class="pv"><div class="pv-head"><b>${dayLine(e.day)}</b><span class="num">${when}</span></div><div class="pv-lines">${lines}</div>
-      ${note ? `<div class="pv-note">${note}</div>` : ""}<div class="pv-total"><span>${e.running ? "עד עכשיו" : "סה״כ"}</span><b class="num">${total}</b></div></div>`;
+      ${note ? `<div class="pv-note">${note}</div>` : ""}${total}</div>`;
   }
   /** A day lifted: its shifts or its day off, or that it has none. */
   function dayPreview(date, entries) {
     const worked = entries.filter((e) => e.type === "work"), hours = worked.reduce((a, e) => a + e.net, 0);
-    const pay = (e) => e.hourly === false ? "" : money(e.pay), byHours = entries.length > 0 && entries.every((e) => e.hourly === false);
-    const lines = entries.map((e) => e.type !== "work" ? line({ vacation: "חופשה בתשלום", sick: "יום מחלה", reserve: "מילואים" }[e.type], "", pay(e))
+    const pay = (e) => e.hourly === false || e.type === "reserve" ? "" : money(e.pay), byHours = entries.length > 0 && entries.every((e) => e.hourly === false);
+    // (proposed) a day of reserve duty alone has no total: its pay is not counted
+    const record = entries.length > 0 && entries.every((e) => e.type === "reserve");
+    const lines = entries.map((e) => e.type !== "work" ? line({ vacation: "חופשה בתשלום", sick: "יום מחלה", reserve: "יום מילואים" }[e.type], "", pay(e))
       : line(e.end == null ? `מ־${clock(new Date(e.start))}` : `<span class="num">${range(e)}</span>`, hm(e.net), pay(e))).join("");
     // (proposed) the Hebrew date under the day's
     const title = dayLine(date) + (state.hebrew ? `<small>${hebrewDay(date)}</small>` : "");
     return `<div class="pv"><div class="pv-head"><b>${title}</b><span class="num">${worked.length ? hm(hours) + " שע׳" : ""}</span></div>
-      ${entries.length ? `<div class="pv-lines">${lines}</div><div class="pv-total"><span>סה״כ</span><b class="num"><span class="ltr">${byHours ? hm(hours) : money(entries.reduce((a, e) => a + e.pay, 0))}</span></b></div>`
+      ${entries.length ? `<div class="pv-lines">${lines}</div>${record ? "" : `<div class="pv-total"><span>סה״כ</span><b class="num"><span class="ltr">${byHours ? hm(hours) : money(entries.reduce((a, e) => a + e.pay, 0))}</span></b></div>`}`
         : `<div class="pv-empty">אין משמרת ביום זה</div>`}</div>`;
   }
   /** What a long press on `key` opens: a preview (or the thing itself, lifted) and the menu's sections. */
@@ -1443,14 +1391,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const [kind, arg] = key.split(":"), s = shift();
     const item = (title, svg, more) => Object.assign({ title, svg }, more);
     const remove = (title) => ({ items: [item(title || "מחיקה", icon.trash, { red: true })] });
-    // (proposed) reserve duty: from the plus, an empty day, or its own day, on its sheet
-    const reserve = item("מילואים", icon.shield, { data: 'data-open="reserve"' });
+    // (proposed) a day of reserve duty, added as a sick day is: from the plus, or an empty day's menu
+    const reserve = item("יום מילואים", icon.shield);
     if (kind === "shift") {
       const e = periodShifts(s)[+arg];
       if (!e) return null;
-      const sections = e.type === "reserve" ? [{ items: [item("עריכת התאריכים", icon.pencil, { data: 'data-open="reserve"' }), item("העתקת הסיכום", icon.copy)] },
-          remove(`מחיקת ${e.of} ימי המילואים`)]
-        : e.type !== "work" ? [{ items: [item("העתקת הסיכום", icon.copy)] }, remove()]
+      const sections = e.type !== "work" ? [{ items: [item("העתקת הסיכום", icon.copy)] }, remove()]
         : [{ items: [item("עריכה", icon.pencil)].concat(e.running ? [] : [item("שכפול להיום", icon.dup)], [item("העתקת הסיכום", icon.copy)]) }, remove()];
       return { preview: shiftPreview(e), sections };
     }
@@ -1725,15 +1671,15 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     place: '<span class="tag built">כמו שבבנייה</span>ההתראות מגיעות גם כשהאפליקציה סגורה. כשמגיעים לעבודה וכשיוצאים ממנה, לפי מקום העבודה שנקבע בהגדרות. כשמגיעים ליעד, לפי שעה שנקבעת מראש.',
     ask: '<span class="tag built">כמו שבבנייה</span>Siri עונה בלי לפתוח את Shifty. מתחת: הסיכום שמגיע בבוקר שאחרי סוף התקופה, והתזכורת אחרי 6 שעות בלי הפסקה, עם כפתור להפסקה. כל אחד מהם נכבה בהגדרות.',
     icon: '<span class="tag built">כמו שבבנייה</span>הסמל של Shifty במסך הבית: בהיר, כהה, וצבוע בגוון שבוחרים באייפון.',
-    welcome: '<span class="tag">הצעה</span>מופיע רק בפתיחה הראשונה, כשאין עדיין משמרות והגדרות. ארבעה צעדים קצרים שממלאים את מקום העבודה: שם ותחילת עבודה, שכר ונסיעות, ימים ושעות, ותקופת השכר. בכל שדה יש ערך סביר מראש, חוץ מהשכר. מי שמשחזר גיבוי או מקבל נתונים מ-iCloud מדלג על האשף. את ההרשאות להתראות ולמיקום האפליקציה מבקשת רק כשצריך אותן. "לפי שעה / גלובלי" בצעד השני מחליף.',
-    quick: '<span class="tag">הצעה</span>לחיצה ארוכה על הסמל של Shifty במסך הבית. הפעולות משתנות לפי המצב ("במשמרת / בהפסקה / לא במשמרת" למעלה). "סיום משמרת" מכאן מסיים מיד, כי זו כבר בחירה מכוונת. מתחת iOS מוסיף את הפעולות שלו.',
+    welcome: '<span class="tag built">כמו שבבנייה</span>מופיע רק בפתיחה הראשונה, כשעוד לא נשמרה אף משמרת. ארבעה צעדים קצרים שממלאים את מקום העבודה: שם ותחילת עבודה (לא חובה), שכר ונסיעות, ימים ושעות, ותקופת השכר. באפליקציה ברירת המחדל היא א׳–ה׳, 8:24 ביום (42 שעות בשבוע), והשכר הוא השדה היחיד שצריך למלא. משמרות שמגיעות מ-iCloud, מהתקנה קודמת, סוגרות אותו. "שחזור מגיבוי" עובר להגדרות. את ההרשאות להתראות ולמיקום האפליקציה מבקשת רק כשצריך אותן. "לפי שעה / גלובלי" בצעד השני מחליף.',
+    quick: '<span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על הסמל של Shifty במסך הבית. הפעולות משתנות לפי המצב ("במשמרת / בהפסקה / לא במשמרת" למעלה). "סיום משמרת" מכאן מסיים מיד, כי זו כבר בחירה מכוונת. מתחת iOS מוסיף את הפעולות שלו.',
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag">הצעה</span>שעת ההגעה (Pro, עם תזכורת לפי מיקום): אם הגעת לעבודה 5 דקות או יותר לפני שהמשמרת התחילה, מתחת לשעון מופיעה הצעה להתחיל משעת ההגעה. לחיצה מזיזה את ההתחלה, ו־✕ סוגר. <span class="tag">הצעה</span>תאריך עברי בשעון, ליד התאריך (הגדרות › תצוגה). <span class="tag built">כמו שבבנייה</span>כרטיס התקופה, מסודר: התאריכים בשורה אחת ובלי השנה, הסכום עד עכשיו והצפי לסוף התקופה באותה שורה ומתחת לכל אחד השם שלו, כמו המספרים שמתחתם. מספר שהוא אפס, כמו "0:00 חוסר", באפור. <span class="tag built">כמו שבבנייה</span>דמי הבראה (Pro, למטה): כמה ימים מגיעים לפי הוותק, כמה הם שווים ומתי ישולמו. <span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
-    shifts: '<span class="tag">הצעה</span>מילואים: סוג יום חדש בכפתור ה־+ (ובלחיצה ארוכה על יום ריק בלוח). בוחרים מתאריך עד תאריך, וכל יום מסומן, גם שישי ושבת. התגמול כמו שביטוח לאומי מחשב ב־2026: ממוצע 3 החודשים שלפני השירות, לפחות ₪328.76 ליום, ותוספת 40% לימים שלא משלימים שבוע (5 ימים משולמים כמו 7). בשכר לפי שעה הוא נכנס להכנסה. בשכר גלובלי המשכורת ממשיכה, וההפרש, אם יש, מגיע אחר כך. בדוגמה: 13–17 בחודש, והממוצע מתחת למינימום. לחיצה ארוכה על יום מילואים פותחת את הפירוט. <span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
-    calendar: '<span class="tag">הצעה</span>תאריך עברי (הגדרות › תצוגה): היום העברי בפינה של כל יום, החודשים העבריים מתחת לשם החודש, והתאריך העברי בפירוט של יום. <span class="tag">הצעה</span>ימי מילואים מסומנים "מילואים". <span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
-    settings: '<span class="tag">הצעה</span>תצוגה › תאריך עברי (לחיצה מפעילה ומכבה). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: תאריך תחילת עבודה והוותק, ימי החופשה בשנה לפי הוותק (צו ההרחבה או החוק), ודמי הבראה (תעריף, פעם בשנה או כל חודש). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: הפרשות המעביד לפנסיה ולפיצויים, קרן השתלמות עד התקרה, ונסיעות כסכום לחודש מלא. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
+    now: '<span class="tag built">כמו שבבנייה</span>שעת ההגעה (Pro, עם תזכורת לפי מיקום): אם הגעת לעבודה 5 דקות או יותר לפני שהמשמרת התחילה, מתחת לשעון מופיעה הצעה להתחיל משעת ההגעה. לחיצה מזיזה את ההתחלה, ו־✕ סוגר. <span class="tag built">כמו שבבנייה</span>תאריך עברי בשעון, ליד התאריך (הגדרות › תצוגה, כבוי כברירת מחדל). <span class="tag built">כמו שבבנייה</span>כרטיס התקופה, מסודר: התאריכים בשורה אחת ובלי השנה, הסכום עד עכשיו והצפי לסוף התקופה באותה שורה ומתחת לכל אחד השם שלו, כמו המספרים שמתחתם. מספר שהוא אפס, כמו "0:00 חוסר", באפור. <span class="tag built">כמו שבבנייה</span>דמי הבראה (Pro, למטה): כמה ימים מגיעים לפי הוותק, כמה הם שווים ומתי ישולמו. <span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
+    shifts: '<span class="tag built">כמו שבבנייה</span>יום מילואים, כמו יום מחלה: בכפתור ה־+ ובלחיצה ארוכה על יום ריק בלוח. הוא מסומן ברשימה ובלוח לתיעוד, לא נספר כחוסר ולא יורד מימי החופשה. התגמול לא נכלל בחישוב, כי הכללים והסכומים של ביטוח לאומי משתנים כל שנה. בדוגמה: 13–17 בחודש. <span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
+    calendar: '<span class="tag built">כמו שבבנייה</span>תאריך עברי (הגדרות › תצוגה, כבוי כברירת מחדל): היום העברי בפינה של כל יום, החודשים העבריים מתחת לשם החודש, והתאריך העברי בפירוט של יום. <span class="tag built">כמו שבבנייה</span>ימי מילואים מסומנים "מילואים". <span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
+    settings: '<span class="tag built">כמו שבבנייה</span>תצוגה › תאריך עברי (לחיצה מפעילה ומכבה). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: תאריך תחילת עבודה והוותק, ימי החופשה בשנה לפי הוותק (צו ההרחבה או החוק), ודמי הבראה (תעריף, פעם בשנה או כל חודש). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: הפרשות המעביד לפנסיה ולפיצויים, קרן השתלמות עד התקרה, ונסיעות כסכום לחודש מלא. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
   };
   const device = document.getElementById("device"), stage = document.getElementById("stage");
   const view = document.getElementById("view"), chrome = document.getElementById("chrome"), layer = document.getElementById("layer");
@@ -1800,7 +1746,6 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
           quick: quickScreen }[state.screen]();
     if (state.screen === "now" && state.sheet === "pro") view.insertAdjacentHTML("beforeend", proSheet());
     if (state.screen === "now" && state.sheet === "pay") view.insertAdjacentHTML("beforeend", paySheet());
-    if (state.screen === "now" && state.sheet === "reserve") view.insertAdjacentHTML("beforeend", reserveSheet());
     const again = view.querySelector(".scroll");
     if (again) {
       again.scrollTop = scrolls[again.dataset.scroll] || 0;
@@ -1957,10 +1902,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     if ("cmClose" in b.dataset) {
       // a menu's choice of the next shift's workplace
       if (b.dataset.next != null) { state.next = +b.dataset.next; save(); render(); }
-      closeMenu();
-      // (proposed) a menu's item opening its sheet: reserve duty's
-      if (b.dataset.open) { state.sheet = b.dataset.open; render(); }
-      return;
+      return closeMenu();
     }
     // a menu opened by a tap, as SwiftUI's Menu: the workplace of the next shift
     if ("tapMenu" in b.dataset) return openMenu(b);

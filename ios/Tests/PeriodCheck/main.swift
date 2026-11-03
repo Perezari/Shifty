@@ -373,5 +373,27 @@ let seniorBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder
 expect(seniorBack.startDate == senior.startDate && !seniorBack.extensionOrder && seniorBack.recuperationMonthly
        && seniorBack.place(nil).startDate == senior.startDate && Settings().startDate == nil, "in JSON, as the own workplace's")
 
+// a day of reserve duty, for the record: no hours or pay, nothing missing, and no day of work ahead in the projection
+let withReserve = (shifts + [off(10, .reserve)]).sorted { $0.start > $1.start } // Tuesday 10 November
+let reserveSummary = Calc.summary(withReserve, s, range: november, asOf: now.ms)
+let reserveDay = reserveSummary.days["2026-10-10"]
+expect(reserveDay?.dayOff == .reserve && reserveDay?.pay == 0 && reserveDay?.netHours == 0 && reserveDay?.short == false, "a day of reserve duty")
+expect(near(reserveSummary.totals.total, summary.totals.total) && reserveSummary.totals.count == summary.totals.count
+       && near(reserveSummary.shortfall.total, summary.shortfall.total), "it pays nothing and misses nothing")
+let fifthEvening = LocalTime.date(2026, 10, 5, 20).ms
+expect(Calc.projectedIncome(withReserve, s, range: november, asOf: fifthEvening)
+       < Calc.projectedIncome(shifts, s, range: november, asOf: fifthEvening), "not a day of work in the projection")
+expect(try! JSONDecoder().decode(Shift.self, from: try! JSONEncoder().encode(off(10, .reserve))).type == .reserve, "in JSON")
+
+// the Hebrew date (Settings › תצוגה): in letters, and a period's Hebrew months
+expect(Format.gematria(23) == "כ״ג" && Format.gematria(15) == "ט״ו" && Format.gematria(16) == "ט״ז" && Format.gematria(1) == "א׳"
+       && Format.gematria(20) == "כ׳" && Format.gematria(5787) == "תשפ״ז", "numbers in Hebrew letters")
+expect(Format.hebrewDate(LocalTime.date(2026, 10, 3, 9)) == "כ״ג בחשוון", "3 November 2026: 23 Heshvan")
+expect(Format.hebrewDate(LocalTime.date(2027, 2, 10, 9)) == "א׳ באדר ב׳", "10 March 2027, a leap year: 1 Adar II")
+expect(Format.hebrewDate(LocalTime.date(2026, 1, 20, 9)) == "ג׳ באדר", "20 February 2026, not a leap year: 3 Adar")
+expect(Format.hebrewMonths(october) == "תשרי–חשוון תשפ״ז", "October 2026's Hebrew months")
+expect(Format.hebrewMonths(Calc.period(around: LocalTime.date(2025, 8, 15), monthStartDay: 1)) == "אלול תשפ״ה–תשרי תשפ״ו",
+       "September 2025, across Rosh Hashana")
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

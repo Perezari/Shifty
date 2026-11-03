@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage(Alerts.breakKey) private var breakReminder = true
     @AppStorage(Alerts.summaryKey) private var periodSummary = true
     @AppStorage(CardLook.key) private var glassCards = false
+    @AppStorage(HebrewDates.key) private var hebrewDate = false
     @AppStorage(Perf.key) private var measuring = false
     @State private var exporting = false
     @State private var backup = BackupFile(data: Data())
@@ -53,7 +54,7 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(title: "תצוגה",
-                                note: "כרטיסי זכוכית כבדים יותר לציור. מדידת המהירות מראה בראש המסך, בכל שנייה, כמה פריימים הוצגו, כמה מהם איטיים, וכמה פעמים כל מסך צויר מחדש.") {
+                                note: "התאריך העברי מופיע לצד הלועזי בשעון, בלוח ובפירוט של כל יום. כרטיסי זכוכית כבדים יותר לציור. מדידת המהירות מראה בראש המסך, בכל שנייה, כמה פריימים הוצגו, כמה מהם איטיים, וכמה פעמים כל מסך צויר מחדש.") {
                     Picker("מראה", selection: setting(\.theme)) {
                         Text("כמו באייפון").tag("system")
                         Text("בהיר").tag("light")
@@ -61,6 +62,9 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                     .padding(.vertical, 12)
+                    Divider()
+                    Toggle("תאריך עברי", isOn: $hebrewDate)
+                        .settingsRow()
                     Divider()
                     Toggle("כרטיסי זכוכית", isOn: $glassCards)
                         .settingsRow()

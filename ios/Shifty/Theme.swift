@@ -17,6 +17,12 @@ enum CardLook {
     static let key = "glassCards"
 }
 
+/// The Hebrew date beside the Gregorian, this device's (Settings › תצוגה): on the dial, in each day of the calendar
+/// and over a day's shifts.
+enum HebrewDates {
+    static let key = "hebrewDate"
+}
+
 extension EnvironmentValues {
     /// The cards are of glass (CardLook), set over the tabs.
     @Entry var glassCards = false

@@ -40,7 +40,7 @@ extension Calc {
             let key = LocalTime.dayKey(shift.start)
             var day = days[key] ?? DaySum(date: shift.start)
             if !s.isMonthly(shift) { day.pay += b.pay }
-            if b.type == .vacation || b.type == .sick {
+            if b.type != .work {
                 day.dayOff = b.type
             } else {
                 day.netHours += b.netHours
@@ -116,16 +116,17 @@ extension Calc {
     }
 
     /// Where the pay period's income is heading: what it has, and its average day worked for each day left in
-    /// it, from tomorrow, that has a standard. A month's fixed pay and a bonus stay as they are.
+    /// it, from tomorrow, that has a standard and no reserve duty. A month's fixed pay and a bonus stay as they are.
     static func projectedIncome(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> Double {
         let totals = periodTotals(shifts, s, range: range, asOf: now)
         guard totals.workedDays > 0 else { return totals.total }
         let fixed = totals.salary + totals.bonus + totals.recuperation + monthlyTravel(shifts, s, range: range)
         let variable = totals.total - fixed
+        let reserve = Set(shifts.filter { $0.type == .reserve && !$0.deleted }.map { LocalTime.dayKey($0.start) })
         var day = LocalTime.addingDays(1, to: LocalTime.startOfDay(Date(ms: now)))
         var left = 0
         while day < range.end {
-            if expectedStandard(day, s) != nil { left += 1 }
+            if expectedStandard(day, s) != nil && !reserve.contains(LocalTime.dayKey(day)) { left += 1 }
             day = LocalTime.addingDays(1, to: day)
         }
         return fixed + variable + variable / Double(totals.workedDays) * Double(left)

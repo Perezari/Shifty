@@ -23,8 +23,10 @@ struct Break: Hashable {
     var end: Date?
 }
 
+/// Hours worked, a paid vacation or sick day, or a day of reserve duty: kept for the record alone, with no hours
+/// and no pay, as Bituach Leumi's pay for it changes every year.
 enum ShiftType: String {
-    case work, vacation, sick
+    case work, vacation, sick, reserve
 }
 
 /// The settings, with the web app's keys and defaults (store.js DEFAULT_SETTINGS). Hours are decimal

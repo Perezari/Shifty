@@ -13,6 +13,10 @@ final class Place: NSObject, CLLocationManagerDelegate {
     static let latitudeKey = "placeLatitude"
     static let longitudeKey = "placeLongitude"
     static let radiusKey = "placeRadius"
+    /// When the iPhone last arrived at the place (seconds since 1970), for the Now screen to offer it as the start of
+    /// a shift started later; and the shift whose offer was taken or closed.
+    static let arrivedKey = "placeArrived"
+    static let arrivalTipKey = "placeArrivalTip"
     /// The own workplace's region; another's is this and its id.
     private static let region = "shifty.work"
 
@@ -45,6 +49,12 @@ final class Place: NSObject, CLLocationManagerDelegate {
     static func radius(_ place: String?) -> Double {
         let value = UserDefaults.standard.double(forKey: key(radiusKey, place))
         return value > 0 ? value : 150
+    }
+
+    /// When the iPhone last arrived at the place, if it has.
+    static func arrival(_ place: String?) -> Date? {
+        let seconds = UserDefaults.standard.double(forKey: key(arrivedKey, place))
+        return seconds > 0 ? Date(timeIntervalSince1970: seconds) : nil
     }
 
     /// The workplace a region is watched for: nil for the own one; not one of these, none.
@@ -146,11 +156,13 @@ final class Place: NSObject, CLLocationManagerDelegate {
         ])
     }
 
-    /// Arrived at a workplace: whether to start, unless a shift runs; the shift to start is there.
+    /// Arrived at a workplace: the time kept, and whether to start, unless a shift runs; the shift to start is there.
     @MainActor
     static func arrived(at place: String?) async {
         let store = ShiftStore.shared
-        guard ProFlag.on, store.active == nil else { return }
+        guard ProFlag.on else { return }
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: key(arrivedKey, place))
+        guard store.active == nil else { return }
         store.chooseNextWorkplace(place)
         await ask(arriveCategory, title: "הגעת ל" + name(place), body: "להתחיל משמרת עכשיו?")
     }

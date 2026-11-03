@@ -86,6 +86,34 @@ enum Holidays {
         return days
     }
 
+    // MARK: The Hebrew date
+
+    /// The Hebrew date of `date` in letters: its day "כ״ג", its month "חשוון" and its year "תשפ״ז".
+    static func hebrewDate(_ date: Date) -> (day: String, month: String, year: String) {
+        let h = hebrew.dateComponents([.year, .month, .day], from: date)
+        let year = h.year ?? 0
+        return (Format.gematria(h.day ?? 0), monthName(h.month ?? 0, leap: (7 * year + 1) % 19 < 7), Format.gematria(year))
+    }
+
+    /// A Hebrew month by its name, of Foundation's number (Adar I 6 only in a leap year; Adar, or Adar II, 7).
+    private static func monthName(_ month: Int, leap: Bool) -> String {
+        switch month {
+        case 1: "תשרי"
+        case 2: "חשוון"
+        case 3: "כסלו"
+        case 4: "טבת"
+        case 5: "שבט"
+        case 6: "אדר א׳"
+        case 7: leap ? "אדר ב׳" : "אדר"
+        case 8: "ניסן"
+        case 9: "אייר"
+        case 10: "סיוון"
+        case 11: "תמוז"
+        case 12: "אב"
+        default: "אלול"
+        }
+    }
+
     /// 5 Iyar of a Gregorian year, between April and June.
     private static func iyar5(_ year: Int) -> Date? {
         for month0 in 3...5 {

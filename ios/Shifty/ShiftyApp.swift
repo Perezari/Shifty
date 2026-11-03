@@ -3,6 +3,8 @@ import UserNotifications
 
 @main
 struct ShiftyApp: App {
+    /// The icon's quick actions reach the app through its delegate (Live/QuickActions.swift).
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store: ShiftStore
     @State private var pro: Pro
 
@@ -60,6 +62,8 @@ struct RootView: View {
     @AppStorage(CardLook.key) private var glassCards = false
     @AppStorage(Perf.key) private var measuring = false
     @State private var tab: AppTab = .now
+    /// The first setup (Welcome), at the first launch.
+    @State private var welcoming = false
 
     /// The look chosen in the settings: the iPhone's, light or dark.
     private var scheme: ColorScheme? {
@@ -118,6 +122,43 @@ struct RootView: View {
             ProSheet()
                 .environment(pro)
         }
+        // a shift or a vacation day to add, from the icon's quick actions
+        .sheet(item: Bindable(QuickActions.shared).adding) { adding in
+            switch adding {
+            case .shift:
+                ShiftEditor(shift: nil, day: nil)
+                    .environment(store)
+            case .vacation:
+                DayOffSheet(type: .vacation)
+                    .environment(store)
+            }
+        }
+        .onChange(of: QuickActions.shared.shiftActions) { _, _ in
+            tab = .now
+        }
+        // the first setup: into the app after it, a shift started or not, or to the settings to restore a backup
+        .fullScreenCover(isPresented: $welcoming) {
+            Welcome { finish in
+                welcoming = false
+                switch finish {
+                case .start:
+                    tab = .now
+                    Task { _ = await ShiftActions.run(.start) }
+                case .restore:
+                    tab = .settings
+                case .app:
+                    tab = .now
+                }
+            }
+            .environment(store)
+            .environment(pro)
+        }
+        // shifts from iCloud, of an earlier install: the app is set up already
+        .onChange(of: store.records.isEmpty) { _, empty in
+            guard !empty, welcoming else { return }
+            UserDefaults.standard.set(true, forKey: Welcome.doneKey)
+            welcoming = false
+        }
         .environment(\.glassCards, glassCards)
         .overlay(alignment: .top) {
             if measuring {
@@ -130,6 +171,13 @@ struct RootView: View {
         .preferredColorScheme(scheme)
         .modifier(LockGate())
         .task {
+            QuickActions.update(store)
+            // at the first launch, the setup over the tabs from the first frame, not sliding up
+            if Welcome.due(store) {
+                var instant = Transaction()
+                instant.disablesAnimations = true
+                withTransaction(instant) { welcoming = true }
+            }
             guard syncs else { return }
             ICloud.start(store)
             LiveShift.refresh(store)
@@ -143,9 +191,11 @@ struct RootView: View {
         // each change, here, from iCloud or from a button outside the app, reaches the Lock Screen,
         // the Dynamic Island, the notifications and the widgets
         .onChange(of: store.records) { _, _ in
+            QuickActions.update(store)
             if syncs { LiveShift.refresh(store) }
         }
         .onChange(of: store.settings) { _, _ in
+            QuickActions.update(store)
             if syncs { LiveShift.refresh(store) }
         }
         // the iPhone turned light or dark: the Lock Screen's activity with it

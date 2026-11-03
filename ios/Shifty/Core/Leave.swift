@@ -30,7 +30,7 @@ extension Calc {
             switch shift.type {
             case .vacation: vacation.insert(LocalTime.dayKey(shift.start))
             case .sick: sick.insert(LocalTime.dayKey(shift.start))
-            case .work: break
+            case .work, .reserve: break
             }
         }
         let months = monthsBetween(since, now)

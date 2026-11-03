@@ -95,12 +95,13 @@ extension View {
 }
 
 extension LiftSection {
-    /// What a plus adds: a shift by hand, or a paid vacation or sick day.
+    /// What a plus adds: a shift by hand, a paid vacation or sick day, or a day of reserve duty.
     static func adding(shift: @escaping () -> Void, dayOff: @escaping (ShiftType) -> Void) -> LiftSection {
         LiftSection(items: [
             LiftItem(title: "משמרת", systemImage: "timer", action: shift),
             LiftItem(title: "יום חופש", systemImage: "sun.max") { dayOff(.vacation) },
             LiftItem(title: "יום מחלה", systemImage: "cross.case") { dayOff(.sick) },
+            LiftItem(title: "יום מילואים", systemImage: "shield") { dayOff(.reserve) },
         ])
     }
 }

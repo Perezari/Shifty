@@ -88,6 +88,35 @@ enum Format {
         months[month0]
     }
 
+    /// A number in Hebrew letters, as a Hebrew date writes it: 23 "כ״ג", 15 "ט״ו", 5787 "תשפ״ז", its thousands left
+    /// out. The app's own.
+    static func gematria(_ number: Int) -> String {
+        let ones = ["", "א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "ט"]
+        let tens = ["", "י", "כ", "ל", "מ", "נ", "ס", "ע", "פ", "צ"]
+        let hundreds = ["", "ק", "ר", "ש", "ת", "תק", "תר", "תש", "תת", "תתק"]
+        let n = abs(number) % 1000
+        var letters = hundreds[n / 100] + tens[n % 100 / 10] + ones[n % 10]
+        // 15 and 16 as ט״ו and ט״ז, not as the Name
+        if letters.hasSuffix("יה") { letters = String(letters.dropLast(2)) + "טו" }
+        if letters.hasSuffix("יו") { letters = String(letters.dropLast(2)) + "טז" }
+        guard let last = letters.last, letters.count > 1 else { return letters + "׳" }
+        return String(letters.dropLast()) + "״" + String(last)
+    }
+
+    /// "כ״ג בחשוון"
+    static func hebrewDate(_ date: Date) -> String {
+        let h = Holidays.hebrewDate(date)
+        return h.day + " ב" + h.month
+    }
+
+    /// The Hebrew months of a span of days: "תשרי–חשוון תשפ״ז", or "אלול תשפ״ו–תשרי תשפ״ז" across a new year.
+    static func hebrewMonths(_ range: TimeRange) -> String {
+        let a = Holidays.hebrewDate(range.start)
+        let b = Holidays.hebrewDate(Date(ms: range.end.ms - 1))
+        if a.year != b.year { return a.month + " " + a.year + "–" + b.month + " " + b.year }
+        return (a.month == b.month ? a.month : a.month + "–" + b.month) + " " + b.year
+    }
+
     /// A seniority (Calc.seniority): "5 שנים ו־7 חודשים", "שנה וחודשיים", "חודש", "פחות מחודש". The app's own.
     static func seniority(years: Int, months: Int) -> String {
         func count(_ n: Int, _ one: String, _ two: String, _ many: String) -> String {

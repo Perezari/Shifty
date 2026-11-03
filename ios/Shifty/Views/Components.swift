@@ -33,10 +33,12 @@ private struct MinuteClock: ViewModifier {
 }
 
 /// The pay period on screen, between the earlier one and the later (app.js .period-bar): right to left, the
-/// earlier on the right. Its name opens the period picker.
+/// earlier on the right. Its name opens the period picker; on the calendar, with the Hebrew date on, its Hebrew
+/// months are under it.
 struct PeriodBar: View {
     let range: TimeRange
     @Binding var offset: Int
+    var hebrew = false
     let pick: () -> Void
 
     var body: some View {
@@ -49,14 +51,21 @@ struct PeriodBar: View {
             }
             .accessibilityLabel("התקופה הקודמת")
             Button(action: pick) {
-                HStack(spacing: 4) {
-                    Text(Calc.periodTitle(range))
-                        .font(.headline)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    Image(systemName: "chevron.down")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
+                VStack(spacing: 1) {
+                    HStack(spacing: 4) {
+                        Text(Calc.periodTitle(range))
+                            .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        Image(systemName: "chevron.down")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                    }
+                    if hebrew {
+                        Text(Format.hebrewMonths(range))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .frame(maxWidth: .infinity, minHeight: 44)
             }
@@ -268,7 +277,10 @@ struct ShiftRow: View {
     /// whose seconds stay the same as the list is drawn (NowView.anchor): the row and the list are not.
     @ViewBuilder
     private var pay: some View {
-        if byHours {
+        if shift.type == .reserve {
+            // a day of reserve duty has no pay counted
+            EmptyView()
+        } else if byHours {
             Text(Format.hoursToHM(breakdown.netHours))
         } else if let live, shift.type == .work, shift.end == nil {
             TimelineView(.periodic(from: NowView.anchor, by: 1)) { context in
@@ -287,6 +299,8 @@ struct ShiftRow: View {
             return Text("חופשה בתשלום")
         case .sick:
             return Text("יום מחלה")
+        case .reserve:
+            return Text("יום מילואים")
         case .work:
             guard let end = shift.end else {
                 return Text("התחלה " + Format.clock(shift.start))
@@ -308,6 +322,9 @@ struct ShiftRow: View {
             let plus = tier >= 4 ? "+" : ""
             let pct = Int(jsRound(b.sickPct ?? 0))
             parts.append("יום \(tier)\(plus) · \(pct)% מהתקן")
+        case .reserve:
+            // its pay is Bituach Leumi's, not counted here; a month's fixed pay goes on
+            parts.append(byHours ? "המשכורת ממשיכה" : "התגמול לא נכלל בחישוב")
         case .work:
             if !byHours { parts.append(Format.hoursToHM(b.netHours) + " שע׳") }
             if b.breakMs > 0 { parts.append("הפסקה \(Int(jsRound(b.breakMs / 60000)))׳") }
@@ -612,7 +629,11 @@ struct DayOffSheet: View {
     }
 
     private var title: String {
-        type == .sick ? "יום מחלה" : "יום חופש"
+        switch type {
+        case .sick: "יום מחלה"
+        case .reserve: "יום מילואים"
+        default: "יום חופש"
+        }
     }
 }
 
@@ -620,6 +641,16 @@ struct DayOffSheet: View {
 
 extension ShiftType: Identifiable {
     var id: String { rawValue }
+
+    /// A day off's line in a day's list: "חופשה בתשלום", "יום מחלה", "יום מילואים".
+    var dayOffTitle: String {
+        switch self {
+        case .vacation: "חופשה בתשלום"
+        case .sick: "יום מחלה"
+        case .reserve: "יום מילואים"
+        case .work: "משמרת"
+        }
+    }
 }
 
 extension Shift {
@@ -638,12 +669,14 @@ extension Shift {
             parts.append("חופשה בתשלום")
         case .sick:
             parts.append("יום מחלה")
+        case .reserve:
+            parts.append("יום מילואים")
         case .work:
             if let span { parts.append(span) }
             parts.append(Format.hoursShort(breakdown.netHours))
         }
-        // a month's fixed pay's shift has no pay of its own
-        if !settings.isMonthly(self) { parts.append(Format.money(breakdown.pay, settings.currency)) }
+        // a month's fixed pay's shift has no pay of its own, nor has a day of reserve duty
+        if type != .reserve && !settings.isMonthly(self) { parts.append(Format.money(breakdown.pay, settings.currency)) }
         let line = parts.joined(separator: " · ")
         return note.isEmpty ? line : line + "\n" + note
     }
@@ -773,16 +806,25 @@ struct ShiftPreview: View {
                     .padding(.vertical, 8)
                     .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            Divider()
-            HStack(alignment: .firstTextBaseline) {
-                Text(b.ongoing ? "עד עכשיו" : "סה״כ")
-                    .font(.headline)
-                Spacer()
-                // a month's fixed pay's shift: its hours
-                Text(settings.isMonthly(shift) ? Format.hoursShort(b.netHours) : Format.money(b.pay, settings.currency))
-                    .font(.system(.title2, design: .rounded).weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.accentColor)
+            if shift.type == .reserve {
+                // for the record, with no total: its pay is not counted
+                Text(settings.isMonthly(shift) ? "המשכורת ממשיכה גם בימי המילואים."
+                     : "לתיעוד. התגמול משולם לפי כללי ביטוח לאומי, שמשתנים כל שנה, ולכן לא נכלל בחישוב.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Divider()
+                HStack(alignment: .firstTextBaseline) {
+                    Text(b.ongoing ? "עד עכשיו" : "סה״כ")
+                        .font(.headline)
+                    Spacer()
+                    // a month's fixed pay's shift: its hours
+                    Text(settings.isMonthly(shift) ? Format.hoursShort(b.netHours) : Format.money(b.pay, settings.currency))
+                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.accentColor)
+                }
             }
         }
         .liftedCard()
@@ -800,6 +842,8 @@ struct ShiftPreview: View {
         case .sick:
             let tier = b.sickTier ?? 1
             return [("יום מחלה \(tier)" + (tier >= 4 ? "+" : ""), "\(Int(jsRound(b.sickPct ?? 0)))%", pay(b.pay))]
+        case .reserve:
+            return [("יום מילואים", "", nil)]
         case .work:
             var list: [(title: String, hours: String, pay: Double?)] = []
             if b.isHoliday {
@@ -839,6 +883,7 @@ struct DayPreview: View {
     let shifts: [Shift]
     let settings: Settings
     let sickDates: Set<String>
+    @AppStorage(HebrewDates.key) private var hebrewDate = false
 
     var body: some View {
         let now = Date().ms
@@ -846,8 +891,15 @@ struct DayPreview: View {
         let worked = zip(shifts, breakdowns).filter { $0.0.type == .work }.reduce(0) { $0 + $1.1.netHours }
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text(Format.weekday(date) + ", " + Format.dateLong(date))
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(Format.weekday(date) + ", " + Format.dateLong(date))
+                        .font(.headline)
+                    if hebrewDate {
+                        Text(Format.hebrewDate(date))
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Spacer(minLength: 8)
                 if worked > 0 {
                     Text(Format.hoursShort(worked))
@@ -869,22 +921,25 @@ struct DayPreview: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(Array(zip(shifts, breakdowns).enumerated()), id: \.offset) { _, pair in
-                        PayLine(title: pair.0.span ?? (pair.0.type == .sick ? "יום מחלה" : "חופשה בתשלום"),
+                        PayLine(title: pair.0.span ?? pair.0.type.dayOffTitle,
                                 hours: pair.0.type == .work ? Format.hoursToHM(pair.1.netHours) : "",
-                                pay: settings.isMonthly(pair.0) ? nil : pair.1.pay, currency: settings.currency)
+                                pay: settings.isMonthly(pair.0) || pair.0.type == .reserve ? nil : pair.1.pay, currency: settings.currency)
                     }
                 }
-                Divider()
-                HStack(alignment: .firstTextBaseline) {
-                    Text("סה״כ")
-                        .font(.headline)
-                    Spacer()
-                    // a day of a month's fixed pay alone: its hours
-                    Text(shifts.allSatisfy { settings.isMonthly($0) } ? Format.hoursShort(worked)
-                         : Format.money(zip(shifts, breakdowns).reduce(0) { settings.isMonthly($1.0) ? $0 : $0 + $1.1.pay }, settings.currency))
-                        .font(.system(.title2, design: .rounded).weight(.bold))
-                        .monospacedDigit()
-                        .foregroundStyle(Color.accentColor)
+                // a day of reserve duty alone has no total: its pay is not counted
+                if !shifts.allSatisfy({ $0.type == .reserve }) {
+                    Divider()
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("סה״כ")
+                            .font(.headline)
+                        Spacer()
+                        // a day of a month's fixed pay alone: its hours
+                        Text(shifts.allSatisfy { settings.isMonthly($0) } ? Format.hoursShort(worked)
+                             : Format.money(zip(shifts, breakdowns).reduce(0) { settings.isMonthly($1.0) ? $0 : $0 + $1.1.pay }, settings.currency))
+                            .font(.system(.title2, design: .rounded).weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.accentColor)
+                    }
                 }
             }
         }

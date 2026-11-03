@@ -25,6 +25,9 @@ struct NowView: View {
     @State private var celebrations = 0
     /// The screen on screen, for the dial's clock to count.
     @State private var shown = false
+    @AppStorage(HebrewDates.key) private var hebrewDate = false
+    /// The shift whose arrival's offer was taken or closed.
+    @AppStorage(Place.arrivalTipKey) private var arrivalTipShift = ""
 
     var body: some View {
         let running = store.active != nil
@@ -35,6 +38,7 @@ struct NowView: View {
                 TimelineView(.periodic(from: Self.anchor, by: !shown ? 3600 : running ? 1 : 30)) { context in
                     shift(at: context.date)
                 }
+                arrival()
                 actions()
                 TimelineView(.everyMinute) { context in
                     cards(at: context.date)
@@ -162,6 +166,27 @@ struct NowView: View {
         }
     }
 
+    /// The arrival at the running shift's workplace, as its place's reminder saw it (Shifty Pro), 5 minutes to 4 hours
+    /// before the shift started and after any other shift's end: offered as the start, until taken or closed.
+    @ViewBuilder
+    private func arrival() -> some View {
+        if pro.unlocked, let active = store.active, arrivalTipShift != active.id {
+            let place = store.settings.workplace(of: active)?.id
+            if Place.enabled(place), let arrived = Place.arrival(place),
+               arrived <= active.start.addingTimeInterval(-5 * 60), arrived > active.start.addingTimeInterval(-4 * 3600),
+               !store.shifts.contains(where: { $0.id != active.id && $0.type == .work && ($0.end ?? .distantPast) > arrived }) {
+                ArrivalTip(arrived: arrived, start: active.start, place: placeName(store.settings) ?? "עבודה") {
+                    var moved = active
+                    moved.start = arrived
+                    withAnimation { store.upsert(moved) }
+                    arrivalTipShift = active.id
+                } close: {
+                    withAnimation { arrivalTipShift = active.id }
+                }
+            }
+        }
+    }
+
     // MARK: The workplace
 
     /// The workplace the screen is about: the running shift's, or the next one's; nil for the own.
@@ -243,6 +268,7 @@ struct NowView: View {
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .minimumScaleFactor(0.75)
             Text(hoursText)
                 .font(.system(size: 56, weight: .semibold, design: .rounded))
                 .monospacedDigit()
@@ -314,9 +340,11 @@ struct NowView: View {
         return "בדיוק ביעד"
     }
 
-    /// "יום ה׳, 29 באוקטובר", after the day's holiday when there is one.
+    /// "יום ה׳, 29 באוקטובר", after the day's holiday when there is one; the Hebrew date after it when it is on,
+    /// "יום ג׳, 3 בנובמבר · כ״ג בחשוון".
     private func dayLine(_ date: Date, _ settings: Settings) -> String {
-        let day = Format.weekday(date) + ", " + Format.dateLong(date)
+        var day = Format.weekday(date) + ", " + Format.dateLong(date)
+        if hebrewDate { day += " · " + Format.hebrewDate(date) }
         guard settings.holidaysEnabled, let name = Holidays.info(date).name else { return day }
         return name + " · " + day
     }
@@ -520,6 +548,65 @@ struct NowView: View {
         guard lifter?.isShowing != true else { return }
         withAnimation { store.endBreak() }
         tapped += 1
+    }
+}
+
+/// The arrival at work before the shift's start, offered as its start: a tip, as TipKit draws one, its action under a
+/// line and a close in its corner.
+private struct ArrivalTip: View {
+    let arrived: Date
+    let start: Date
+    /// "סטודיו גל", or "עבודה".
+    let place: String
+    let take: () -> Void
+    let close: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("הגעת ל" + place + " ב־" + Format.clock(arrived))
+                        .font(.subheadline.weight(.semibold))
+                    Text("המשמרת התחילה " + later + " אחר כך, ב־" + Format.clock(start) + ".")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Button(action: close) {
+                    Image(systemName: "xmark")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("סגירה")
+            }
+            .padding(.bottom, 10)
+            Divider()
+            Button(action: take) {
+                Text("להתחיל מ־" + Format.clock(arrived))
+                    .font(.body.weight(.medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 12)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.accentColor)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .surface(in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    /// "13 דקות", or "1:15 שעות".
+    private var later: String {
+        let minutes = Int(jsRound((start.ms - arrived.ms) / 60000))
+        return minutes < 60 ? "\(minutes) דקות" : Format.hoursToHM(Double(minutes) / 60) + " שעות"
     }
 }
 

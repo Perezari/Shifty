@@ -15,6 +15,7 @@ struct CalendarView: View {
     @State private var copying: Shift?
     /// The minute the month shows, again each minute while it is on screen.
     @State private var now = Date()
+    @AppStorage(HebrewDates.key) private var hebrewDate = false
 
     var body: some View {
         let range = Calc.period(around: now, monthStartDay: store.settings.monthStartDay, offset: offset)
@@ -73,7 +74,7 @@ struct CalendarView: View {
         ]
         return ScrollView {
             VStack(spacing: 12) {
-                PeriodBar(range: range, offset: $offset) { picking = true }
+                PeriodBar(range: range, offset: $offset, hebrew: hebrewDate) { picking = true }
                 VStack(spacing: 8) {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 7), spacing: 5) {
                         ForEach(Format.weekdays, id: \.self) { name in
@@ -85,7 +86,7 @@ struct CalendarView: View {
                             let key = LocalTime.dayKey(day)
                             let inPeriod = day >= range.start && day < range.end
                             let cell = DayCell(date: day, inPeriod: inPeriod, today: key == today,
-                                               sum: inPeriod ? summary.days[key] : nil, settings: settings)
+                                               sum: inPeriod ? summary.days[key] : nil, settings: settings, hebrew: hebrewDate)
                             if inPeriod {
                                 let onDay = (records[key] ?? []).sorted { $0.start < $1.start }
                                 Button {
@@ -143,13 +144,15 @@ struct DayRef: Identifiable {
     var id: String { LocalTime.dayKey(date) }
 }
 
-/// A day of the calendar: its number, and the hours worked, the kind of day off or the holiday's name.
+/// A day of the calendar: its number, and the hours worked, the kind of day off or the holiday's name; the Hebrew
+/// day in its corner when the Hebrew date is on.
 private struct DayCell: View {
     let date: Date
     let inPeriod: Bool
     let today: Bool
     let sum: DaySum?
     let settings: Settings
+    let hebrew: Bool
 
     var body: some View {
         let _ = Perf.drew("יום")
@@ -188,12 +191,26 @@ private struct DayCell: View {
                     .strokeBorder(Color.accentColor, lineWidth: 1.6)
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if hebrew && inPeriod {
+                Text(Holidays.hebrewDate(date).day)
+                    .font(.system(size: 9.5, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+                    .padding(.trailing, 5)
+            }
+        }
         .opacity(inPeriod ? 1 : 0.3)
         .contentShape(Rectangle())
     }
 
     private static func name(_ dayOff: ShiftType) -> String {
-        dayOff == .vacation ? "חופש" : "מחלה"
+        switch dayOff {
+        case .vacation: "חופש"
+        case .sick: "מחלה"
+        case .reserve: "מילואים"
+        case .work: ""
+        }
     }
 
     /// The day's holiday, when the holidays are on.
@@ -240,6 +257,7 @@ private struct DayCell: View {
 /// paid day off, never both.
 struct DayDetail: View {
     let date: Date
+    @AppStorage(HebrewDates.key) private var hebrewDate = false
     @Environment(ShiftStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.lifter) private var lifter
@@ -258,10 +276,9 @@ struct DayDetail: View {
         NavigationStack {
             // a list, for a shift to be swiped away as on the Shifts tab
             List {
-                if let line = holidayLine(settings) {
-                    Text(line)
+                if hebrewDate || holidayLine(settings) != nil {
+                    dateLine(settings)
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(Color("Holiday"))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .cardRow()
                 }
@@ -315,7 +332,15 @@ struct DayDetail: View {
                                     Text("יום מחלה")
                                         .frame(maxWidth: .infinity)
                                 }
+                                Button {
+                                    addDayOff(.reserve)
+                                } label: {
+                                    Text("מילואים")
+                                        .frame(maxWidth: .infinity)
+                                }
                             }
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                             .buttonStyle(.glass)
                         }
                     }
@@ -361,6 +386,15 @@ struct DayDetail: View {
         let info = Holidays.info(date)
         guard let kind = info.kind, let name = info.name else { return nil }
         return kind == .short ? name + " · יום מקוצר" : name
+    }
+
+    /// The Hebrew date when it is on, "כ״ג בחשוון תשפ״ז", then the holiday's line in its color.
+    private func dateLine(_ settings: Settings) -> Text {
+        let holiday = holidayLine(settings).map { Text($0).foregroundStyle(Color("Holiday")) }
+        guard hebrewDate else { return holiday ?? Text(verbatim: "") }
+        let hebrew = Text(Format.hebrewDate(date) + " " + Holidays.hebrewDate(date).year).foregroundStyle(.secondary)
+        guard let holiday else { return hebrew }
+        return hebrew + Text(verbatim: " · ").foregroundStyle(.secondary) + holiday
     }
 
     private func addDayOff(_ type: ShiftType) {
