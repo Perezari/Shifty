@@ -1081,9 +1081,19 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   const midnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
   /** The month the Shifts and Calendar tabs show: this one, or in its first week the one before, which has days to show. */
   const periodStart = () => { const t = midnight(); return new Date(t.getFullYear(), t.getMonth() - (t.getDate() < 8 ? 1 : 0), 1); };
-  /** (proposed) Reserve duty from the 13th to the 17th of the month shown, Friday and Shabbat too. By the hour, each day is paid
-   *  Bituach Leumi's way: the income of the three months before the month it began, by 90 (`base` the three months'). */
-  const RESERVE = { from: 13, to: 17, base: 25500, day: 25500 / 90 };
+  /** (proposed) Reserve duty from the 13th to the 17th of the month shown, Friday and Shabbat too, paid as Bituach Leumi pays a
+   *  worker in 2026: the income of the three months before the month it began, by 90, between ₪ 328.76 and ₪ 1,730.33 a day;
+   *  and the days that make no whole week paid 40% more, five days as seven. `base`: the three months' income by the hour. */
+  const RESERVE = { from: 13, to: 17, base: 25500, min: 328.76, max: 1730.33 };
+  RESERVE.days = RESERVE.to - RESERVE.from + 1;
+  /** The days paid for `n` days of service: each day of a week not whole adds 0.4 of a day, six of them a whole one. */
+  const paidDays = (n) => { const r = n % 7; return n + (r === 6 ? 1 : 0.4 * r); };
+  /** The service's pay from three months' income: their average day, the day's pay within the floor and the cap, the days paid
+   *  and the whole. */
+  const reservePay = (base) => {
+    const average = base / 90, daily = Math.min(RESERVE.max, Math.max(RESERVE.min, average)), paid = paidDays(RESERVE.days);
+    return { average, daily, paid, total: daily * paid };
+  };
   /** The period's shifts and days off, the newest first: back from yesterday (or the month's last day), thirteen shifts with a
    *  sick day and three days of vacation among them (with today's, the Now screen's fourteen), and none on the days before. With
    *  two workplaces, the second's Fridays too. A global pay's shifts earn nothing each (`hourly` false): the month's pay is the
@@ -1097,8 +1107,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       d.setDate(d.getDate() - 1);
       if (d < first) break;
       if (d.getDate() >= RESERVE.from && d.getDate() <= RESERVE.to) {
-        list.push({ day: new Date(d), type: "reserve", start: +d, net: 0, pay: hourly ? RESERVE.day : 0, hourly, place,
-          nth: d.getDate() - RESERVE.from + 1, of: RESERVE.to - RESERVE.from + 1 });
+        list.push({ day: new Date(d), type: "reserve", start: +d, net: 0, pay: hourly ? reservePay(RESERVE.base).total / RESERVE.days : 0, hourly, place,
+          nth: d.getDate() - RESERVE.from + 1, of: RESERVE.days });
         continue;
       }
       if (d.getDay() === 5 && state.places === 2) {
@@ -1180,7 +1190,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const where = e.place ? `<span class="wp-name">${e.place}</span>` : "";
     // (proposed) a day of reserve duty: which of how many, and its pay, by the average or the month's pay going on
     const meta = e.type === "vacation" ? [where, `${hm(e.net)} שע׳ בתשלום`].filter(Boolean).join(" · ") : e.type === "sick" ? "יום 1 · 0% מהתקן"
-      : reserve ? `יום ${e.nth} מתוך ${e.of} · ${byHours ? "השכר החודשי ממשיך" : "תגמול לפי ממוצע 3 חודשים"}`
+      : reserve ? `יום ${e.nth} מתוך ${e.of} · ${byHours ? "השכר החודשי ממשיך" : "תגמול משוער"}`
       : [where, byHours ? "" : hm(e.net) + " שע׳", e.breakMin ? `הפסקה ${e.breakMin}׳` : "", e.overtime > 0.01 ? "נ.ש " + hm(e.overtime) : ""]
         .filter(Boolean).join(" · ");
     return `<div class="srow glass" data-menu="shift:${i}">
@@ -1356,22 +1366,29 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         <p>סכום קבוע שמגיע פעם בשנה, עם השכר של החודש שבחרת. הוא נכנס להכנסה ולנטו המשוער של אותו חודש.</p></div>`;
   }
 
-  /** (proposed) Reserve duty, from a date to a date, on a sheet: each of its days a day of its own, Friday and Shabbat too. By
-   *  the hour, its pay as Bituach Leumi counts it; a global pay goes on. */
+  /** (proposed) Reserve duty, from a date to a date, on a sheet: each of its days a day of its own, Friday and Shabbat too. Its
+   *  pay as Bituach Leumi counts it: by the hour, in the period's income; with a global pay, the month's pay goes on, and what
+   *  the pay counted is above it comes later. */
   function reserveSheet() {
-    const first = periodStart(), y = first.getFullYear(), m = first.getMonth(), count = RESERVE.to - RESERVE.from + 1;
+    const first = periodStart(), y = first.getFullYear(), m = first.getMonth(), count = RESERVE.days;
     const row = (title, value) => `<div class="setrow"><span>${title}</span>${value}</div>`;
     const chip = (value) => `<span class="vchip">${value}</span>`;
     const date = (day) => chip(`${day} ב${months[m]} ${y}`);
-    // the three months before the month it began
+    // the three months before the month it began: the hours' income, or three months of the global pay
     const before = (k) => months[(m - k + 12) % 12];
+    const r = reservePay(isGlobal() ? SALARY * 3 : RESERVE.base);
+    const daily = `<span class="ltr">${money(r.daily)}</span>${r.daily === RESERVE.min ? " · המינימום" : ""}`;
+    const lines = `<div><span>ליום שירות</span><span>${daily}</span></div>
+      <div><span>ימים בתשלום</span><span><span class="num">${+r.paid.toFixed(1)}</span> · ${count} ועוד ${Math.round((r.paid / count - 1) * 100)}%</span></div>
+      <div><span>ממוצע ${before(3)}–${before(1)}</span><span><span class="ltr">${money(r.average)}</span> ליום</span></div>`;
+    const rule = `כמו שביטוח לאומי מחשב לשכירים ב־2026: ההכנסה ב־3 החודשים שלפני החודש שבו התחיל השירות, חלקי 90, ולפחות
+      <span class="ltr num">${money(RESERVE.min)}</span> ליום. ימים שלא משלימים שבוע שלם מקבלים תוספת של 40%.`;
     const pay = isGlobal()
-      ? `<div class="est"><div><span>השכר החודשי</span><span>ממשיך כרגיל</span></div></div>
-        <p>בשכר חודשי המשכורת ממשיכה בימי המילואים, והתקופה לא משתנה.</p>`
-      : `<div class="est"><div><span>תגמול משוער</span><b class="ltr">${moneyShort(RESERVE.day * count)}</b></div>
-          <div><span>ליום שירות</span><span class="ltr">${money(RESERVE.day)}</span></div>
-          <div><span>ההכנסה ב${before(3)}–${before(1)}</span><span class="ltr">${moneyShort(RESERVE.base)}</span></div></div>
-        <p>כמו שביטוח לאומי מחשב: ההכנסה ב־3 החודשים שלפני החודש שבו התחיל השירות, חלקי 90, לכל יום שירות. המעסיק משלם אותו עם השכר, ונכנס להכנסה של התקופה.</p>`;
+      ? `<div class="est"><div><span>המשכורת</span><span>ממשיכה כרגיל</span></div>
+          <div><span>תגמול משוער</span><span class="ltr">${moneyShort(r.total)}</span></div>${lines}</div>
+        <p>${rule} המעסיק ממשיך לשלם את המשכורת. אם התגמול גבוה מהשכר של ימי השירות, ההפרש מגיע אחר כך, בתלוש נפרד.</p>`
+      : `<div class="est"><div><span>תגמול משוער</span><b class="ltr">${moneyShort(r.total)}</b></div>${lines}</div>
+        <p>${rule} המעסיק משלם אותו עם השכר ומקבל החזר. הוא נכנס להכנסה של התקופה.</p>`;
     return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
       <div class="sheet"><span class="grab"></span>
         <div class="sheet-bar"><button class="circle glass" type="button" data-sheet="" aria-label="ביטול">${icon.close}</button><b>מילואים</b>
@@ -1393,14 +1410,18 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         + (a > 0.01 ? line("נוספות 125%", hm(a), pay(a * wage * 1.25)) : "") + (b > 0.01 ? line("נוספות 150%", hm(b), pay(b * wage * 1.5)) : "")
         + (e.breakMin ? line("הפסקה", hm(e.breakMin / 60), "") : "");
     } else if (e.type === "reserve") {
-      // (proposed) a day of reserve duty: by the hour, the average day of the three months before; a global pay goes on
-      lines = line("מילואים", `יום ${e.nth} מתוך ${e.of}`, byHours ? "" : money(e.pay));
+      // (proposed) a day of reserve duty: by the hour, the day's pay and its share of the days added; a global pay goes on
+      const r = reservePay(RESERVE.base);
+      lines = byHours ? line("מילואים", `יום ${e.nth} מתוך ${e.of}`, "")
+        : line("תגמול ליום", "", money(r.daily)) + line(`תוספת ${Math.round((r.paid / RESERVE.days - 1) * 100)}%`, "", money(e.pay - r.daily));
     } else {
       lines = e.type === "vacation" ? line("חופשה בתשלום", hm(e.net), pay(e.pay)) : line("יום מחלה 1", "0%", pay(0));
     }
     const when = e.type !== "work" ? "" : e.end == null ? `מ־${clock(new Date(e.start))}` : range(e);
-    const note = e.type === "reserve" ? (byHours ? "השכר החודשי ממשיך גם בימי המילואים."
-      : `ההכנסה ב־3 החודשים שלפני השירות, <span class="ltr num">${moneyShort(RESERVE.base)}</span>, חלקי 90.`) : e.note;
+    const avg = reservePay(RESERVE.base);
+    const note = e.type === "reserve" ? (byHours ? "המשכורת ממשיכה גם בימי המילואים."
+      : `ממוצע ההכנסה ב־3 החודשים שלפני: <span class="ltr num">${money(avg.average)}</span> ליום${avg.average < RESERVE.min
+        ? `, פחות מהמינימום של <span class="ltr num">${money(RESERVE.min)}</span>` : ""}.`) : e.note;
     const total = e.type === "reserve" && byHours ? "השכר החודשי" : `<span class="ltr">${byHours ? hm(e.net) : money(e.pay)}</span>`;
     return `<div class="pv"><div class="pv-head"><b>${dayLine(e.day)}</b><span class="num">${when}</span></div><div class="pv-lines">${lines}</div>
       ${note ? `<div class="pv-note">${note}</div>` : ""}<div class="pv-total"><span>${e.running ? "עד עכשיו" : "סה״כ"}</span><b class="num">${total}</b></div></div>`;
@@ -1710,7 +1731,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   // the app's tabs, and what is new on each
   const appNotes = {
     now: '<span class="tag">הצעה</span>שעת ההגעה (Pro, עם תזכורת לפי מיקום): אם הגעת לעבודה 5 דקות או יותר לפני שהמשמרת התחילה, מתחת לשעון מופיעה הצעה להתחיל משעת ההגעה. לחיצה מזיזה את ההתחלה, ו־✕ סוגר. <span class="tag">הצעה</span>תאריך עברי בשעון, ליד התאריך (הגדרות › תצוגה). <span class="tag built">כמו שבבנייה</span>כרטיס התקופה, מסודר: התאריכים בשורה אחת ובלי השנה, הסכום עד עכשיו והצפי לסוף התקופה באותה שורה ומתחת לכל אחד השם שלו, כמו המספרים שמתחתם. מספר שהוא אפס, כמו "0:00 חוסר", באפור. <span class="tag built">כמו שבבנייה</span>דמי הבראה (Pro, למטה): כמה ימים מגיעים לפי הוותק, כמה הם שווים ומתי ישולמו. <span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
-    shifts: '<span class="tag">הצעה</span>מילואים: סוג יום חדש בכפתור ה־+ (ובלחיצה ארוכה על יום ריק בלוח). בוחרים מתאריך עד תאריך, וכל יום מסומן, גם שישי ושבת. בשכר לפי שעה, כל יום מקבל תגמול משוער לפי ממוצע 3 החודשים שלפני השירות, כמו שביטוח לאומי מחשב. בשכר גלובלי, המשכורת ממשיכה. בדוגמה: 13–17 בחודש. לחיצה ארוכה על יום מילואים פותחת את הפירוט. <span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
+    shifts: '<span class="tag">הצעה</span>מילואים: סוג יום חדש בכפתור ה־+ (ובלחיצה ארוכה על יום ריק בלוח). בוחרים מתאריך עד תאריך, וכל יום מסומן, גם שישי ושבת. התגמול כמו שביטוח לאומי מחשב ב־2026: ממוצע 3 החודשים שלפני השירות, לפחות ₪328.76 ליום, ותוספת 40% לימים שלא משלימים שבוע (5 ימים משולמים כמו 7). בשכר לפי שעה הוא נכנס להכנסה. בשכר גלובלי המשכורת ממשיכה, וההפרש, אם יש, מגיע אחר כך. בדוגמה: 13–17 בחודש, והממוצע מתחת למינימום. לחיצה ארוכה על יום מילואים פותחת את הפירוט. <span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
     calendar: '<span class="tag">הצעה</span>תאריך עברי (הגדרות › תצוגה): היום העברי בפינה של כל יום, החודשים העבריים מתחת לשם החודש, והתאריך העברי בפירוט של יום. <span class="tag">הצעה</span>ימי מילואים מסומנים "מילואים". <span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
     settings: '<span class="tag">הצעה</span>תצוגה › תאריך עברי (לחיצה מפעילה ומכבה). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: תאריך תחילת עבודה והוותק, ימי החופשה בשנה לפי הוותק (צו ההרחבה או החוק), ודמי הבראה (תעריף, פעם בשנה או כל חודש). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: הפרשות המעביד לפנסיה ולפיצויים, קרן השתלמות עד התקרה, ונסיעות כסכום לחודש מלא. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
   };
