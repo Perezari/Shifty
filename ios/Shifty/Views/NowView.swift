@@ -28,6 +28,10 @@ struct NowView: View {
     @AppStorage(HebrewDates.key) private var hebrewDate = false
     /// The shift whose arrival's offer was taken or closed.
     @AppStorage(Place.arrivalTipKey) private var arrivalTipShift = ""
+    /// The running shift's start being dragged along the dial, to correct it; let go, it is kept.
+    @State private var draftStart: Date?
+    /// The start just moved: the shift, its start before, and until when it can be undone.
+    @State private var startUndo: (shift: String, start: Date, until: Date)?
 
     var body: some View {
         let running = store.active != nil
@@ -53,6 +57,7 @@ struct NowView: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: tapped)
         .sensoryFeedback(.success, trigger: celebrations)
         .sensoryFeedback(.selection, trigger: planQuarter)
+        .sensoryFeedback(.selection, trigger: draftStart)
         // the goal reached: a good moment to ask for a rating, now and then (Review.swift)
         .reviewRequest(on: celebrations)
         .sheet(isPresented: $adding) {
@@ -72,6 +77,8 @@ struct NowView: View {
         }
         .onChange(of: store.active?.id) { _, _ in
             plan = nil
+            draftStart = nil
+            startUndo = nil
         }
         .onAppear {
             shown = true
@@ -96,7 +103,13 @@ struct NowView: View {
         Perf.drew("עכשיו")
         let settings = store.settings
         let shifts = store.shifts
-        let status = Calc.nowStatus(shifts, settings, active: store.active, at: date.ms)
+        // the running shift, its start where it is being dragged to
+        let running = store.active.map { active -> Shift in
+            var moved = active
+            if let draftStart { moved.start = draftStart }
+            return moved
+        }
+        let status = Calc.nowStatus(shifts, settings, active: running, at: date.ms)
         let reached = status.active != nil && status.remaining <= 0.001
         let period = Calc.period(around: date, monthStartDay: settings.monthStartDay)
         let periodTotals = Calc.periodTotals(shifts, settings, range: period, asOf: date.ms)
@@ -111,7 +124,7 @@ struct NowView: View {
             NowFacts(cells: facts(status, settings, totals: periodTotals, global: overtime != nil, at: date))
         }
         .onChange(of: reached) { was, now in
-            if now && !was { celebrate() }
+            if now && !was && draftStart == nil { celebrate() }
         }
     }
 
@@ -234,15 +247,22 @@ struct NowView: View {
                       overtime: MonthOvertime?) -> some View {
         if let active = status.active {
             let layout = Calc.dial(active, settings, at: date, leave: plan)
+            // the start dragged: its time over the clock, then that it changed, with an undo, for a few seconds
+            let undo = startUndo.flatMap { $0.shift == active.id && date < $0.until ? $0 : nil }
+            let note: (text: String, accent: Bool)? = draftStart != nil ? ("התחלה ב־" + Format.clock(active.start), false)
+                : undo != nil ? ("ההתחלה עודכנה ל־" + Format.clock(active.start), true) : nil
             ShiftDial(layout: layout, reached: reached && plan == nil, planned: plan != nil, glow: glow,
                       knob: knobColor(status, reached: reached),
                       drag: { degrees in
                           plan = Calc.dialTime(degrees, start: active.start, now: Date())
-                      }) {
+                      },
+                      moveStart: plan == nil ? moveStart(to:) : nil,
+                      movingStart: draftStart != nil) {
                 if let leave = plan {
                     planCenter(active, leave: leave, settings, at: date, global: overtime != nil)
                 } else {
-                    shiftCenter(hoursText: Format.timer(status.netMs), pay: status.pay, overtime: overtime, faint: false, settings, at: date)
+                    shiftCenter(hoursText: Format.timer(status.netMs), pay: status.pay, overtime: overtime, faint: false, settings, at: date,
+                                note: note, undo: undo != nil ? undoStart : nil)
                 }
             }
         } else {
@@ -262,11 +282,13 @@ struct NowView: View {
     /// The day, the time worked and the wage: the running shift's, or today's. A global pay's has the period's
     /// overtime instead of the wage, and with a bonus at targets, the hours left to the next.
     private func shiftCenter(hoursText: String, pay: Double, overtime: MonthOvertime?, faint: Bool, _ settings: Settings,
-                             at date: Date) -> some View {
+                             at date: Date, note: (text: String, accent: Bool)? = nil, undo: (() -> Void)? = nil) -> some View {
         VStack(spacing: 8) {
-            Text(dayLine(date, settings))
+            // the day, or the start dragged instead
+            Text(note?.text ?? dayLine(date, settings))
                 .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(note?.accent == true ? Color.accentColor : Color.secondary)
+                .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Text(hoursText)
@@ -296,8 +318,45 @@ struct NowView: View {
                     .monospacedDigit()
                     .foregroundStyle(Color.accentColor)
             }
+            if let undo {
+                Button("ביטול", action: undo)
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
+            }
         }
         .frame(maxWidth: 230)
+    }
+
+    /// The running shift's start dragged to `degrees` on the dial, never past its first break nor before the shift
+    /// before it; let go (nil), it is kept when it moved, and can be undone for a few seconds.
+    private func moveStart(to degrees: Double?) {
+        guard let active = store.active else {
+            draftStart = nil
+            return
+        }
+        guard let degrees else {
+            if let draft = draftStart, abs(draft.ms - active.start.ms) >= 60_000 {
+                var moved = active
+                moved.start = draft
+                withAnimation { store.upsert(moved) }
+                startUndo = (active.id, active.start, Date().addingTimeInterval(6))
+            }
+            draftStart = nil
+            return
+        }
+        let before = store.shifts.filter { $0.id != active.id && $0.type == .work }.compactMap(\.end).filter { $0 <= active.start }.max()
+        draftStart = Calc.dialStart(degrees, now: Date(), earliest: before, latest: active.breaks.map(\.start).min())
+    }
+
+    /// The start moved back to where it was.
+    private func undoStart() {
+        guard let undo = startUndo, var active = store.active, active.id == undo.shift else {
+            startUndo = nil
+            return
+        }
+        active.start = undo.start
+        withAnimation { store.upsert(active) }
+        startUndo = nil
     }
 
     /// Leaving at the time chosen: the wage then (a global pay's, the hours), and the overtime it adds or the hours
@@ -871,6 +930,10 @@ private struct ShiftDial<Center: View>: View {
     let knob: Color
     /// Called with the angle, clockwise from 12, the flag is dragged to.
     let drag: ((Double) -> Void)?
+    /// Called with the angle the start is dragged to, and with nil once it is let go.
+    var moveStart: ((Double?) -> Void)? = nil
+    /// The start being dragged: it has a halo, as the flag has.
+    var movingStart = false
     @ViewBuilder var center: Center
 
     var body: some View {
@@ -913,12 +976,24 @@ private struct ShiftDial<Center: View>: View {
     @ViewBuilder
     private func marks(_ c: CGFloat, _ r: CGFloat) -> some View {
         if let goal = layout.goalDeg {
+            // the start, dragged along the dial to correct it, in a finger's room
             Image(systemName: "play.fill")
                 .font(.system(size: 9, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 22, height: 22)
                 .background(Circle().fill(Color.accentColor))
+                .background(Circle().fill(Color.accentColor.opacity(movingStart ? 0.22 : 0)).frame(width: 40, height: 40))
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
                 .position(Self.point(layout.startDeg, r, c))
+                .gesture(DragGesture(minimumDistance: 3, coordinateSpace: .named("dial"))
+                    .onChanged { value in
+                        var degrees = atan2(value.location.x - c, -(value.location.y - c)) * 180 / .pi
+                        if degrees < 0 { degrees += 360 }
+                        moveStart?(degrees)
+                    }
+                    .onEnded { _ in moveStart?(nil) }, including: moveStart == nil ? [] : .all)
+                .accessibilityLabel("גרירה לתיקון שעת ההתחלה")
             if planned {
                 Circle()
                     .fill(Color.white)

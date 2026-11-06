@@ -125,6 +125,17 @@ extension Calc {
         return Date(ms: max(now.ms, snapped))
     }
 
+    /// The running shift's start dragged on the dial, at `degrees` clockwise from 12: the last time at that angle
+    /// before now, by five minutes, five minutes before now at the latest; not after `latest` (its first break) nor
+    /// before `earliest` (the end of the shift before it).
+    static func dialStart(_ degrees: Double, now: Date, earliest: Date? = nil, latest: Date? = nil) -> Date {
+        let back = ((dialDegrees(now) - degrees).truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
+        var ms = min(jsRound((now.ms - back / 30 * hour) / 300_000) * 300_000, now.ms - 300_000)
+        if let latest { ms = min(ms, latest.ms) }
+        if let earliest { ms = max(ms, earliest.ms) }
+        return Date(ms: ms)
+    }
+
     /// The shift as it would be if it ended at `end`: an open break ended now, and the hours and the wage then.
     static func leaving(_ shift: Shift, at end: Date, _ s: Settings, now: Date, sickDates: Set<String>? = nil) -> Breakdown {
         var shift = shift

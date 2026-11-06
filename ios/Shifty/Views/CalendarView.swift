@@ -254,118 +254,90 @@ private struct DayCell: View {
 }
 
 /// A day's shifts and adding to them (app.js openDayDetail): a day is either work, one shift or more, or one
-/// paid day off, never both.
+/// paid day off, never both. The days around it are pages: a swipe, or an arrow beside the date, moves to the day
+/// before or after, the day before on the right. A shift goes from its long press's menu, as a swipe is the pages'.
 struct DayDetail: View {
     let date: Date
     @AppStorage(HebrewDates.key) private var hebrewDate = false
     @Environment(ShiftStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @Environment(\.lifter) private var lifter
+    /// The day shown, in days from `date`.
+    @State private var page: Int? = 0
     @State private var adding = false
     @State private var editing: Shift?
     @State private var copying: Shift?
+
+    /// The days a swipe reaches, each way: two months.
+    private static let reach = 62
+
+    /// The day shown.
+    private var day: Date {
+        LocalTime.addingDays(page ?? 0, to: LocalTime.startOfDay(date))
+    }
 
     var body: some View {
         let settings = store.settings
         let all = store.shifts
         let sick = Calc.sickDates(of: all)
-        let key = LocalTime.dayKey(date)
-        let shifts = all.filter { LocalTime.dayKey($0.start) == key }.sorted { $0.start < $1.start }
-        let hasDayOff = shifts.contains { $0.type != .work }
-        let hasWork = shifts.contains { $0.type == .work }
+        // each day's shifts, once for all the pages
+        let byDay = Dictionary(grouping: all) { LocalTime.dayKey($0.start) }
         NavigationStack {
-            // a list, for a shift to be swiped away as on the Shifts tab
-            List {
-                if hebrewDate || holidayLine(settings) != nil {
-                    dateLine(settings)
-                        .font(.subheadline.weight(.medium))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .cardRow()
-                }
-                if shifts.isEmpty {
-                    Text("אין משמרת ביום זה")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-                        .cardRow()
-                }
-                ForEach(shifts) { shift in
-                    let breakdown = Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick)
-                    Button {
-                        // not the finger lifted after a long press
-                        if lifter?.isShowing != true { editing = shift }
-                    } label: {
-                        ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency, showsDate: false,
-                                 byHours: settings.isMonthly(shift), place: settings.placeName(of: shift))
+            ScrollView(.horizontal) {
+                LazyHStack(spacing: 0) {
+                    ForEach(-Self.reach...Self.reach, id: \.self) { offset in
+                        let day = LocalTime.addingDays(offset, to: LocalTime.startOfDay(date))
+                        dayPage(day, (byDay[LocalTime.dayKey(day)] ?? []).sorted { $0.start < $1.start }, settings, sick)
+                            .containerRelativeFrame(.horizontal)
+                            .id(offset)
                     }
-                    .buttonStyle(.plain)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            withAnimation { store.delete(shift.id) }
-                        } label: {
-                            Label("מחיקה", systemImage: "trash")
-                        }
-                    }
-                    .shiftMenu(shift, breakdown, settings, edit: { editing = shift }, copy: { copying = shift })
-                    .cardRow()
                 }
-                if !hasDayOff {
-                    VStack(spacing: 10) {
-                        Button {
-                            adding = true
-                        } label: {
-                            Label("הוספת משמרת ליום זה", systemImage: "plus")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.glassProminent)
-                        if !hasWork {
-                            HStack(spacing: 10) {
-                                Button {
-                                    addDayOff(.vacation)
-                                } label: {
-                                    Text("יום חופש")
-                                        .frame(maxWidth: .infinity)
-                                }
-                                Button {
-                                    addDayOff(.sick)
-                                } label: {
-                                    Text("יום מחלה")
-                                        .frame(maxWidth: .infinity)
-                                }
-                                Button {
-                                    addDayOff(.reserve)
-                                } label: {
-                                    Text("מילואים")
-                                        .frame(maxWidth: .infinity)
-                                }
-                            }
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .buttonStyle(.glass)
-                        }
-                    }
-                    .controlSize(.large)
-                    .padding(.top, 6)
-                    .cardRow()
-                }
+                .scrollTargetLayout()
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $page)
+            // the day opened, in the middle of the days each way
+            .defaultScrollAnchor(.center)
+            .scrollIndicators(.hidden)
             .background(Color.appBackground.ignoresSafeArea())
-            .navigationTitle(Format.dateFull(date))
+            .navigationTitle(Format.dateFull(day))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        dismiss()
+                        step(-1)
                     } label: {
-                        Image(systemName: "xmark")
+                        Image(systemName: "chevron.backward")
                     }
-                    .accessibilityLabel("סגירה")
+                    .disabled((page ?? 0) <= -Self.reach)
+                    .accessibilityLabel("היום הקודם")
+                }
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 1) {
+                        Text(Format.dateFull(day))
+                            .font(.headline)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        if hebrewDate || holidayLine(day, settings) != nil {
+                            dateLine(day, settings)
+                                .font(.caption.weight(.medium))
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        step(1)
+                    } label: {
+                        Image(systemName: "chevron.forward")
+                    }
+                    .disabled((page ?? 0) >= Self.reach)
+                    .accessibilityLabel("היום הבא")
                 }
             }
+            .sensoryFeedback(.selection, trigger: page)
             .sheet(isPresented: $adding) {
-                ShiftEditor(shift: nil, day: date)
+                ShiftEditor(shift: nil, day: day)
                     .environment(store)
             }
             .sheet(item: $editing) { shift in
@@ -380,25 +352,101 @@ struct DayDetail: View {
         .presentationDetents([.medium, .large])
     }
 
+    /// A day's page: its shifts or day off, each opening, and lifted by a long press with its menu; and adding to it.
+    private func dayPage(_ day: Date, _ shifts: [Shift], _ settings: Settings, _ sick: Set<String>) -> some View {
+        let hasDayOff = shifts.contains { $0.type != .work }
+        let hasWork = shifts.contains { $0.type == .work }
+        return ScrollView {
+            VStack(spacing: 10) {
+                if shifts.isEmpty {
+                    Text("אין משמרת ביום זה")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                }
+                ForEach(shifts) { shift in
+                    let breakdown = Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick)
+                    Button {
+                        // not the finger lifted after a long press
+                        if lifter?.isShowing != true { editing = shift }
+                    } label: {
+                        ShiftRow(shift: shift, breakdown: breakdown, currency: settings.currency, showsDate: false,
+                                 byHours: settings.isMonthly(shift), place: settings.placeName(of: shift))
+                    }
+                    .buttonStyle(.plain)
+                    .shiftMenu(shift, breakdown, settings, edit: { editing = shift }, copy: { copying = shift })
+                }
+                if !hasDayOff {
+                    VStack(spacing: 10) {
+                        Button {
+                            adding = true
+                        } label: {
+                            Label("הוספת משמרת ליום זה", systemImage: "plus")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glassProminent)
+                        if !hasWork {
+                            HStack(spacing: 10) {
+                                Button {
+                                    addDayOff(.vacation, on: day)
+                                } label: {
+                                    Text("יום חופש")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                Button {
+                                    addDayOff(.sick, on: day)
+                                } label: {
+                                    Text("יום מחלה")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                Button {
+                                    addDayOff(.reserve, on: day)
+                                } label: {
+                                    Text("מילואים")
+                                        .frame(maxWidth: .infinity)
+                                }
+                            }
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .buttonStyle(.glass)
+                        }
+                    }
+                    .controlSize(.large)
+                    .padding(.top, 6)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    /// The day before (-1) or after (1), sliding in.
+    private func step(_ by: Int) {
+        let next = min(Self.reach, max(-Self.reach, (page ?? 0) + by))
+        withAnimation { page = next }
+    }
+
     /// "ערב פסח · יום מקוצר", or the holiday's name.
-    private func holidayLine(_ settings: Settings) -> String? {
+    private func holidayLine(_ day: Date, _ settings: Settings) -> String? {
         guard settings.holidaysEnabled else { return nil }
-        let info = Holidays.info(date)
+        let info = Holidays.info(day)
         guard let kind = info.kind, let name = info.name else { return nil }
         return kind == .short ? name + " · יום מקוצר" : name
     }
 
     /// The Hebrew date when it is on, "כ״ג בחשוון תשפ״ז", then the holiday's line in its color.
-    private func dateLine(_ settings: Settings) -> Text {
-        let holiday = holidayLine(settings).map { Text($0).foregroundStyle(Color("Holiday")) }
+    private func dateLine(_ day: Date, _ settings: Settings) -> Text {
+        let holiday = holidayLine(day, settings).map { Text($0).foregroundStyle(Color("Holiday")) }
         guard hebrewDate else { return holiday ?? Text(verbatim: "") }
-        let hebrew = Text(Format.hebrewDate(date) + " " + Holidays.hebrewDate(date).year).foregroundStyle(.secondary)
+        let hebrew = Text(Format.hebrewDate(day) + " " + Holidays.hebrewDate(day).year).foregroundStyle(.secondary)
         guard let holiday else { return hebrew }
         return hebrew + Text(verbatim: " · ").foregroundStyle(.secondary) + holiday
     }
 
-    private func addDayOff(_ type: ShiftType) {
-        store.addDayOff(date, type: type)
+    private func addDayOff(_ type: ShiftType, on day: Date) {
+        store.addDayOff(day, type: type)
         dismiss()
     }
 }

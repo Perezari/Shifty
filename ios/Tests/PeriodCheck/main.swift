@@ -385,6 +385,16 @@ expect(Calc.projectedIncome(withReserve, s, range: november, asOf: fifthEvening)
        < Calc.projectedIncome(shifts, s, range: november, asOf: fifthEvening), "not a day of work in the projection")
 expect(try! JSONDecoder().decode(Shift.self, from: try! JSONEncoder().encode(off(10, .reserve))).type == .reserve, "in JSON")
 
+// the running shift's start dragged on the dial: the last time at the angle before now, by five minutes
+let dragNow = LocalTime.date(2026, 10, 3, 12, 32)
+let angle = { (h: Int, m: Int) in Calc.dialDegrees(LocalTime.date(2026, 10, 3, h, m)) }
+expect(Format.clock(Calc.dialStart(angle(7, 2), now: dragNow)) == "07:00" && Format.clock(Calc.dialStart(angle(7, 3), now: dragNow)) == "07:05",
+       "07:02's angle at 12:32: 07:00, and 07:03's 07:05")
+expect(Calc.dialStart(angle(12, 31), now: dragNow) == Date(ms: dragNow.ms - 300_000), "five minutes before now at the latest")
+expect(Format.clock(Calc.dialStart(angle(10, 0), now: dragNow, latest: LocalTime.date(2026, 10, 3, 9, 30))) == "09:30", "not after its first break")
+expect(Format.clock(Calc.dialStart(angle(6, 0), now: dragNow, earliest: LocalTime.date(2026, 10, 3, 6, 30))) == "06:30",
+       "not before the shift before it ended")
+
 // the Hebrew date (Settings › תצוגה): in letters, and a period's Hebrew months
 expect(Format.gematria(23) == "כ״ג" && Format.gematria(15) == "ט״ו" && Format.gematria(16) == "ט״ז" && Format.gematria(1) == "א׳"
        && Format.gematria(20) == "כ׳" && Format.gematria(5787) == "תשפ״ז", "numbers in Hebrew letters")
