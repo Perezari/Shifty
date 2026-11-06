@@ -131,7 +131,10 @@ private struct Liftable: ViewModifier {
             } action: { frame in
                 place.frame = frame
             }
-            .gesture(LongPress(duration: 0.25) { lift() })
+            .background {
+                LongPress(duration: 0.25) { lift() }
+                    .allowsHitTesting(false)
+            }
             .accessibilityAction(named: "אפשרויות") { lift() }
             #if DEBUG
             .task {
@@ -151,23 +154,105 @@ private struct Liftable: ViewModifier {
     }
 }
 
-/// A long press as UIKit's own: it fails as soon as the finger moves, so that a list scrolls, and a row's swipe
-/// opens, from under a thing that lifts. SwiftUI's LongPressGesture, a simultaneous gesture on the rows, held the
-/// finger, and the Shifts tab neither scrolled nor swiped. Once it lifts, it cancels the finger's touch: a button
-/// under it is not tapped too.
-private struct LongPress: UIGestureRecognizerRepresentable {
+/// A long press as UIKit's own, and out of SwiftUI's gestures: an empty view behind a thing that lifts, its long
+/// press on the window, taking only a touch on that thing. SwiftUI's LongPressGesture, a simultaneous gesture on a
+/// list's rows, held the finger, and the Shifts tab neither scrolled nor swiped; UIKit's put on the rows with
+/// .gesture() waited for their buttons, each a gesture under it, and never lifted. This one waits for none and holds
+/// up none: it gives up as soon as the finger moves, so that a list scrolls and a row's swipe opens.
+private struct LongPress: UIViewRepresentable {
     let duration: TimeInterval
     let action: () -> Void
 
-    func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
-        let press = UILongPressGestureRecognizer()
-        press.minimumPressDuration = duration
-        press.allowableMovement = 12
-        return press
+    func makeUIView(context: Context) -> PressView {
+        PressView(duration: duration)
     }
 
-    func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
-        if recognizer.state == .began { action() }
+    func updateUIView(_ view: PressView, context: Context) {
+        view.action = action
+    }
+}
+
+/// The view behind a thing that lifts. It takes no touch itself, its thing's button does; its long press is on the
+/// window while it is on one, and goes along with every other gesture: a button's tap, which asks the lifter
+/// first, a list's scroll and a row's swipe.
+private final class PressView: UIView, UIGestureRecognizerDelegate {
+    var action: () -> Void = {}
+    private let press = UILongPressGestureRecognizer()
+
+    init(duration: TimeInterval) {
+        super.init(frame: .zero)
+        isUserInteractionEnabled = false
+        press.minimumPressDuration = duration
+        press.allowableMovement = 12
+        press.cancelsTouchesInView = false
+        press.delaysTouchesEnded = false
+        press.delegate = self
+        press.addTarget(self, action: #selector(pressed))
+    }
+
+    required init?(coder: NSCoder) {
+        return nil
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if let window {
+            if press.view !== window { window.addGestureRecognizer(press) }
+        } else {
+            press.view?.removeGestureRecognizer(press)
+        }
+    }
+
+    @objc private func pressed() {
+        guard press.state == .began else { return }
+        // once it lifts, the list or the page under it moves no more with the finger, nor does a row's swipe open
+        var view = superview
+        while let v = view {
+            if let scroll = v as? UIScrollView {
+                for pan in scroll.gestureRecognizers ?? [] where pan is UIPanGestureRecognizer && pan.isEnabled {
+                    pan.isEnabled = false
+                    pan.isEnabled = true
+                }
+            }
+            view = v.superview
+        }
+        action()
+    }
+
+    /// A touch on the thing, and not on a bar or a sheet over it: one in the same list, bar or screen. A small thing
+    /// (a bar's plus) is taken 44 points round, as its button is.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard let touched = touch.view, let window, touched.window === window, isShown else { return false }
+        let area = bounds.insetBy(dx: min(0, (bounds.width - 44) / 2), dy: min(0, (bounds.height - 44) / 2))
+        return area.contains(touch.location(in: self)) && Self.owner(of: touched) === Self.owner(of: self)
+    }
+
+    /// On the screen, and not in a list's cell kept hidden for another row.
+    private var isShown: Bool {
+        var view: UIView? = self
+        while let v = view {
+            if v.isHidden || v.alpha < 0.01 { return false }
+            view = v.superview
+        }
+        return true
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        true
+    }
+
+    /// What a view is in: the list or the scroll that moves it, a bar, or else the screen it is on, the tabs' or a
+    /// sheet's.
+    private static func owner(of view: UIView) -> UIView {
+        var view = view
+        while let parent = view.superview, !(parent is UIWindow) {
+            if view is UIScrollView || view is UINavigationBar || view is UITabBar || view is UIToolbar {
+                return view
+            }
+            view = parent
+        }
+        return view
     }
 }
 
