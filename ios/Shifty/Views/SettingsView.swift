@@ -73,6 +73,10 @@ struct SettingsView: View {
                         .settingsRow()
                 }
 
+                SettingsSection(title: "אייקון", pro: true) {
+                    IconPicker()
+                }
+
                 SettingsSection(title: pro.unlocked ? "מסך הנעילה והתראות" : "התראות", note: alertsNote) {
                     Toggle("התראות על המשמרת", isOn: $alerts)
                         .settingsRow()

@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "IconChoice-Mono.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

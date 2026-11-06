@@ -80,8 +80,9 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay
   period (`PeriodCheck`).
 - `Shifty/Assets.xcassets`: the icon (`AppIcon.svg` at 1024 px, and `AppIcon-dark.svg` and
-  `AppIcon-tinted.svg` for the iPhone's dark and tinted home screen), the accent color and the
-  background, in light and dark.
+  `AppIcon-tinted.svg` for the iPhone's dark and tinted home screen), the alternates picked in Settings
+  (`AppIcon-white.svg`, `AppIcon-dark.svg` and `AppIcon-mono.svg`, each with a small picture
+  `IconChoice-…` for the picker), the accent color and the background, in light and dark.
 - `scripts/`: the builds (`testflight.sh`, `screenshots.sh`, and `codemagic.py` to run them from the
   computer) and the check of the Swift without a Mac (`check-swift.sh`).
 - `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).

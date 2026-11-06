@@ -395,6 +395,57 @@ expect(Format.clock(Calc.dialStart(angle(10, 0), now: dragNow, latest: LocalTime
 expect(Format.clock(Calc.dialStart(angle(6, 0), now: dragNow, earliest: LocalTime.date(2026, 10, 3, 6, 30))) == "06:30",
        "not before the shift before it ended")
 
+// the end of the work (a workplace's page › סיום העבודה): the notice by the law, in calendar days
+expect(Calc.noticeDays(months: 0, monthly: true) == 0 && Calc.noticeDays(months: 6, monthly: true) == 6
+       && Calc.noticeDays(months: 8, monthly: true) == 11 && Calc.noticeDays(months: 11, monthly: true) == 18.5
+       && Calc.noticeDays(months: 12, monthly: true) == nil, "by the month: a day a month to six, then 2.5, a month from a year")
+expect(Calc.noticeDays(months: 11, monthly: false) == 11 && Calc.noticeDays(months: 12, monthly: false) == 14
+       && Calc.noticeDays(months: 15, monthly: false) == 15 && Calc.noticeDays(months: 23, monthly: false) == 19
+       && Calc.noticeDays(months: 24, monthly: false) == 21 && Calc.noticeDays(months: 35, monthly: false) == 26
+       && Calc.noticeDays(months: 36, monthly: false) == nil, "by the hour: 14 and 21 days and one for each two months, a month from three years")
+func close(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 1e-6 }
+// a global salary from 1 March 2023, six percent to the fund's severance, recuperation with July's pay
+var leaver = s
+leaver.startDate = LocalTime.date(2023, 2, 1)
+leaver.payTerms = [PayTerms(id: "global", from: PayTerms.start, kind: .monthly, monthlySalary: 12_000)]
+leaver.balanceDate = LocalTime.date(2025, 11, 31)
+leaver.vacationBalance = 10
+let tookOff = Shift(id: "v", start: LocalTime.date(2026, 1, 10, 12), end: LocalTime.date(2026, 1, 10, 12), type: .vacation)
+let threeYears = Calc.termination([tookOff], leaver, at: nil, lastDay: LocalTime.date(2026, 1, 28))! // to 28 February 2026
+expect(threeYears.years == 3 && threeYears.months == 0 && close(threeYears.exactYears, 3), "three years to the end of the last day")
+expect(close(threeYears.severance(.dismissal), 36_000) && close(threeYears.severance(.resignation), 36_000 * 0.72),
+       "dismissed: a month's pay a year; resigning: the fund's 6% of 8.33")
+expect(threeYears.noticeDays == nil && close(threeYears.noticePay, 12_000), "a month's notice, or its pay")
+expect(close(threeYears.vacationDays ?? -1, 10) && close(threeYears.vacationPay, 10 * 12_000 / (5.0 * 52 / 12)),
+       "the payslip's 10, a month's 1, less the day taken, each at the month over 21.67")
+expect(close(threeYears.recuperationDays ?? -1, 6) && close(threeYears.recuperationPay, 6 * 451.5),
+       "the third year's 6 recuperation days, not yet paid by July's")
+expect(close(threeYears.total(.dismissal), 36_000 + threeYears.vacationPay + 6 * 451.5), "the total, the notice apart")
+expect(Calc.termination([], leaver, at: nil, lastDay: LocalTime.date(2024, 1, 29))?.severance(.dismissal) == 12_000,
+       "a year to the day: a month's pay")
+expect(Calc.termination([], leaver, at: nil, lastDay: LocalTime.date(2023, 9, 31))?.noticeDays == 11, "eight months: 11 days")
+expect(Calc.termination([], s, at: nil, lastDay: now) == nil && Calc.termination([], leaver, at: nil, lastDay: LocalTime.date(2023, 0, 1)) == nil,
+       "none without the start, or before it")
+leaver.severancePercent = 8.33
+expect(Calc.termination([], leaver, at: nil, lastDay: LocalTime.date(2026, 1, 28))?.fund == 36_000, "8.33% stands for all of it")
+// by the hour from 15 January 2025, 42 hours a week: a month of 182
+var hourly = s
+hourly.startDate = LocalTime.date(2025, 0, 15)
+hourly.standardByDay = [8.4, 8.4, 8.4, 8.4, 8.4, nil, nil]
+let byHour = Calc.termination([], hourly, at: nil, lastDay: LocalTime.date(2026, 8, 14))! // to 14 September 2026
+expect(byHour.years == 1 && byHour.months == 8 && close(byHour.monthPay, 50 * 182) && close(byHour.severance(.dismissal), 50 * 182 * 20 / 12),
+       "a year and eight months at 182 hours a month")
+expect(byHour.noticeDays == 18 && close(byHour.noticePay, 50 * 182 * 18 / 30) && byHour.vacationDays == nil, "18 days; no balance kept")
+expect(close(byHour.recuperationDays ?? -1, 4) && close(byHour.recuperationPay, 4 * 451.5),
+       "the first year's 5 paid in July 2026, the second's two thirds of 6 not yet")
+hourly.recuperationMonthly = true
+expect(close(Calc.termination([], hourly, at: nil, lastDay: LocalTime.date(2026, 8, 14))?.recuperationDays ?? -1, 9 - 8 * 5.0 / 12),
+       "paid by the month: eight twelfths of the first year's 5 so far")
+hourly.startDate = LocalTime.date(2026, 0, 1)
+let firstYear = Calc.termination([], hourly, at: nil, lastDay: LocalTime.date(2026, 7, 31))! // eight months
+expect(!firstYear.severanceDue && close(firstYear.severance(.dismissal), 50 * 182 * 8 / 12 * 0.72) && firstYear.noticeDays == 8
+       && firstYear.recuperationDays == 0, "before a year: the fund's money alone, 8 days' notice, no recuperation yet")
+
 // the Hebrew date (Settings › תצוגה): in letters, and a period's Hebrew months
 expect(Format.gematria(23) == "כ״ג" && Format.gematria(15) == "ט״ו" && Format.gematria(16) == "ט״ז" && Format.gematria(1) == "א׳"
        && Format.gematria(20) == "כ׳" && Format.gematria(5787) == "תשפ״ז", "numbers in Hebrew letters")

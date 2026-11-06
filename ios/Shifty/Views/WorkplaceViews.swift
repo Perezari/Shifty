@@ -86,8 +86,8 @@ struct WorkplacesSection: View {
 /// A workplace's page: its name, its pay from each date, the newest first (a sheet changes one or adds one from a
 /// date), its pay now when it is global or has a bonus, its pay month, its standard hours, and what its employer
 /// sets: overtime, breaks, Shabbat and night, a holiday's eve, vacation and sick days and the days left of them, the
-/// pension and travel; and the reminder of its place. Another workplace can be deleted, its shifts then counted as
-/// the own one's.
+/// pension and travel; the reminder of its place, and what ending the work there comes to (TerminationPage). Another
+/// workplace can be deleted, its shifts then counted as the own one's.
 struct WorkplacePage: View {
     /// nil for the settings' own workplace.
     let placeID: String?
@@ -377,6 +377,23 @@ struct WorkplacePage: View {
                         }
                         .settingsRow()
                     }
+                }
+
+                SettingsSection(title: "סיום העבודה", note: "פיצויים, הודעה מוקדמת, פדיון ימי החופשה ודמי הבראה, לפי החוק.", pro: true) {
+                    NavigationLink {
+                        TerminationPage(placeID: placeID)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("מה מגיע לי בסיום העבודה")
+                            Spacer()
+                            Image(systemName: "chevron.forward")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .settingsRow()
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 if placeID != nil {

@@ -24,6 +24,8 @@ struct ProSheet: View {
         Feature(symbol: "mic", title: "\u{200F}Siri ומרכז הבקרה", text: "להתחיל ולסיים משמרת, ולשאול כמה הרווחת, בלי לפתוח את Shifty."),
         Feature(symbol: "icloud", title: "סנכרון ב-iCloud", text: "אותן משמרות והגדרות בכל מכשיר עם אותו Apple ID."),
         Feature(symbol: "mappin.and.ellipse", title: "תזכורת לפי מיקום", text: "שאלה כשמגיעים לעבודה וכשיוצאים ממנה."),
+        Feature(symbol: "briefcase", title: "סיום העבודה", text: "פיצויים, הודעה מוקדמת, פדיון חופשה והבראה, לפי החוק."),
+        Feature(symbol: "paintpalette", title: "אייקונים לבחירה", text: "לבן, כהה או שחור־לבן, במסך הבית."),
     ]
 
     var body: some View {
