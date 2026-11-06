@@ -34,15 +34,11 @@ struct Lift {
 @MainActor @Observable
 final class Lifter {
     private(set) var lift: Lift?
-    /// The iPhone's tap at each lift, readied as a finger presses: a generator of UIKit's, and not a
-    /// sensoryFeedback over the tabs, which drew the whole of them again for each tap.
+    /// The iPhone's tap at each lift: a generator of UIKit's, and not a sensoryFeedback over the tabs, which drew
+    /// the whole of them again for each tap.
     private let tap = UIImpactFeedbackGenerator(style: .medium)
 
     var isShowing: Bool { lift != nil }
-
-    func ready() {
-        tap.prepare()
-    }
 
     func show(_ lift: Lift) {
         guard self.lift == nil else { return }
@@ -124,29 +120,18 @@ private struct Liftable: ViewModifier {
     let sections: () -> [LiftSection]
     @Environment(\.lifter) private var lifter
     @State private var place = LiftSpot()
-    /// Held down, before it lifts: it gives a little under the finger, as iOS's do.
-    @GestureState private var pressing = false
     #if DEBUG
     @Environment(\.liftsForScreenshot) private var liftsForScreenshot
     #endif
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(pressing ? 0.96 : 1)
-            .animation(.easeOut(duration: 0.18), value: pressing)
             .onGeometryChange(for: CGRect.self) { proxy in
                 proxy.frame(in: .global)
             } action: { frame in
                 place.frame = frame
             }
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.25, maximumDistance: 12)
-                    .updating($pressing) { held, state, _ in state = held }
-                    .onEnded { _ in lift() }
-            )
-            .onChange(of: pressing) { _, held in
-                if held { lifter?.ready() }
-            }
+            .gesture(LongPress(duration: 0.25) { lift() })
             .accessibilityAction(named: "אפשרויות") { lift() }
             #if DEBUG
             .task {
@@ -163,6 +148,26 @@ private struct Liftable: ViewModifier {
         let menu = sections()
         guard let lifter, !menu.isEmpty else { return }
         lifter.show(Lift(source: place.frame, card: card, preview: preview(), sections: menu))
+    }
+}
+
+/// A long press as UIKit's own: it fails as soon as the finger moves, so that a list scrolls, and a row's swipe
+/// opens, from under a thing that lifts. SwiftUI's LongPressGesture, a simultaneous gesture on the rows, held the
+/// finger, and the Shifts tab neither scrolled nor swiped. Once it lifts, it cancels the finger's touch: a button
+/// under it is not tapped too.
+private struct LongPress: UIGestureRecognizerRepresentable {
+    let duration: TimeInterval
+    let action: () -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
+        let press = UILongPressGestureRecognizer()
+        press.minimumPressDuration = duration
+        press.allowableMovement = 12
+        return press
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
+        if recognizer.state == .began { action() }
     }
 }
 
