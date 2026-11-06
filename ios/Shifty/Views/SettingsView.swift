@@ -129,6 +129,8 @@ struct SettingsView: View {
                 SettingsSection(title: nil) {
                     Link(destination: AppInfo.support) { actionRow("תמיכה ושאלות נפוצות") }
                     Divider()
+                    Link(destination: AppInfo.feedback) { actionRow("שליחת משוב") }
+                    Divider()
                     Link(destination: AppInfo.privacy) { actionRow("מדיניות פרטיות") }
                 }
 

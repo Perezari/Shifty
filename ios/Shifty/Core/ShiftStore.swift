@@ -82,10 +82,17 @@ final class ShiftStore {
     }
 
     /// The workplace the next shift starts at, and a day off is taken at: the one chosen, while the settings
-    /// have it; nil for the settings' own.
+    /// have it and the work there goes on; nil for the settings' own, unless its work has ended and another's
+    /// goes on.
     var nextWorkplace: String? {
-        guard let id = chosenWorkplace, settings.workplaces.contains(where: { $0.id == id }) else { return nil }
-        return id
+        let now = Self.now()
+        if let id = chosenWorkplace, let place = settings.workplaces.first(where: { $0.id == id }), !place.ended(by: now) {
+            return id
+        }
+        if settings.place(nil).ended(by: now), let open = settings.workplaces.first(where: { !$0.ended(by: now) }) {
+            return open.id
+        }
+        return nil
     }
 
     func chooseNextWorkplace(_ id: String?) {

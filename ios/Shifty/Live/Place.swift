@@ -75,9 +75,10 @@ final class Place: NSObject, CLLocationManagerDelegate {
             manager.stopMonitoring(for: region)
         }
         guard ProFlag.on, CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
-        // the workplaces from the files, as the app may be woken in the background for this
-        let places: [String?] = [nil] + ShiftStore.snapshot().settings.workplaces.map { Optional($0.id) }
-        for place in places where Self.enabled(place) {
+        // the workplaces from the files, as the app may be woken in the background for this; not one whose work ended
+        let settings = ShiftStore.snapshot().settings
+        let places: [String?] = [nil] + settings.workplaces.map { Optional($0.id) }
+        for place in places where Self.enabled(place) && !settings.place(place).ended(by: Date()) {
             guard let center = Self.coordinate(place) else { continue }
             let region = CLCircularRegion(center: center, radius: Self.radius(place),
                                           identifier: place.map { Self.region + "." + $0 } ?? Self.region)
@@ -157,22 +158,33 @@ final class Place: NSObject, CLLocationManagerDelegate {
     }
 
     /// Arrived at a workplace: the time kept, and whether to start, unless a shift runs; the shift to start is there.
+    /// Back while the shift runs, the question of the leaving goes.
     @MainActor
     static func arrived(at place: String?) async {
         let store = ShiftStore.shared
-        guard ProFlag.on else { return }
+        guard ProFlag.on, !store.settings.place(place).ended(by: Date()) else { return }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: key(arrivedKey, place))
-        guard store.active == nil else { return }
+        guard store.active == nil else {
+            UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [leaveCategory])
+            return
+        }
         store.chooseNextWorkplace(place)
         await ask(arriveCategory, title: "הגעת ל" + name(place), body: "להתחיל משמרת עכשיו?")
     }
 
-    /// Left a workplace: whether to end the shift running there, if one runs.
+    /// The notification's key for when the iPhone left, the end its button gives the shift (Notifications).
+    static let leftKey = "left"
+    static let shiftKey = "shift"
+
+    /// Left a workplace: whether to end the shift running there, if one runs, at the time of leaving.
     @MainActor
     static func left(_ place: String?) async {
         let store = ShiftStore.shared
         guard ProFlag.on, let active = store.active, store.settings.workplace(of: active)?.id == place else { return }
-        await ask(leaveCategory, title: "יצאת מ" + name(place), body: "המשמרת פתוחה מ־" + Format.clock(active.start) + ". לסיים אותה?")
+        let now = Date()
+        await ask(leaveCategory, title: "יצאת מ" + name(place) + " ב־" + Format.clock(now),
+                  body: "המשמרת פתוחה מ־" + Format.clock(active.start) + ". לסיים אותה בשעה שיצאת?",
+                  info: [leftKey: now.timeIntervalSince1970, shiftKey: active.id])
     }
 
     /// A workplace's name, or "העבודה" while the own one has the default.
@@ -183,13 +195,14 @@ final class Place: NSObject, CLLocationManagerDelegate {
     }
 
     @MainActor
-    private static func ask(_ category: String, title: String, body: String) async {
+    private static func ask(_ category: String, title: String, body: String, info: [String: Any] = [:]) async {
         guard await Alerts.allowed() else { return }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
         content.categoryIdentifier = category
+        content.userInfo = info
         try? await UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: category, content: content, trigger: nil))
     }
 }
@@ -206,10 +219,14 @@ final class Notifications: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let action = response.actionIdentifier
+        let info = response.notification.request.content.userInfo
+        // the leaving's question: the shift it asked about, ended when the iPhone left
+        let left = (info[Place.leftKey] as? Double).map { Date(timeIntervalSince1970: $0) }
+        let shift = info[Place.shiftKey] as? String
         Task { @MainActor in
             switch action {
             case "start": _ = await ShiftActions.run(.start)
-            case "end": _ = await ShiftActions.run(.end)
+            case "end": _ = await ShiftActions.run(.end, at: ShiftActions.endTime(left: left, of: shift))
             case "break": _ = await ShiftActions.run(.startBreak)
             default: break
             }

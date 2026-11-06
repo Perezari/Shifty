@@ -93,6 +93,27 @@ enum Calc {
         return nil
     }
 
+    /// The standard a work shift's overtime starts after: its day's (standardHours of its start), or 7 hours on a night
+    /// shift, two hours or more of it up to `endMs` between 22:00 and 06:00, where the law's night shift is set
+    /// (Settings.nightShift). `s` is the shift's own settings (effective(for:)).
+    static func shiftStandard(_ startMs: Double, _ endMs: Double, _ s: Settings) -> Double {
+        let standard = standardHours(Date(ms: startMs), s)
+        guard s.nightShift, nightMs(startMs, endMs, 22, 6) >= 2 * hour else { return standard }
+        return min(standard, 7)
+    }
+
+    /// The running shift's goal in hours: the standard of the day of `now`, as the web app's Now screen takes it; or
+    /// a night shift's 7, where it is set, once its span up to now, or up to the goal at that standard, holds two
+    /// hours of night.
+    static func goalHours(_ shift: Shift, _ s: Settings, asOf now: Double) -> Double {
+        let s = s.effective(for: shift)
+        let day = standardHours(Date(ms: now), s)
+        guard s.nightShift else { return day }
+        let planned = shift.start.ms + day * hour + max(breaksMs(shift, asOf: now), s.autoBreakMinutes * 60000)
+        guard nightMs(shift.start.ms, max(now, planned), 22, 6) >= 2 * hour else { return day }
+        return min(day, 7)
+    }
+
     /// The breaks of a shift, an open one up to `asOf`.
     static func breaksMs(_ shift: Shift, asOf: Double) -> Double {
         var ms = 0.0
@@ -216,8 +237,8 @@ enum Calc {
         // the night's share of the span worked, breaks included
         let nightHours = s.nightEnabled ? nightMs(startMs, endMs, s.nightStart, s.nightEnd) / hour : 0
 
-        // the regular hours up to the day's standard, then the overtime tiers
-        let regular = min(netHours, standardHours(Date(ms: startMs), s))
+        // the regular hours up to the day's standard (a night shift's, where it is set), then the overtime tiers
+        let regular = min(netHours, shiftStandard(startMs, endMs, s))
         var rest = netHours - regular
         let ot1 = min(rest, s.overtime1Hours)
         rest -= ot1
@@ -335,17 +356,23 @@ enum Calc {
         var keys: [String] = []
         var net: [String: Double] = [:]
         var dates: [String: Date] = [:]
+        // the days with a night shift, where it is set: their standard is its 7 hours
+        var nights = Set<String>()
         for shift in shifts where inRange(shift, range) {
             if shift.type != .work { continue }
             let key = LocalTime.dayKey(shift.start)
             if net[key] == nil { keys.append(key) }
-            net[key] = (net[key] ?? 0) + breakdown(shift, s, asOf: asOf, sickDates: sick).netHours
+            let b = breakdown(shift, s, asOf: asOf, sickDates: sick)
+            net[key] = (net[key] ?? 0) + b.netHours
             dates[key] = shift.start
+            let own = s.effective(for: shift)
+            if own.nightShift && nightMs(b.startMs, b.endMs, 22, 6) >= 2 * hour { nights.insert(key) }
         }
         var byDay: [String: Double] = [:]
         var total = 0.0
         for key in keys {
-            guard let date = dates[key], let worked = net[key], let expected = expectedStandard(date, s) else { continue }
+            guard let date = dates[key], let worked = net[key], var expected = expectedStandard(date, s) else { continue }
+            if nights.contains(key) { expected = min(expected, 7) }
             let miss = max(0, expected - worked)
             if miss > 0.001 {
                 byDay[key] = miss

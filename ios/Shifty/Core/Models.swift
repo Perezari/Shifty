@@ -54,6 +54,9 @@ struct Settings: Hashable {
     var nightStart = 22.0
     var nightEnd = 6.0
     var nightMult = 1.0
+    /// A night shift's day as the law's 7 hours: one with two hours or more between 22:00 and 06:00, its overtime
+    /// from the eighth (Calc.shiftStandard). The app's alone.
+    var nightShift = false
 
     /// The multiplier of a whole shift marked Shabbat or holiday.
     var holidayMult = 1.5
@@ -108,6 +111,9 @@ struct Settings: Hashable {
     /// recuperation pay's day's worth (2026's in the private sector) and its month (0 January), or each month's
     /// twelfth. The app's alone.
     var startDate: Date?
+    /// The last day of work at the own workplace; nil while it goes on. Its month's pay, bonus and recuperation pay
+    /// are counted from the start date to the end of this day, and its vacation days accrue up to it. The app's alone.
+    var endDate: Date?
     var extensionOrder = true
     var recuperationOn = true
     var recuperationRate = 451.5
@@ -283,13 +289,13 @@ extension Break: Codable {
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case appName, workplaceName, currency, theme, hourlyWage, regularDailyHours, standardByDay,
-             overtime1Hours, overtime1Mult, overtime2Mult, nightEnabled, nightStart, nightEnd, nightMult,
+             overtime1Hours, overtime1Mult, overtime2Mult, nightEnabled, nightStart, nightEnd, nightMult, nightShift,
              holidayMult, holidaysEnabled, holidayEveHours, vacationHours,
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, autoBreakMinutes, autoBreakAfterHours,
              travelPerDay, travelMonthlyCap, monthlyIncomeGoal, monthStartDay, weekStartsOn,
              creditPoints, pensionPercent, vacationBalance, sickBalance, balanceDate, vacationDaysPerYear,
              pensionEmployerPercent, severancePercent, studyFundPercent, studyFundEmployerPercent, travelMonthly,
-             startDate, extensionOrder, recuperationOn, recuperationRate, recuperationMonthly, recuperationMonth,
+             startDate, endDate, extensionOrder, recuperationOn, recuperationRate, recuperationMonthly, recuperationMonth,
              payTerms, workplaces, updatedAt
     }
 
@@ -319,6 +325,7 @@ extension Settings: Codable {
         nightStart = value(.nightStart, d.nightStart)
         nightEnd = value(.nightEnd, d.nightEnd)
         nightMult = value(.nightMult, d.nightMult)
+        nightShift = value(.nightShift, d.nightShift)
         holidayMult = value(.holidayMult, d.holidayMult)
         holidaysEnabled = value(.holidaysEnabled, d.holidaysEnabled)
         holidayEveHours = value(.holidayEveHours, d.holidayEveHours)
@@ -342,6 +349,7 @@ extension Settings: Codable {
         studyFundPercent = value(.studyFundPercent, d.studyFundPercent)
         studyFundEmployerPercent = value(.studyFundEmployerPercent, d.studyFundEmployerPercent)
         startDate = ISODate.decodeIfPresent(c, .startDate)
+        endDate = ISODate.decodeIfPresent(c, .endDate)
         extensionOrder = value(.extensionOrder, d.extensionOrder)
         recuperationOn = value(.recuperationOn, d.recuperationOn)
         recuperationRate = value(.recuperationRate, d.recuperationRate)
@@ -376,6 +384,7 @@ extension Settings: Codable {
         try c.encode(nightStart, forKey: .nightStart)
         try c.encode(nightEnd, forKey: .nightEnd)
         try c.encode(nightMult, forKey: .nightMult)
+        try c.encode(nightShift, forKey: .nightShift)
         try c.encode(holidayMult, forKey: .holidayMult)
         try c.encode(holidaysEnabled, forKey: .holidaysEnabled)
         try c.encode(holidayEveHours, forKey: .holidayEveHours)
@@ -399,6 +408,7 @@ extension Settings: Codable {
         try c.encode(studyFundPercent, forKey: .studyFundPercent)
         try c.encode(studyFundEmployerPercent, forKey: .studyFundEmployerPercent)
         try c.encodeIfPresent(startDate.map(ISODate.string), forKey: .startDate)
+        try c.encodeIfPresent(endDate.map(ISODate.string), forKey: .endDate)
         try c.encode(extensionOrder, forKey: .extensionOrder)
         try c.encode(recuperationOn, forKey: .recuperationOn)
         try c.encode(recuperationRate, forKey: .recuperationRate)

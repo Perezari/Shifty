@@ -8,11 +8,13 @@ struct TerminationPage: View {
     let placeID: String?
     @Environment(ShiftStore.self) private var store
     @State private var leaving = Leaving.dismissal
-    @State private var lastDay = LocalTime.startOfDay(Date())
+    /// The last day picked here; until then the workplace's own (Workplace.endDate), or today.
+    @State private var picked: Date?
 
     var body: some View {
         let s = store.settings
         let place = s.place(placeID)
+        let lastDay = picked ?? place.endDate.map(LocalTime.startOfDay) ?? LocalTime.startOfDay(Date())
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 if let start = place.startDate.map(LocalTime.startOfDay) {
@@ -27,7 +29,9 @@ struct TerminationPage: View {
                         DatePicker("תאריך תחילת עבודה", selection: startDate, in: ...Date(), displayedComponents: .date)
                             .settingsRow()
                         Divider()
-                        DatePicker("יום העבודה האחרון", selection: $lastDay, in: start..., displayedComponents: .date)
+                        DatePicker("יום העבודה האחרון",
+                                   selection: Binding(get: { lastDay }, set: { picked = LocalTime.startOfDay($0) }),
+                                   in: start..., displayedComponents: .date)
                             .settingsRow()
                     }
                     if let ending = Calc.termination(store.shifts, s, at: placeID, lastDay: max(lastDay, start)) {

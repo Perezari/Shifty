@@ -169,12 +169,14 @@ struct NowView: View {
         }
     }
 
-    /// The days off left at each workplace whose payslip's are kept; named with more than one workplace.
+    /// The days off left at each workplace whose payslip's are kept, while the work there goes on; named with more
+    /// than one workplace.
     private func leaves(_ shifts: [Shift], _ settings: Settings, at date: Date) -> [PlaceLeave] {
         let places: [String?] = [nil] + settings.workplaces.map { Optional($0.id) }
         return places.compactMap { id -> PlaceLeave? in
             let place = settings.place(id)
-            guard let since = place.rules.balanceDate, let balance = Calc.leave(shifts, settings, asOf: date, at: id) else { return nil }
+            guard !place.ended(by: date), let since = place.rules.balanceDate,
+                  let balance = Calc.leave(shifts, settings, asOf: date, at: id) else { return nil }
             return PlaceLeave(id: id ?? "", balance: balance, since: since, place: settings.workplaces.isEmpty ? nil : place.name)
         }
     }
@@ -234,10 +236,13 @@ struct NowView: View {
         return name
     }
 
-    /// The workplaces to choose the next shift's from, with more than one and none running.
+    /// The workplaces to choose the next shift's from, those whose work goes on, with more than one and none running.
     private func placeChoices(_ settings: Settings) -> [PlaceChoice] {
         guard !settings.workplaces.isEmpty, store.active == nil else { return [] }
-        return [PlaceChoice(id: nil, name: settings.workplaceName)] + settings.workplaces.map { PlaceChoice(id: $0.id, name: $0.name) }
+        let now = Date()
+        let all = [PlaceChoice(id: nil, name: settings.workplaceName)] + settings.workplaces.map { PlaceChoice(id: $0.id, name: $0.name) }
+        let open = all.filter { !settings.place($0.id).ended(by: now) }
+        return open.count > 1 ? open : []
     }
 
     // MARK: The dial
@@ -364,7 +369,7 @@ struct NowView: View {
     private func planCenter(_ active: Shift, leave: Date, _ settings: Settings, at date: Date, global: Bool) -> some View {
         let leaving = Calc.leaving(active, at: leave, settings, now: date)
         let atGoal = Calc.leaving(active, at: Calc.goalTime(active, settings, asOf: date.ms), settings, now: date)
-        let extra = leaving.netHours - Calc.standardHours(date, settings.effective(for: active))
+        let extra = leaving.netHours - Calc.shiftStandard(active.start.ms, leave.ms, settings.effective(for: active))
         return VStack(spacing: 8) {
             Text("אם תצא ב־" + Format.clock(leave))
                 .font(.subheadline.weight(.medium))

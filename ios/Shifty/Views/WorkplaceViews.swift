@@ -52,7 +52,8 @@ struct WorkplacesSection: View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(place.name)
-                Text(PayText.summary(Settings.terms(place.pay, at: Date()) ?? place.pay[0], s.currency))
+                Text(PayText.summary(Settings.terms(place.pay, at: Date()) ?? place.pay[0], s.currency)
+                     + (place.ended(by: Date()) ? " · הסתיים" : ""))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -125,7 +126,7 @@ struct WorkplacePage: View {
                     TextRow(title: "שם", text: name, fallback: placeID == nil ? Settings().workplaceName : "מקום עבודה")
                 }
 
-                SettingsSection(title: "ותק", note: seniorityNote(place)) {
+                SettingsSection(title: "תקופת העבודה", note: seniorityNote(place)) {
                     if place.startDate == nil {
                         Button {
                             change { $0.startDate = LocalTime.startOfDay(Date()) }
@@ -141,6 +142,15 @@ struct WorkplacePage: View {
                         .buttonStyle(.plain)
                     } else {
                         DatePicker("תאריך תחילת עבודה", selection: startDate, in: ...Date(), displayedComponents: .date)
+                            .settingsRow()
+                    }
+                    Divider()
+                    Toggle("סיימתי לעבוד כאן", isOn: hasEnded)
+                        .settingsRow()
+                    if place.endDate != nil {
+                        Divider()
+                        DatePicker("יום העבודה האחרון", selection: endDate,
+                                   in: (place.startDate.map(LocalTime.startOfDay) ?? .distantPast)..., displayedComponents: .date)
                             .settingsRow()
                     }
                 }
@@ -220,7 +230,7 @@ struct WorkplacePage: View {
                 }
 
                 SettingsSection(title: "הפסקות, שבת ולילה",
-                                note: "ההפסקה האוטומטית יורדת מכל משמרת ארוכה, אם לא נרשמה הפסקה ארוכה ממנה.") {
+                                note: "ההפסקה האוטומטית יורדת מכל משמרת ארוכה, אם לא נרשמה הפסקה ארוכה ממנה. משמרת לילה היא משמרת שלפחות שעתיים ממנה בין 22:00 ל־06:00. לפי החוק יום מלא בה הוא 7 שעות, ומעבר להן שעות נוספות.") {
                     MinutesRow(title: "הפסקה אוטומטית", value: rule(\.autoBreakMinutes))
                     Divider()
                     hoursRow("מעל כמה שעות", \.autoBreakAfterHours, place.rules)
@@ -237,6 +247,9 @@ struct WorkplacePage: View {
                         Divider()
                         PercentRow(title: "תוספת לילה", value: multiplier(\.nightMult), range: 100...300)
                     }
+                    Divider()
+                    Toggle("משמרת לילה של 7 שעות", isOn: rule(\.nightShift))
+                        .settingsRow()
                 }
 
                 SettingsSection(title: "ערב חג", note: "בערב חג וביום מקוצר, התקן הוא השעות שכאן.") {
@@ -444,6 +457,10 @@ struct WorkplacePage: View {
         .onChange(of: placeRadius) { _, _ in
             Place.shared.start()
         }
+        // a place whose work has ended is no longer watched
+        .onChange(of: store.settings.place(placeID).endDate) { _, _ in
+            Place.shared.start()
+        }
     }
 
     // MARK: Rows
@@ -631,6 +648,29 @@ struct WorkplacePage: View {
         )
     }
 
+    /// Whether the work there has ended: from today, until its own last day is picked.
+    private var hasEnded: Binding<Bool> {
+        Binding(
+            get: { store.settings.place(placeID).endDate != nil },
+            set: { on in
+                guard on != (store.settings.place(placeID).endDate != nil) else { return }
+                change { $0.endDate = on ? LocalTime.startOfDay(Date()) : nil }
+            }
+        )
+    }
+
+    /// The last day of work there, a day.
+    private var endDate: Binding<Date> {
+        Binding(
+            get: { store.settings.place(placeID).endDate ?? LocalTime.startOfDay(Date()) },
+            set: { date in
+                let day = LocalTime.startOfDay(date)
+                guard store.settings.place(placeID).endDate != day else { return }
+                change { $0.endDate = day }
+            }
+        )
+    }
+
     /// The vacation days a year: its own number, or the law's by the seniority when more.
     private var vacationDays: Binding<Double> {
         Binding(
@@ -642,11 +682,13 @@ struct WorkplacePage: View {
         )
     }
 
-    /// The seniority, and what it decides.
+    /// The seniority, up to the last day when it is set, and what it decides; and what the last day stops.
     private func seniorityNote(_ place: Workplace) -> String {
-        guard let start = place.startDate else { return "לפי התאריך נקבעים הוותק, ימי החופשה בשנה ודמי ההבראה." }
-        let worked = Calc.seniority(from: start, to: Date())
-        return Format.seniority(years: worked.years, months: worked.months) + ". לפיו נקבעים ימי החופשה בשנה ודמי ההבראה."
+        let ended = place.endDate == nil ? ""
+            : " אחרי היום האחרון לא נספרים כאן שכר חודשי, בונוס, הבראה וצבירת חופשה, והמקום לא מוצע למשמרת הבאה."
+        guard let start = place.startDate else { return "לפי התאריך נקבעים הוותק, ימי החופשה בשנה ודמי ההבראה." + ended }
+        let worked = Calc.seniority(from: start, to: place.until.map { min(Date(), $0) } ?? Date())
+        return Format.seniority(years: worked.years, months: worked.months) + ". לפיו נקבעים ימי החופשה בשנה ודמי ההבראה." + ended
     }
 
     /// The days off left, and the vacation days a year by the seniority.

@@ -27,8 +27,8 @@ struct NowStatus {
 extension Calc {
     /// The Now screen at `now`. `shifts` are all of them, the newest first; `active` the running one.
     static func nowStatus(_ shifts: [Shift], _ s: Settings, active: Shift?, at now: Double) -> NowStatus {
-        // the running shift's workplace's standard hours
-        let goal = standardHours(Date(ms: now), active.map { s.effective(for: $0) } ?? s)
+        // the running shift's workplace's standard hours (a night shift's, where it is set), or today's
+        let goal = active.map { goalHours($0, s, asOf: now) } ?? standardHours(Date(ms: now), s)
         var netMs: Double, netHours: Double, overtimeHours: Double, pay: Double
         var open: Break? = nil
         if let active {

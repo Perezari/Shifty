@@ -69,6 +69,8 @@ struct EmployerRules: Hashable {
     var nightStart = 22.0
     var nightEnd = 6.0
     var nightMult = 1.0
+    /// A night shift's day as the law's 7 hours (Settings.nightShift).
+    var nightShift = false
     var holidayEveHours = 4.1
     var vacationHours = 8.6
     var sickDay1Pct = 0.0
@@ -112,6 +114,27 @@ struct Workplace: Hashable, Identifiable {
     var travelMonthly: Double?
     /// The day work began there, for its seniority; nil: not given.
     var startDate: Date?
+    /// The last day of work there; nil while it goes on.
+    var endDate: Date?
+
+    /// The first moment after its last day; nil while the work there goes on.
+    var until: Date? {
+        endDate.map { LocalTime.addingDays(1, to: LocalTime.startOfDay($0)) }
+    }
+
+    /// Whether `date` is in the work there: from its start date's midnight, when given, to the end of its last day,
+    /// when given. Its month's pay, its bonus and its recuperation pay are counted in it alone.
+    func employs(_ date: Date) -> Bool {
+        if let start = startDate, date < LocalTime.startOfDay(start) { return false }
+        if let until, date >= until { return false }
+        return true
+    }
+
+    /// Whether the work there has ended by `date`: not offered for the next shift, its place no longer watched, its
+    /// cards gone from the Now screen.
+    func ended(by date: Date) -> Bool {
+        until.map { date >= $0 } ?? false
+    }
 }
 
 /// A workplace's next recuperation pay (NowView's card).
@@ -147,7 +170,7 @@ extension Settings {
             EmployerRules(overtime1Hours: overtime1Hours, overtime1Mult: overtime1Mult, overtime2Mult: overtime2Mult,
                           autoBreakMinutes: autoBreakMinutes, autoBreakAfterHours: autoBreakAfterHours, holidayMult: holidayMult,
                           nightEnabled: nightEnabled, nightStart: nightStart, nightEnd: nightEnd, nightMult: nightMult,
-                          holidayEveHours: holidayEveHours, vacationHours: vacationHours, sickDay1Pct: sickDay1Pct,
+                          nightShift: nightShift, holidayEveHours: holidayEveHours, vacationHours: vacationHours, sickDay1Pct: sickDay1Pct,
                           sickDay2Pct: sickDay2Pct, sickDay3Pct: sickDay3Pct, sickDay4Pct: sickDay4Pct,
                           pensionPercent: pensionPercent, vacationBalance: vacationBalance, sickBalance: sickBalance,
                           balanceDate: balanceDate, vacationDaysPerYear: vacationDaysPerYear,
@@ -167,6 +190,7 @@ extension Settings {
             nightStart = newValue.nightStart
             nightEnd = newValue.nightEnd
             nightMult = newValue.nightMult
+            nightShift = newValue.nightShift
             holidayEveHours = newValue.holidayEveHours
             vacationHours = newValue.vacationHours
             sickDay1Pct = newValue.sickDay1Pct
@@ -250,7 +274,7 @@ extension Settings {
         if let id, let place = workplaces.first(where: { $0.id == id }) { return place }
         return Workplace(id: "", name: workplaceName, pay: ownPay, standardByDay: standardByDay,
                          travelPerDay: travelPerDay, travelMonthlyCap: travelMonthlyCap, rules: rules,
-                         monthStartDay: monthStartDay, travelMonthly: travelMonthly, startDate: startDate)
+                         monthStartDay: monthStartDay, travelMonthly: travelMonthly, startDate: startDate, endDate: endDate)
     }
 
     /// The day a workplace's pay month starts: its own, or the own workplace's, which is the app's pay period.
@@ -277,6 +301,7 @@ extension Settings {
         if let day = place.monthStartDay { monthStartDay = day }
         travelMonthly = place.travelMonthly
         startDate = place.startDate
+        endDate = place.endDate
         if pay.count == 1 && pay[0].kind == .hourly && pay[0].bonus == 0 {
             payTerms = []
             hourlyWage = pay[0].hourlyWage
@@ -317,12 +342,16 @@ extension Calc {
         let years = LocalTime.parts(range.start).year...LocalTime.parts(range.end).year
         for place in places {
             let pay = place.pay
-            totals.salary += salary(pay, range: range)
+            // only while the work there goes on: from its start date to the end of its last day
+            let work = s.place(place.id)
+            totals.salary += salary(pay, range: range, from: work.startDate, until: work.until)
             // the bonus, with the pay of its month, as long as its terms hold on its first day
             for t in pay where t.bonus > 0 {
                 for year in years {
                     let due = LocalTime.date(year, t.bonusMonth, 1)
-                    if due >= range.start && due < range.end && Settings.terms(pay, at: due)?.id == t.id { totals.bonus += t.bonus }
+                    if due >= range.start && due < range.end && Settings.terms(pay, at: due)?.id == t.id && work.employs(due) {
+                        totals.bonus += t.bonus
+                    }
                 }
             }
         }
@@ -350,7 +379,7 @@ extension Calc {
         let places: [String?] = [nil] + s.workplaces.map { Optional($0.id) }
         return places.compactMap { id -> AccruedBonus? in
             let place = s.place(id)
-            guard let terms = Settings.terms(place.pay, at: date), terms.bonus > 0 else { return nil }
+            guard place.employs(date), let terms = Settings.terms(place.pay, at: date), terms.bonus > 0 else { return nil }
             let year = LocalTime.parts(date).year
             var last = LocalTime.date(year, terms.bonusMonth, 1)
             if last > date { last = LocalTime.date(year - 1, terms.bonusMonth, 1) }
@@ -418,9 +447,10 @@ extension Calc {
         min(1, place.standardByDay.compactMap { $0 }.reduce(0, +) / 42)
     }
 
-    /// A workplace's recuperation pay for the years of work completed by `date`; none before the first.
+    /// A workplace's recuperation pay for the years of work completed by `date`; none before the first, nor after its
+    /// last day.
     static func recuperationPay(_ place: Workplace, at date: Date) -> (days: Double, amount: Double)? {
-        guard place.rules.recuperationOn, let start = place.startDate else { return nil }
+        guard place.rules.recuperationOn, let start = place.startDate, place.employs(date) else { return nil }
         let years = seniority(from: start, to: date).years
         guard years >= 1 else { return nil }
         let days = recuperationDays(year: years)
@@ -467,13 +497,15 @@ extension Calc {
     }
 
     /// A workplace's month's fixed pay in a period: each month's pay for the part of the period its terms hold, from
-    /// their date to the next terms'.
-    static func salary(_ pay: [PayTerms], range: TimeRange) -> Double {
+    /// their date to the next terms', within the work there (from the midnight of `start`, up to `until`).
+    static func salary(_ pay: [PayTerms], range: TimeRange, from start: Date? = nil, until: Date? = nil) -> Double {
         let days = max(1, daysBetween(range.start, range.end))
         var salary = 0.0
         for (i, t) in pay.enumerated() where t.kind == .monthly {
-            let from = max(t.from, range.start)
-            let to = min(i + 1 < pay.count ? pay[i + 1].from : range.end, range.end)
+            var from = max(t.from, range.start)
+            var to = min(i + 1 < pay.count ? pay[i + 1].from : range.end, range.end)
+            if let start { from = max(from, LocalTime.startOfDay(start)) }
+            if let until { to = min(to, until) }
             if to > from { salary += t.monthlySalary * Double(daysBetween(from, to)) / Double(days) }
         }
         return salary
@@ -596,7 +628,7 @@ extension PayTerms: Codable {
 extension EmployerRules: Codable {
     private enum CodingKeys: String, CodingKey {
         case overtime1Hours, overtime1Mult, overtime2Mult, autoBreakMinutes, autoBreakAfterHours, holidayMult,
-             nightEnabled, nightStart, nightEnd, nightMult, holidayEveHours, vacationHours,
+             nightEnabled, nightStart, nightEnd, nightMult, nightShift, holidayEveHours, vacationHours,
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, pensionPercent,
              vacationBalance, sickBalance, balanceDate, vacationDaysPerYear,
              pensionEmployerPercent, severancePercent, studyFundPercent, studyFundEmployerPercent,
@@ -620,6 +652,7 @@ extension EmployerRules: Codable {
         nightStart = value(.nightStart, d.nightStart)
         nightEnd = value(.nightEnd, d.nightEnd)
         nightMult = value(.nightMult, d.nightMult)
+        nightShift = value(.nightShift, d.nightShift)
         holidayEveHours = value(.holidayEveHours, d.holidayEveHours)
         vacationHours = value(.vacationHours, d.vacationHours)
         sickDay1Pct = value(.sickDay1Pct, d.sickDay1Pct)
@@ -654,6 +687,7 @@ extension EmployerRules: Codable {
         try c.encode(nightStart, forKey: .nightStart)
         try c.encode(nightEnd, forKey: .nightEnd)
         try c.encode(nightMult, forKey: .nightMult)
+        try c.encode(nightShift, forKey: .nightShift)
         try c.encode(holidayEveHours, forKey: .holidayEveHours)
         try c.encode(vacationHours, forKey: .vacationHours)
         try c.encode(sickDay1Pct, forKey: .sickDay1Pct)
@@ -679,7 +713,8 @@ extension EmployerRules: Codable {
 
 extension Workplace: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules, monthStartDay, travelMonthly, startDate
+        case id, name, pay, standardByDay, travelPerDay, travelMonthlyCap, rules, monthStartDay, travelMonthly, startDate,
+             endDate
     }
 
     init(from decoder: Decoder) throws {
@@ -696,6 +731,7 @@ extension Workplace: Codable {
         monthStartDay = (try? c.decodeIfPresent(Int.self, forKey: .monthStartDay)) ?? nil
         travelMonthly = (try? c.decodeIfPresent(Double.self, forKey: .travelMonthly)) ?? nil
         startDate = ISODate.decodeIfPresent(c, .startDate)
+        endDate = ISODate.decodeIfPresent(c, .endDate)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -710,5 +746,6 @@ extension Workplace: Codable {
         try c.encodeIfPresent(monthStartDay, forKey: .monthStartDay)
         try c.encodeIfPresent(travelMonthly, forKey: .travelMonthly)
         try c.encodeIfPresent(startDate.map(ISODate.string), forKey: .startDate)
+        try c.encodeIfPresent(endDate.map(ISODate.string), forKey: .endDate)
     }
 }

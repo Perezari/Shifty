@@ -17,10 +17,13 @@ extension Calc {
     static let sickDaysMost = 90.0
 
     /// The balance at `now` of a workplace (nil for the settings' own), once its payslip's date is set
-    /// (EmployerRules.balanceDate): its days off alone. `shifts` are all of them.
+    /// (EmployerRules.balanceDate): its days off alone, its days added up to its last day. `shifts` are all of them.
     static func leave(_ shifts: [Shift], _ s: Settings, asOf now: Date, at place: String? = nil) -> LeaveBalance? {
-        let rules = s.place(place).rules
+        let work = s.place(place)
+        let rules = work.rules
         guard let since = rules.balanceDate else { return nil }
+        // no days added after the work there ends
+        let accrued = work.endDate.map { min(now, $0) } ?? now
         // the days off after the payslip's day, up to today's
         let from = LocalTime.addingDays(1, to: LocalTime.startOfDay(since))
         let to = LocalTime.addingDays(1, to: LocalTime.startOfDay(now))
@@ -33,8 +36,8 @@ extension Calc {
             case .work, .reserve: break
             }
         }
-        let months = monthsBetween(since, now)
-        return LeaveBalance(vacation: rules.vacationBalance + vacationDaysPerYear(s, at: place, on: now) / 12 * Double(months) - Double(vacation.count),
+        let months = monthsBetween(since, accrued)
+        return LeaveBalance(vacation: rules.vacationBalance + vacationDaysPerYear(s, at: place, on: accrued) / 12 * Double(months) - Double(vacation.count),
                             sick: min(sickDaysMost, rules.sickBalance + sickDaysPerMonth * Double(months)) - Double(sick.count),
                             months: months, vacationTaken: vacation.count, sickTaken: sick.count)
     }

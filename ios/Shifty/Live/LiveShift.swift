@@ -10,9 +10,10 @@ import WidgetKit
 /// to sleep once it is done.
 @MainActor
 enum ShiftActions {
-    static func run(_ action: ShiftAction) async -> String {
+    /// `date`: when an end is to be, instead of now (the place's question of the leaving, endTime).
+    static func run(_ action: ShiftAction, at date: Date? = nil) async -> String {
         let store = ShiftStore.shared
-        let message = apply(action, to: store)
+        let message = apply(action, to: store, at: date)
         ICloud.start(store)
         ICloud.syncNow()
         // the icon's quick actions too, for the shift's state now
@@ -21,7 +22,15 @@ enum ShiftActions {
         return message
     }
 
-    private static func apply(_ action: ShiftAction, to store: ShiftStore) -> String {
+    /// When the iPhone left the workplace, as the end of the shift the question asked about: while it runs, after its
+    /// start and its breaks, and not ahead of now; else nil, for now.
+    static func endTime(left: Date?, of shift: String?) -> Date? {
+        guard let left, let running = ShiftStore.shared.active, running.id == shift, left <= Date() else { return nil }
+        let last = running.breaks.map { $0.end ?? $0.start }.max() ?? running.start
+        return left > max(last, running.start) ? left : nil
+    }
+
+    private static func apply(_ action: ShiftAction, to store: ShiftStore, at date: Date? = nil) -> String {
         switch action {
         case .start:
             if let running = store.active {
@@ -30,7 +39,7 @@ enum ShiftActions {
             let shift = store.startShift()
             return "המשמרת התחילה ב־" + Format.clock(shift.start) + "."
         case .end:
-            guard let ended = store.endShift() else { return "אין משמרת פעילה." }
+            guard let ended = store.endShift(at: date ?? ShiftStore.now()) else { return "אין משמרת פעילה." }
             let b = Calc.breakdown(ended, store.settings)
             // a month's fixed pay's shift has no pay of its own
             guard !store.settings.isMonthly(ended) else { return "המשמרת הסתיימה: " + Format.hoursToHM(b.netHours) + " שעות." }

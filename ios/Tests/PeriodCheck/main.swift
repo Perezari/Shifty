@@ -446,6 +446,56 @@ let firstYear = Calc.termination([], hourly, at: nil, lastDay: LocalTime.date(20
 expect(!firstYear.severanceDue && close(firstYear.severance(.dismissal), 50 * 182 * 8 / 12 * 0.72) && firstYear.noticeDays == 8
        && firstYear.recuperationDays == 0, "before a year: the fund's money alone, 8 days' notice, no recuperation yet")
 
+// the work's span (a workplace's page › תקופת העבודה): its month's pay, bonus and recuperation pay in it alone
+var spanned = s
+spanned.payTerms = [PayTerms(id: "global", from: PayTerms.start, kind: .monthly, monthlySalary: 12_000, bonus: 6_000, bonusMonth: 6)]
+spanned.startDate = LocalTime.date(2026, 10, 16) // 16 November 2026
+expect(Calc.periodTotals([], spanned, range: october).salary == 0, "no month's pay before the start")
+expect(near(Calc.periodTotals([], spanned, range: november).salary, 12_000 * 15 / 30), "November from the 16th: 15 days of 30")
+spanned.startDate = LocalTime.date(2025, 0, 1)
+spanned.endDate = LocalTime.date(2026, 10, 10) // the last day, 10 November 2026
+expect(near(Calc.periodTotals([], spanned, range: november).salary, 12_000 * 10 / 30) && Calc.periodTotals([], spanned, range: december).salary == 0,
+       "to the end of the 10th, and none after")
+let july2027 = Calc.period(around: LocalTime.date(2027, 6, 15), monthStartDay: 1)
+expect(Calc.periodTotals([], spanned, range: july).bonus == 6_000 && Calc.periodTotals([], spanned, range: july2027).bonus == 0
+       && Calc.accruedBonuses(spanned, at: LocalTime.date(2027, 0, 1)).isEmpty, "the bonus while working there alone")
+expect(near(Calc.periodTotals([], spanned, range: july).recuperation, 5 * 451.5) && Calc.periodTotals([], spanned, range: july2027).recuperation == 0
+       && Calc.upcomingRecuperation(spanned, at: LocalTime.date(2026, 11, 1)).isEmpty, "recuperation pay too")
+spanned.balanceDate = LocalTime.date(2026, 0, 31)
+let atEnd = Calc.leave([], spanned, asOf: LocalTime.date(2026, 10, 10))!
+let later = Calc.leave([], spanned, asOf: LocalTime.date(2027, 2, 1))!
+expect(atEnd.months > 0 && later.months == atEnd.months && later.vacation == atEnd.vacation, "no vacation days added after the last day")
+let spannedPlace = spanned.place(nil)
+expect(spannedPlace.employs(LocalTime.date(2026, 10, 10, 23)) && spannedPlace.ended(by: LocalTime.date(2026, 10, 11))
+       && !spannedPlace.employs(LocalTime.date(2024, 11, 31)) && !Settings().place(nil).ended(by: now), "the last day in it, the next not")
+spanned.nightShift = true
+spanned.workplaces = [Workplace(id: "w", name: "w", pay: [PayTerms(id: "w-pay", from: PayTerms.start)], endDate: LocalTime.date(2026, 5, 30))]
+spanned.workplaces[0].rules.nightShift = true
+let spannedBack = try! JSONDecoder().decode(Settings.self, from: try! JSONEncoder().encode(spanned))
+expect(spannedBack.endDate == spanned.endDate && spannedBack.nightShift && spannedBack.workplaces[0].endDate == LocalTime.date(2026, 5, 30)
+       && spannedBack.workplaces[0].rules.nightShift && Settings().endDate == nil && !Settings().nightShift, "in JSON")
+
+// a night shift, two hours or more between 22:00 and 06:00, where it is set: a day of 7 hours, then overtime
+var nightRules = s
+let overnight = Shift(id: "n", start: LocalTime.date(2026, 10, 1, 22), end: LocalTime.date(2026, 10, 2, 7)) // Sunday to Monday
+expect(near(Calc.breakdown(overnight, nightRules).regularHours, 9) && Calc.breakdown(overnight, nightRules).overtimeHours == 0,
+       "without it: 9 hours of Sunday's 9:36")
+nightRules.nightShift = true
+expect(near(Calc.breakdown(overnight, nightRules).regularHours, 7) && near(Calc.breakdown(overnight, nightRules).ot1Hours, 2),
+       "with it: 7 hours, then 2 at 125%")
+let evening = Shift(id: "e", start: LocalTime.date(2026, 10, 2, 16), end: LocalTime.date(2026, 10, 2, 23, 30))
+expect(near(Calc.breakdown(evening, nightRules).regularHours, 7.5) && Calc.breakdown(evening, nightRules).overtimeHours == 0,
+       "an hour and a half of night is no night shift")
+let sevenNight = Shift(id: "n7", start: LocalTime.date(2026, 10, 8, 23), end: LocalTime.date(2026, 10, 9, 6))
+expect(Calc.shortfall([sevenNight], nightRules, range: november).total == 0, "7 hours of a night shift miss nothing")
+let lateShift = Shift(id: "late", start: LocalTime.date(2026, 10, 1, 21))
+let morningShift = Shift(id: "morning", start: LocalTime.date(2026, 10, 1, 8))
+expect(Calc.goalHours(lateShift, nightRules, asOf: LocalTime.date(2026, 10, 1, 22).ms) == 7
+       && Calc.goalHours(morningShift, nightRules, asOf: LocalTime.date(2026, 10, 1, 9).ms) == 9.6, "the dial's goal: 7 into the night, else the day's")
+nightRules.nightShift = false
+expect(near(Calc.shortfall([sevenNight], nightRules, range: november).total, 9.6 - 7)
+       && Calc.goalHours(lateShift, nightRules, asOf: LocalTime.date(2026, 10, 1, 22).ms) == 9.6, "without it, Sunday's standard")
+
 // the Hebrew date (Settings › תצוגה): in letters, and a period's Hebrew months
 expect(Format.gematria(23) == "כ״ג" && Format.gematria(15) == "ט״ו" && Format.gematria(16) == "ט״ז" && Format.gematria(1) == "א׳"
        && Format.gematria(20) == "כ׳" && Format.gematria(5787) == "תשפ״ז", "numbers in Hebrew letters")

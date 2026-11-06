@@ -125,7 +125,10 @@ extension Calc {
         let reserve = Set(shifts.filter { $0.type == .reserve && !$0.deleted }.map { LocalTime.dayKey($0.start) })
         var day = LocalTime.addingDays(1, to: LocalTime.startOfDay(Date(ms: now)))
         var left = 0
-        while day < range.end {
+        // no days ahead once the work at every workplace has ended
+        let ends = ([s.place(nil)] + s.workplaces).map(\.until)
+        let last = ends.contains { $0 == nil } ? range.end : min(range.end, ends.compactMap { $0 }.max() ?? range.end)
+        while day < last {
             if expectedStandard(day, s) != nil && !reserve.contains(LocalTime.dayKey(day)) { left += 1 }
             day = LocalTime.addingDays(1, to: day)
         }

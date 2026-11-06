@@ -233,6 +233,31 @@ enum AppInfo {
     /// for and the settings link to.
     static let support = URL(string: "https://perezari.github.io/shifty-app/")!
     static let privacy = URL(string: "https://perezari.github.io/shifty-app/privacy.html")!
+    /// The address the support page gives.
+    static let email = "ari.perez25.06@gmail.com"
+
+    /// A mail to it (Settings › שליחת משוב), with the app's version, the iOS version and the iPhone's model under
+    /// the space to write in, and nothing of the shifts or the pay.
+    @MainActor
+    static var feedback: URL {
+        var mail = URLComponents()
+        mail.scheme = "mailto"
+        mail.path = email
+        mail.queryItems = [
+            URLQueryItem(name: "subject", value: "משוב על Shifty"),
+            URLQueryItem(name: "body", value: "\n\n\n—\nShifty \(version)\niOS \(UIDevice.current.systemVersion)\n\(model)"),
+        ]
+        return mail.url ?? URL(string: "mailto:" + email)!
+    }
+
+    /// The iPhone's model, as "iPhone18,1".
+    private static var model: String {
+        var info = utsname()
+        uname(&info)
+        return withUnsafeBytes(of: &info.machine) { raw in
+            String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
+        }
+    }
 
     /// "1.0 (263011530)": the version, and the build, which is the time it was built.
     static var version: String {
