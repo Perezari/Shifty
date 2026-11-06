@@ -566,6 +566,53 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 .pbar .pt small { font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
 .pv-head small { display: block; font-size: 13px; font-weight: 500; color: var(--ink-2); margin-top: 3px; }
 
+/* (proposed) a day's sheet, from the calendar: its date between the days before and after, its shifts or day off, its papers;
+   a swipe or an arrow moves to the next day, sliding in from its side */
+.day-sheet { top: 400px; padding-bottom: 34px; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; }
+.day-sheet::-webkit-scrollbar { display: none; }
+.dhead { display: flex; align-items: center; gap: 10px; }
+.dhead .circle { flex: none; width: 38px; height: 38px; }
+.dhead .circle svg { width: 15px; height: 15px; }
+.dhead .circle[disabled] { opacity: .3; }
+.dtitle { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.dtitle b { font-size: 17px; }
+.dtitle span { font-size: 13px; color: var(--ink-2); font-weight: 500; }
+.dpage { display: flex; flex-direction: column; gap: 10px; touch-action: pan-y; }
+.dpage.from-right { animation: day-in-r .26s ease-out both; }
+.dpage.from-left { animation: day-in-l .26s ease-out both; }
+@keyframes day-in-r { from { transform: translateX(56px); opacity: 0; } }
+@keyframes day-in-l { from { transform: translateX(-56px); opacity: 0; } }
+.day-sheet .badge { display: none; }
+.dempty { color: var(--ink-2); text-align: center; padding: 22px 0 8px; }
+.offs { display: flex; gap: 8px; }
+.offs .capsule { height: 48px; font-size: 15px; }
+.day-sheet .capsule.prominent { flex: none; height: 52px; font-size: 16px; }
+.sheet .sec-title.papers { padding: 0 4px; margin: 4px 0 -2px; }
+.sheet-note { margin: -2px 0 0; padding: 0 4px; font-size: 12.5px; color: var(--ink-2); line-height: 1.4; }
+/* (proposed) a day off's papers: a photo or a file each, and adding one */
+.attach { display: flex; gap: 10px; flex-wrap: wrap; }
+.thumb { width: 66px; height: 86px; border-radius: 12px; border: 0; padding: 0; overflow: hidden; cursor: pointer; background: #fff;
+  box-shadow: 0 0 0 .5px var(--sep), 0 3px 10px rgba(0, 0, 0, .12); }
+.thumb svg { display: block; width: 100%; height: 100%; }
+.thumb.add svg { width: 24px; height: 24px; }
+.thumb.add { background: var(--track); box-shadow: inset 0 0 0 1.5px var(--sep); color: var(--accent); display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px; font: 600 12px/1 var(--font-text); }
+.smeta .clip { display: inline-flex; vertical-align: -2px; }
+.smeta .clip svg { width: 13px; height: 13px; }
+/* a paper opened: over everything, on black, with its actions */
+.viewer { position: absolute; inset: 0; z-index: 12; background: #000; display: flex; flex-direction: column; }
+.vbar { display: flex; align-items: center; gap: 10px; padding: 58px 16px 10px; color: #fff; }
+.vbar b { flex: 1; text-align: center; font-size: 16px; }
+.vbar .circle { color: #fff; background: rgba(255, 255, 255, .14); }
+.vbar .vacts { display: flex; gap: 8px; }
+.vdoc { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px 34px 60px; }
+.vdoc svg { width: 100%; height: auto; max-height: 100%; border-radius: 6px; }
+
+/* (proposed) the shift's start dragged along the dial to correct it, as the goal's flag is */
+.dial .start { cursor: grab; touch-action: none; }
+.dial .start::after { content: ""; position: absolute; inset: -12px; border-radius: 50%; }
+.dial .start.moving { box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 22%, transparent); }
+
 @media (prefers-reduced-motion: reduce) { .pulse { animation: none; } }
 </style>
 
@@ -644,15 +691,21 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   // cover: what a global pay does with overtime ("all", "upTo", "none", or "tiers": a bonus at each target)
   // autoBreak: the main workplace takes an automatic break, so no break button is shown
   // (proposed) step: the first setup's step; hebrew: the Hebrew date shown; fromDay: the setup's pay period, from the 1st or the 20th;
-  // tip: the arrival's tip not yet taken or closed; early: the minutes the start moved back by taking it
+  // tip: the arrival's tip not yet taken or closed; early: the minutes the start moved back by taking it, or by dragging it
+  // (proposed) day: the day of the month whose sheet is open (sheet "day"), and dayAnim the side it slid in from; paper: the
+  // paper opened over it; startUndo: the start dragged, undone with the earlier one until a few seconds pass
   const state = { screen: "now", state: "work", theme: null, tab: "now", pro: false, pay: "hourly", places: 1, next: 0, cover: "tiers", autoBreak: true,
-    plan: null, sheet: null, page: null, step: 0, hebrew: true, fromDay: 1, tip: true, early: 0 };
+    plan: null, sheet: null, page: null, step: 0, hebrew: true, fromDay: 1, tip: true, early: 0, day: 15, dayAnim: "", paper: null, startUndo: null };
   try { Object.assign(state, JSON.parse(localStorage.getItem("shifty-preview") || "{}")); } catch (e) {}
   state.plan = null;
-  state.sheet = null;
   state.page = null;
   state.tip = true;
   state.early = 0;
+  state.dayAnim = "";
+  state.paper = null;
+  state.startUndo = null;
+  // a sheet opened again only as the day's, for its screenshots
+  if (state.sheet !== "day") state.sheet = null;
   if (!scenes[state.state]) state.state = "work";
   if (!TABS.includes(state.tab)) state.tab = "now";
 
@@ -775,7 +828,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9.5 2.5h5"/></svg>',
     // list.bullet as iOS draws it right to left
     list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><g class="l"><path d="M4 6h11"/><circle cx="19.5" cy="6" r="1.2" fill="currentColor"/></g><g class="l"><path d="M4 12h11"/><circle cx="19.5" cy="12" r="1.2" fill="currentColor"/></g><g class="l"><path d="M4 18h11"/><circle cx="19.5" cy="18" r="1.2" fill="currentColor"/></g></svg>',
-    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+    calendar: '<span class="tag">הצעה</span>חלון היום: לחיצה על יום בלוח פותחת אותו. החלקה הצידה, או החצים למעלה, עוברת ליום הקודם (ימינה) או הבא, בלי לסגור. <span class="tag">הצעה</span>אישורים: ביום חופש, מחלה או מילואים, מתחת ליום, צילום או קובץ (בדוגמה: יום המחלה וה־13 בחודש, יום המילואים הראשון). לחיצה על אישור פותחת אותו גדול, עם שיתוף ומחיקה. "צירוף" מצלם, בוחר מהתמונות או מצרף קובץ. האישורים נשמרים באייפון בלבד. <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>',
     play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>',
@@ -806,7 +859,14 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>',
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    // (proposed) a day off's papers: a clip, a photo, a file, sharing one
+    clip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>',
+    photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5.5-5.5L6 19"/></svg>',
+    doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
+    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>',
   };
+  /** (proposed) A paper as its photo shows it, made up as the rest: a page with lines, a stamp and a signature. */
+  const paper = '<svg viewBox="0 0 60 78"><rect width="60" height="78" fill="#fdfdfb"/><path d="M9 12h24M9 20h42M9 26h38M9 32h42M9 38h30M9 50h20" stroke="#c7ccd3" stroke-width="2.4" stroke-linecap="round"/><ellipse cx="43" cy="58" rx="10" ry="7" fill="none" stroke="#5b7fd6" stroke-width="1.6"/><path d="M37.5 56.5h11M39 59.8h8" stroke="#5b7fd6" stroke-width="1.2" stroke-linecap="round"/><path d="M9 64c4-4 8 3 12-1s5 2 8-1" fill="none" stroke="#2c3e66" stroke-width="1.3" stroke-linecap="round"/></svg>';
   /** What Shifty Pro opens, each with its line (ProFeature in Pro.swift, once built). */
   const PRO = [
     ["money", "נטו משוער", "כמה ייכנס לחשבון בסוף התקופה, אחרי מס, ביטוח לאומי ופנסיה."],
@@ -879,7 +939,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       const knob = s.open != null ? "var(--orange)" : now > goal ? "var(--amber)" : "var(--accent)";
       const flagColor = plan ? (plan.extra >= 0 ? "var(--amber)" : "var(--red)") : "var(--accent)";
       const done = !plan && now >= goal;
-      marks = `<span class="mark start" style="left:${sx}px;top:${sy}px">${sized(icon.play, 10)}</span>
+      marks = `<span class="mark start${movingStart ? " moving" : ""}" style="left:${sx}px;top:${sy}px" aria-label="גרירה לתיקון שעת ההתחלה">${sized(icon.play, 10)}</span>
         ${plan ? `<span class="mark goal-dot" style="left:${gx}px;top:${gy}px"></span>` : ""}
         <span class="mark knob" style="left:${nx}px;top:${ny}px;--k:${knob}"></span>
         <span class="mark goal${done ? " done" : ""}" style="left:${fx}px;top:${fy}px;--f:${flagColor}" aria-label="גרירה לבחירת שעת יציאה">${done ? icon.check : icon.flag}</span>`;
@@ -927,8 +987,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
           <span class="plan-pay num"><span class="ltr">${isGlobal() ? hm(plan.net) : money(plan.pay)}</span></span>${delta}
           <button class="reset" type="button" data-reset="1">חזרה</button>`;
       } else {
-        center = `${date}<span class="time num"><span class="ltr">${timer(s.netMs)}</span></span>${isGlobal() ? monthOvertime(s.overtime)
-          : `<span class="earned num"><span class="ltr">${money(s.pay)}</span></span>`}`;
+        // (proposed) the start dragged: its time over the clock while dragging, then that it changed, with an undo
+        const undo = state.startUndo && Date.now() < state.startUndo.until;
+        const line = movingStart ? `<span class="date-in">התחלה ב־<span class="num ltr">${clock(new Date(s.start))}</span></span>`
+          : undo ? `<span class="date-in" style="color:var(--accent)">ההתחלה עודכנה ל־<span class="num ltr">${clock(new Date(s.start))}</span></span>` : date;
+        center = `${line}<span class="time num"><span class="ltr">${timer(s.netMs)}</span></span>${isGlobal() ? monthOvertime(s.overtime)
+          : `<span class="earned num"><span class="ltr">${money(s.pay)}</span></span>`}${undo ? '<button class="reset" type="button" data-undo-start="1">ביטול</button>' : ""}`;
       }
       const middle = plan ? fact(clock(new Date(plan.end)), "יציאה מתוכננת", plan.extra >= 0 ? "var(--amber)" : "var(--red)")
         : past ? fact("+" + hm(s.overtime), "שעות נוספות", "var(--amber)")
@@ -1090,7 +1154,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       d.setDate(d.getDate() - 1);
       if (d < first) break;
       if (d.getDate() >= RESERVE.from && d.getDate() <= RESERVE.to) {
-        list.push({ day: new Date(d), type: "reserve", start: +d, net: 0, pay: 0, hourly, place });
+        // (proposed) the service's paper with its first day
+        list.push({ day: new Date(d), type: "reserve", start: +d, net: 0, pay: 0, hourly, place, papers: d.getDate() === RESERVE.from ? ["אישור מילואים"] : [] });
         continue;
       }
       if (d.getDay() === 5 && state.places === 2) {
@@ -1104,7 +1169,7 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
       n++;
       const day = new Date(d), std = day.getDay() === 4 ? 8.1 : 9.1;
       const r = (k) => { const x = Math.sin(day.getDate() * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
-      if (n === 4) { list.push({ day, type: "sick", start: +day, net: std, pay: 0, std, hourly, place }); continue; }
+      if (n === 4) { list.push({ day, type: "sick", start: +day, net: std, pay: 0, std, hourly, place, papers: ["אישור מחלה"] }); continue; }
       if (n >= 9 && n <= 11) { list.push({ day, type: "vacation", start: +day, net: std, pay: hourly ? std * WAGE : 0, std, hourly, place }); continue; }
       worked++;
       const start = new Date(day);
@@ -1171,10 +1236,12 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const tag = e.running ? `<span class="rtag${e.onBreak ? " brk" : ""}">${e.onBreak ? "בהפסקה" : "פעילה"}</span>` : "";
     const where = e.place ? `<span class="wp-name">${e.place}</span>` : "";
     // (proposed) a day of reserve duty, for the record: its pay is not counted, a global pay's month going on
-    const meta = e.type === "vacation" ? [where, `${hm(e.net)} שע׳ בתשלום`].filter(Boolean).join(" · ") : e.type === "sick" ? "יום 1 · 0% מהתקן"
+    // (proposed) a day off with its papers: a clip, and how many
+    const papers = e.papers && e.papers.length ? ` · <span class="clip">${icon.clip}</span> ${e.papers.length === 1 ? "אישור" : e.papers.length + " אישורים"}` : "";
+    const meta = (e.type === "vacation" ? [where, `${hm(e.net)} שע׳ בתשלום`].filter(Boolean).join(" · ") : e.type === "sick" ? "יום 1 · 0% מהתקן"
       : reserve ? (byHours ? "המשכורת ממשיכה" : "התגמול לא נכלל בחישוב")
       : [where, byHours ? "" : hm(e.net) + " שע׳", e.breakMin ? `הפסקה ${e.breakMin}׳` : "", e.overtime > 0.01 ? "נ.ש " + hm(e.overtime) : ""]
-        .filter(Boolean).join(" · ");
+        .filter(Boolean).join(" · ")) + papers;
     return `<div class="srow glass" data-menu="shift:${i}">
       <span class="badge${e.short ? " short" : ""}${off ? " off" : ""}"><b>${e.day.getDate()}</b><small>${days[e.day.getDay()].replace("׳", "")}</small></span>
       <div class="sbody"><div class="sline"><b>${time}</b>${tag}<span class="spay num"><span class="ltr">${reserve ? "" : byHours ? hm(e.net) : money(e.pay)}</span></span></div>
@@ -1208,13 +1275,58 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
         : sum && sum.off ? `<small>${{ vacation: "חופש", sick: "מחלה", reserve: "מילואים" }[sum.off]}</small>` : "";
       // (proposed) the Hebrew day in the corner
       const heb = inside && state.hebrew ? `<span class="hd">${hebrew(d).day}</span>` : "";
-      cells += `<span class="dc"${inside ? ` data-menu="day:${d.getDate()}"` : ""} style="background:${fill};${inside ? "" : "opacity:.3;"}${isToday ? "box-shadow:inset 0 0 0 1.6px var(--accent);" : ""}">
+      cells += `<span class="dc"${inside ? ` data-menu="day:${d.getDate()}" data-day="${d.getDate()}"` : ""} style="background:${fill};${inside ? "" : "opacity:.3;"}${isToday ? "box-shadow:inset 0 0 0 1.6px var(--accent);" : ""}">
         ${heb}<b style="color:${color};font-weight:${weight}">${d.getDate()}</b>${under}</span>`;
     }
     return `<div class="app">${statusBar(s.now)}<div class="edge"></div>
       <div class="scroll" data-scroll="calendar"><div class="scr"><h1 class="large">לוח</h1>${periodBar(state.hebrew)}<div class="cal glass">${cells}</div>
         ${summary([["ימי עבודה", String(t.days.size)], ["שעות", hm(t.hours)], ["שעות חוסר", hm(t.missing)], ["סה״כ", moneyShort(income(t))]])}
       </div></div><div class="home-ind"></div></div>`;
+  }
+
+  /** (proposed) A day's sheet, opened from the calendar (CalendarView's DayDetail): its date and Hebrew date between the days
+   *  before (on the right) and after, its shifts or day off, a day off's papers, and adding to the day. A swipe moves to the
+   *  day on its side, as an arrow does: the finger to the left shows the day before. */
+  function daySheet() {
+    const s = shift(), first = periodStart(), last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    const date = new Date(first.getFullYear(), first.getMonth(), state.day), list = periodShifts(s);
+    const entries = list.filter((e) => e.day.getMonth() === first.getMonth() && e.day.getDate() === state.day).sort((a, b) => a.start - b.start);
+    const off = entries.find((e) => e.type !== "work"), work = entries.some((e) => e.type === "work");
+    const rows = entries.length ? entries.map((e) => shiftRow(e, list.indexOf(e))).join("") : `<div class="dempty">אין משמרת ביום זה</div>`;
+    // a day off keeps its papers: a sick note, the service's paper; each opens, and one more is added
+    const papers = !off ? "" : `<div class="sec-title papers">אישורים</div>
+      <div class="attach">${(off.papers || []).map((title, i) => `<button class="thumb" type="button" data-paper="${title}" aria-label="${title}">${paper}</button>`).join("")}
+        <button class="thumb add" type="button" data-menu="attach" data-tap-menu aria-label="צירוף אישור">${sized(icon.camera, 22)}<span>צירוף</span></button></div>
+      <p class="sheet-note">צילום או קובץ, כמו אישור מחלה או אישור מילואים. נשמרים באייפון בלבד.</p>`;
+    const add = off ? "" : `<button class="capsule prominent" type="button">${icon.plus}הוספת משמרת ליום זה</button>
+      ${work ? "" : `<div class="offs"><button class="capsule glass" type="button">יום חופש</button><button class="capsule glass" type="button">יום מחלה</button>
+        <button class="capsule glass" type="button">מילואים</button></div>`}`;
+    const heb = state.hebrew ? `<span>${hebrewDay(date)} ${hebrew(date).year}</span>` : "";
+    return `<button class="dim" type="button" data-sheet="" aria-label="סגירה"></button>
+      <div class="sheet day-sheet"><span class="grab"></span>
+        <div class="dhead"><button class="circle glass" type="button" data-goday="-1"${state.day > 1 ? "" : " disabled"} aria-label="היום הקודם">${icon.back}</button>
+          <div class="dtitle"><b>${dayLine(date)} ${date.getFullYear()}</b>${heb}</div>
+          <button class="circle glass" type="button" data-goday="1"${state.day < last ? "" : " disabled"} aria-label="היום הבא">${icon.chevron}</button></div>
+        <div class="dpage${state.dayAnim ? " " + state.dayAnim : ""}">${rows}${papers}${add}</div>
+      </div>`;
+  }
+
+  /** (proposed) A paper opened over everything, on black: its name, sharing it and deleting it. */
+  function paperView() {
+    return `<div class="viewer"><div class="vbar"><button class="circle" type="button" data-paper="" aria-label="סגירה">${icon.close}</button>
+      <b>${state.paper}</b><span class="vacts"><button class="circle" type="button" aria-label="שיתוף">${icon.share}</button>
+        <button class="circle" type="button" aria-label="מחיקה" style="color:#ff6961">${icon.trash}</button></span></div>
+      <div class="vdoc">${paper}</div></div>`;
+  }
+
+  /** The day `step` days from the open one, within the month shown; it slides in from its side. */
+  function goDay(step) {
+    const first = periodStart(), last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate(), day = state.day + step;
+    if (day < 1 || day > last) return false;
+    state.day = day;
+    state.dayAnim = step < 0 ? "from-right" : "from-left";
+    setTimeout(() => { state.dayAnim = ""; }, 400);
+    return true;
   }
 
   // ---- the Settings tab (SettingsView.swift), shortened: Shifty Pro on top, then a few of its sections, Pro's marked ----
@@ -1393,19 +1505,23 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     const remove = (title) => ({ items: [item(title || "מחיקה", icon.trash, { red: true })] });
     // (proposed) a day of reserve duty, added as a sick day is: from the plus, or an empty day's menu
     const reserve = item("יום מילואים", icon.shield);
+    // (proposed) a paper for a day off, from its menu or its sheet: a photo taken, one of the photos, or a file
+    const attach = item("צירוף אישור", icon.clip);
+    if (kind === "attach") return { sections: [{ items: [item("צילום", icon.camera), item("בחירה מהתמונות", icon.photo), item("קובץ", icon.doc)] }] };
     if (kind === "shift") {
       const e = periodShifts(s)[+arg];
       if (!e) return null;
-      const sections = e.type !== "work" ? [{ items: [item("העתקת הסיכום", icon.copy)] }, remove()]
+      const sections = e.type !== "work" ? [{ items: [attach, item("העתקת הסיכום", icon.copy)] }, remove()]
         : [{ items: [item("עריכה", icon.pencil)].concat(e.running ? [] : [item("שכפול להיום", icon.dup)], [item("העתקת הסיכום", icon.copy)]) }, remove()];
       return { preview: shiftPreview(e), sections };
     }
     if (kind === "day") {
       const today = midnight(), month = periodStart(), date = new Date(month.getFullYear(), month.getMonth(), +arg), sum = byDay(periodShifts(s)).get(+arg);
       const entries = sum ? sum.entries : [];
+      const open = item("פתיחת היום", icon.calendar, { data: `data-openday="${+arg}"` });
       const sections = !entries.length ? [{ items: [item("משמרת", icon.timer), item("יום חופש", icon.sun), item("יום מחלה", icon.sick), reserve] }]
-        : sum.off ? [{ items: [item("פתיחת היום", icon.calendar)] }, remove()]
-        : [{ items: [item("פתיחת היום", icon.calendar)].concat(+date === +today || entries.length !== 1 ? [] : [item("שכפול להיום", icon.dup)]) }, remove(entries.length > 1 ? "מחיקת המשמרות" : "")];
+        : sum.off ? [{ items: [open, attach] }, remove()]
+        : [{ items: [open].concat(+date === +today || entries.length !== 1 ? [] : [item("שכפול להיום", icon.dup)]) }, remove(entries.length > 1 ? "מחיקת המשמרות" : "")];
       return { preview: dayPreview(date, entries), sections };
     }
     if (kind === "act") {
@@ -1676,8 +1792,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
   };
   // the app's tabs, and what is new on each
   const appNotes = {
-    now: '<span class="tag built">כמו שבבנייה</span>שעת ההגעה (Pro, עם תזכורת לפי מיקום): אם הגעת לעבודה 5 דקות או יותר לפני שהמשמרת התחילה, מתחת לשעון מופיעה הצעה להתחיל משעת ההגעה. לחיצה מזיזה את ההתחלה, ו־✕ סוגר. <span class="tag built">כמו שבבנייה</span>תאריך עברי בשעון, ליד התאריך (הגדרות › תצוגה, כבוי כברירת מחדל). <span class="tag built">כמו שבבנייה</span>כרטיס התקופה, מסודר: התאריכים בשורה אחת ובלי השנה, הסכום עד עכשיו והצפי לסוף התקופה באותה שורה ומתחת לכל אחד השם שלו, כמו המספרים שמתחתם. מספר שהוא אפס, כמו "0:00 חוסר", באפור. <span class="tag built">כמו שבבנייה</span>דמי הבראה (Pro, למטה): כמה ימים מגיעים לפי הוותק, כמה הם שווים ומתי ישולמו. <span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
-    shifts: '<span class="tag built">כמו שבבנייה</span>יום מילואים, כמו יום מחלה: בכפתור ה־+ ובלחיצה ארוכה על יום ריק בלוח. הוא מסומן ברשימה ובלוח לתיעוד, לא נספר כחוסר ולא יורד מימי החופשה. התגמול לא נכלל בחישוב, כי הכללים והסכומים של ביטוח לאומי משתנים כל שנה. בדוגמה: 13–17 בחודש. <span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
+    now: '<span class="tag">הצעה</span>תיקון שעת ההתחלה בגרירה: במשמרת שרצה, את סימן ההתחלה ▶ בשעון גוררים אחורה או קדימה, בקפיצות של 5 דקות ועם רטט. בזמן הגרירה במרכז כתוב "התחלה ב־07:02", ואחרי ששחררים "ההתחלה עודכנה" עם "ביטול" לכמה שניות. <span class="tag built">כמו שבבנייה</span>שעת ההגעה (Pro, עם תזכורת לפי מיקום): אם הגעת לעבודה 5 דקות או יותר לפני שהמשמרת התחילה, מתחת לשעון מופיעה הצעה להתחיל משעת ההגעה. לחיצה מזיזה את ההתחלה, ו־✕ סוגר. <span class="tag built">כמו שבבנייה</span>תאריך עברי בשעון, ליד התאריך (הגדרות › תצוגה, כבוי כברירת מחדל). <span class="tag built">כמו שבבנייה</span>כרטיס התקופה, מסודר: התאריכים בשורה אחת ובלי השנה, הסכום עד עכשיו והצפי לסוף התקופה באותה שורה ומתחת לכל אחד השם שלו, כמו המספרים שמתחתם. מספר שהוא אפס, כמו "0:00 חוסר", באפור. <span class="tag built">כמו שבבנייה</span>דמי הבראה (Pro, למטה): כמה ימים מגיעים לפי הוותק, כמה הם שווים ומתי ישולמו. <span class="tag built">כמו שבבנייה</span>בונוס צבור (Pro, בשכר גלובלי למטה): כמה מהבונוס השנתי כבר נצבר מאז התשלום הקודם, ומתי ישולם. בדף הנטו: קרן ההשתלמות יורדת מהנטו, ומתחתיו מה שהמעביד מפריש בשבילך. <span class="tag built">כמו שבבנייה</span>סיום משמרת בלחיצה ארוכה: הכפתור מתמלא בשנייה וחצי, ורק אז המשמרת מסתיימת. עזיבה לפני כן מרוקנת אותו, ולחיצה רגילה פותחת את "סיימתי כבר". כשיש הפסקה אוטומטית במקום העבודה, אין כפתור הפסקה, גם לא במסך הנעילה ובווידג׳ט, והסיום תופס את כל השורה (המתג "הפסקה אוטומטית" למעלה). בשכר גלובלי, מתחת לשעון השעות הנוספות של החודש במקום השכר שעולה. עם שני מקומות עבודה, לחיצה על השורה למעלה (כשאין משמרת) בוחרת איפה המשמרת הבאה. עם בונוס ביעד: מתחת לשעות הנוספות כמה נשאר לבונוס הבא, ובכרטיס התקופה "6:30 מתוך 20".',
+    shifts: '<span class="tag">הצעה</span>יום חופש, מחלה או מילואים עם אישור מצורף מסומן במהדק ("אישור"). בלחיצה ארוכה על יום כזה: "צירוף אישור". <span class="tag built">כמו שבבנייה</span>יום מילואים, כמו יום מחלה: בכפתור ה־+ ובלחיצה ארוכה על יום ריק בלוח. הוא מסומן ברשימה ובלוח לתיעוד, לא נספר כחוסר ולא יורד מימי החופשה. התגמול לא נכלל בחישוב, כי הכללים והסכומים של ביטוח לאומי משתנים כל שנה. בדוגמה: 13–17 בחודש. <span class="tag built">כמו שבבנייה</span>בשכר גלובלי, בכל משמרת השעות שלה במקום סכום, והסה״כ הוא השכר החודשי. עם שני מקומות עבודה, שם המקום בכל שורה.',
     calendar: '<span class="tag built">כמו שבבנייה</span>תאריך עברי (הגדרות › תצוגה, כבוי כברירת מחדל): היום העברי בפינה של כל יום, החודשים העבריים מתחת לשם החודש, והתאריך העברי בפירוט של יום. <span class="tag built">כמו שבבנייה</span>ימי מילואים מסומנים "מילואים". <span class="tag built">כמו שבבנייה</span>לחיצה ארוכה על יום: הפירוט שלו ותפריט. בשכר גלובלי, הסה״כ הוא השכר החודשי.',
     settings: '<span class="tag built">כמו שבבנייה</span>תצוגה › תאריך עברי (לחיצה מפעילה ומכבה). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: תאריך תחילת עבודה והוותק, ימי החופשה בשנה לפי הוותק (צו ההרחבה או החוק), ודמי הבראה (תעריף, פעם בשנה או כל חודש). <span class="tag built">כמו שבבנייה</span>בדף של מקום העבודה: הפרשות המעביד לפנסיה ולפיצויים, קרן השתלמות עד התקרה, ונסיעות כסכום לחודש מלא. <span class="tag built">כמו שבבנייה</span>כל מה שהמעסיק קובע עובר לדף של מקום העבודה: תקופת השכר, שעות נוספות, הפסקות, שבת ולילה, ערב חג, חופשה ומחלה והיתרות, הפנסיה והתזכורת לפי מיקום. בהגדרות נשאר מה שלך: חגים, יעד ההכנסה, נקודות זיכוי, מראה, התראות ו-iCloud. בשינוי בשכר לגלובלי: ארבע אפשרויות לשעות הנוספות, ובהן "בונוס ביעד".',
   };
@@ -1716,6 +1832,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   // ---- the screen, drawn again each second: each tab keeps its scroll, and it waits while a finger scrolls, drags or holds ----
   let touched = 0, dragging = false, frame = 0, mini = false, lastY = 0, restored = null;
+  /** (proposed) The start being dragged along the dial: the minutes it was moved by before. */
+  let movingStart = null;
   const scrolls = {};
   const touch = () => { touched = Date.now(); };
   document.addEventListener("touchmove", touch, { passive: true });
@@ -1746,6 +1864,8 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
           quick: quickScreen }[state.screen]();
     if (state.screen === "now" && state.sheet === "pro") view.insertAdjacentHTML("beforeend", proSheet());
     if (state.screen === "now" && state.sheet === "pay") view.insertAdjacentHTML("beforeend", paySheet());
+    if (state.screen === "now" && state.sheet === "day") view.insertAdjacentHTML("beforeend", daySheet());
+    if (state.screen === "now" && state.paper) view.insertAdjacentHTML("beforeend", paperView());
     const again = view.querySelector(".scroll");
     if (again) {
       again.scrollTop = scrolls[again.dataset.scroll] || 0;
@@ -1779,15 +1899,76 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     touch();
     if (!frame) frame = requestAnimationFrame(() => { frame = 0; render(); });
   }
+  // (proposed) dragging the start along the dial, to correct it: the last time at the angle before now, by five minutes and
+  // five minutes back at the least; let go, it holds, undone with "ביטול" for a few seconds
+  function dragStartTo(x, y) {
+    const el = device.querySelector(".dial"), s = shift();
+    if (!el || !s.running) return;
+    const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let deg = Math.atan2(x - cx, -(y - cy)) * 180 / Math.PI;
+    if (deg < 0) deg += 360;
+    const back = ((clockDeg(s.now) - deg) % 360 + 360) % 360;
+    const start = Math.min(Math.round((s.now - back / 30 * 3600000) / 300000) * 300000, s.now - 300000);
+    state.early = Math.round((START - start) / 60000);
+    touch();
+    if (!frame) frame = requestAnimationFrame(() => { frame = 0; render(); });
+  }
   document.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".dial .start") && state.plan == null) {
+      movingStart = { early: state.early };
+      state.startUndo = null;
+      dragging = true;
+      e.preventDefault();
+      dragStartTo(e.clientX, e.clientY);
+      return;
+    }
     if (!e.target.closest(".dial .goal")) return;
     dragging = true;
     e.preventDefault();
     dragTo(e.clientX, e.clientY);
   });
-  document.addEventListener("pointermove", (e) => { if (dragging) { e.preventDefault(); dragTo(e.clientX, e.clientY); } });
-  document.addEventListener("pointerup", () => { dragging = false; });
-  document.addEventListener("pointercancel", () => { dragging = false; });
+  document.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    if (movingStart) dragStartTo(e.clientX, e.clientY);
+    else dragTo(e.clientX, e.clientY);
+  });
+  const letGoOfDial = () => {
+    dragging = false;
+    if (!movingStart) return;
+    if (movingStart.early !== state.early) state.startUndo = { early: movingStart.early, until: Date.now() + 6000 };
+    movingStart = null;
+    render();
+  };
+  document.addEventListener("pointerup", letGoOfDial);
+  document.addEventListener("pointercancel", letGoOfDial);
+
+  // (proposed) a day's sheet swiped to the day on the side the finger leaves: to the left, the day before
+  let swipe = null;
+  device.addEventListener("pointerdown", (e) => {
+    const page = e.target.closest(".day-sheet .dpage");
+    if (page && !state.menu) swipe = { x: e.clientX, y: e.clientY, page, dx: 0 };
+  });
+  device.addEventListener("pointermove", (e) => {
+    if (!swipe) return;
+    const dx = (e.clientX - swipe.x) / scale, dy = (e.clientY - swipe.y) / scale;
+    if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
+    swipe.dx = dx;
+    swipe.page.style.transform = `translateX(${dx}px)`;
+    touch();
+    release();
+  });
+  const endSwipe = () => {
+    if (!swipe) return;
+    const { dx, page } = swipe;
+    swipe = null;
+    page.style.transform = "";
+    if (Math.abs(dx) < 70) return;
+    suppress = Date.now() + 300;
+    if (goDay(dx < 0 ? -1 : 1)) render();
+  };
+  device.addEventListener("pointerup", endSwipe);
+  device.addEventListener("pointercancel", endSwipe);
 
   // ---- a long press: what was pressed shrinks a little, then lifts with its menu ----
   let press = null, suppress = 0;
@@ -1895,6 +2076,14 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
 
   document.addEventListener("click", (e) => {
     if (Date.now() < suppress) return;
+    // (proposed) a day of the calendar tapped: its sheet
+    const cell = e.target.closest("[data-day]");
+    if (cell && !state.menu) {
+      state.sheet = "day";
+      state.day = +cell.dataset.day;
+      state.dayAnim = "";
+      return render();
+    }
     const b = e.target.closest("button");
     if (!b) return;
     if (b.dataset.tab) return switchTab(b.dataset.tab);
@@ -1902,11 +2091,19 @@ body { background: var(--page); color: var(--page-ink); font-family: var(--font-
     if ("cmClose" in b.dataset) {
       // a menu's choice of the next shift's workplace
       if (b.dataset.next != null) { state.next = +b.dataset.next; save(); render(); }
-      return closeMenu();
+      closeMenu();
+      // (proposed) a day's menu opening its sheet
+      if (b.dataset.openday) { state.sheet = "day"; state.day = +b.dataset.openday; state.dayAnim = ""; render(); }
+      return;
     }
     // a menu opened by a tap, as SwiftUI's Menu: the workplace of the next shift
     if ("tapMenu" in b.dataset) return openMenu(b);
     if (b.dataset.reset) state.plan = null;
+    // (proposed) a day's sheet: the day before or after; a paper opened and closed
+    else if (b.dataset.goday) { if (!goDay(+b.dataset.goday)) return; }
+    else if (b.dataset.paper != null) state.paper = b.dataset.paper || null;
+    // (proposed) the start dragged, undone
+    else if (b.dataset.undoStart) { if (state.startUndo) state.early = state.startUndo.early; state.startUndo = null; }
     // (proposed) the first setup's steps: on, back, and into the app, a shift started or not
     else if (b.dataset.step) {
       const go = b.dataset.step;
