@@ -20,6 +20,10 @@ struct CalendarView: View {
     var body: some View {
         let range = Calc.period(around: now, monthStartDay: store.settings.monthStartDay, offset: offset)
         month(range, at: now)
+            // a day's shifts just deleted, offered back for a few seconds
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                UndoStrip()
+            }
             .background(Color.appBackground.ignoresSafeArea())
             .navigationTitle("לוח")
             .minutes($now)
@@ -130,9 +134,8 @@ struct CalendarView: View {
             items.append(LiftItem(title: "שכפול להיום", systemImage: "plus.square.on.square") { copying = only })
         }
         let delete = LiftItem(title: onDay.count > 1 ? "מחיקת המשמרות" : "מחיקה", systemImage: "trash", destructive: true) {
-            withAnimation {
-                for shift in onDay { store.delete(shift.id) }
-            }
+            // as one deletion, which the strip brings back at once
+            withAnimation { store.delete(onDay.map(\.id)) }
         }
         return [LiftSection(items: items), LiftSection(items: [delete])]
     }
@@ -299,6 +302,10 @@ struct DayDetail: View {
             // the day opened, in the middle of the days each way
             .defaultScrollAnchor(.center)
             .scrollIndicators(.hidden)
+            // a shift just deleted here, offered back at the sheet's bottom, as the tabs' is under it
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                UndoStrip()
+            }
             .background(Color.appBackground.ignoresSafeArea())
             .navigationTitle(Format.dateFull(day))
             .navigationBarTitleDisplayMode(.inline)

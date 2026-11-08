@@ -105,7 +105,11 @@ struct SettingsView: View {
                     .settingsRow()
                 }
 
-                SettingsSection(title: "גיבוי לקובץ", note: "גם קובץ גיבוי של האתר משוחזר כאן.") {
+                SettingsSection(title: "גיבוי ושחזור",
+                                note: "משמרת שנמחקת נשארת 30 יום ב״נמחקו לאחרונה״. גם קובץ גיבוי של האתר משוחזר כאן.") {
+                    // the shifts deleted in the last 30 days, each to bring back
+                    RecentlyDeletedRow()
+                    Divider()
                     // the exporter and the importer each on a view of its own: on one view, one of them
                     // may never show
                     Button(action: export) { actionRow("ייצוא לקובץ") }

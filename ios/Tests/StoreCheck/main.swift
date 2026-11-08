@@ -15,6 +15,7 @@ func expect(_ ok: Bool, _ what: String, line: Int = #line) {
 let temporary = FileManager.default.temporaryDirectory
 let folder = temporary.appendingPathComponent("shifty-store-\(UUID().uuidString)")
 let other = temporary.appendingPathComponent("shifty-store-\(UUID().uuidString)")
+let third = temporary.appendingPathComponent("shifty-store-\(UUID().uuidString)")
 
 MainActor.assumeIsolated {
     let store = ShiftStore(folder: folder)
@@ -46,6 +47,20 @@ MainActor.assumeIsolated {
     expect(store.shifts.map(\.id) == [vacation.id, shift.id], "the newest first")
     store.delete(vacation.id)
     expect(store.shifts.count == 1 && store.records.count == 2, "a deletion leaves a tombstone")
+    expect(store.deletion?.ids == [vacation.id], "the deletion kept for the strip")
+    expect(store.recentlyDeleted().map(\.id) == [vacation.id], "a deleted shift among the recently deleted")
+    let deletedAt = store.records.first { $0.id == vacation.id }?.updatedAt ?? .distantFuture
+    Thread.sleep(forTimeInterval: 0.005)
+    store.restore([vacation.id])
+    expect(store.shifts.map(\.id) == [vacation.id, shift.id] && store.deletion == nil, "the undo brings it back")
+    expect(store.recentlyDeleted().isEmpty, "a shift brought back is no longer among the deleted")
+    expect(store.records.first { $0.id == vacation.id }?.updatedAt.map { $0 > deletedAt } == true,
+           "a shift brought back is stamped anew, for the other devices")
+    store.delete(vacation.id)
+    let stamped = store.records.first { $0.id == vacation.id }?.updatedAt
+    Thread.sleep(forTimeInterval: 0.005)
+    store.delete(vacation.id)
+    expect(store.records.first { $0.id == vacation.id }?.updatedAt == stamped, "deleting a deleted shift again changes nothing")
 
     store.updateSettings {
         $0.hourlyWage = 57.3
@@ -105,9 +120,56 @@ MainActor.assumeIsolated {
     } catch {
         expect(false, "a backup: \(error)")
     }
+
+    // a day's shifts deleted together, a running shift brought back, and the 30 days
+    let day = ShiftStore(folder: third)
+    let morning = day.startShift(at: LocalTime.date(2026, 10, 2, 7, 0))
+    _ = day.endShift(at: LocalTime.date(2026, 10, 2, 11, 0))
+    let evening = day.startShift(at: LocalTime.date(2026, 10, 2, 17, 0))
+    _ = day.endShift(at: LocalTime.date(2026, 10, 2, 21, 0))
+    var pushes = 0
+    day.onChange = { pushes += 1 }
+    day.delete([morning.id, evening.id, "none"])
+    expect(day.shifts.isEmpty && day.deletion?.ids == [morning.id, evening.id] && pushes == 1,
+           "a day's shifts deleted as one deletion, sent once")
+    day.restore(day.deletion?.ids ?? [])
+    expect(day.shifts.count == 2 && day.deletion == nil && pushes == 2, "and brought back together")
+    let deletion = Deletion(ids: [morning.id], at: Date(timeIntervalSince1970: 0))
+    day.delete(morning.id)
+    day.forget(deletion)
+    expect(day.deletion != nil, "only the strip's own deletion is forgotten")
+    if let shown = day.deletion { day.forget(shown) }
+    expect(day.deletion == nil && day.recentlyDeleted().map(\.id) == [morning.id],
+           "a forgotten deletion stays among the recently deleted")
+
+    let running = day.startShift(at: LocalTime.date(2026, 10, 3, 8, 0))
+    day.startBreak(at: LocalTime.date(2026, 10, 3, 10, 0))
+    day.delete(running.id)
+    expect(day.active == nil, "a running shift deleted runs no more")
+    day.restore([running.id])
+    expect(day.active?.id == running.id && day.active?.breaks.first?.end == nil, "brought back, it runs again, on its break")
+    day.delete(running.id)
+    let goneAt = day.records.first { $0.id == running.id }?.updatedAt
+    let next = day.startShift(at: LocalTime.date(2026, 10, 3, 12, 0))
+    day.restore([running.id])
+    let back = day.records.first { $0.id == running.id }
+    expect(day.active?.id == next.id && back?.end == goneAt && back?.breaks.first?.end == goneAt,
+           "with another running, it ends, with its break, when it was deleted")
+
+    let now = ShiftStore.now()
+    var old = Shift(id: "sold", start: LocalTime.date(2026, 9, 1, 8, 0), end: LocalTime.date(2026, 9, 1, 16, 0))
+    old.deleted = true
+    old.updatedAt = now.addingTimeInterval(-31 * 86_400)
+    var recent = Shift(id: "srecent", start: LocalTime.date(2026, 9, 2, 8, 0), end: LocalTime.date(2026, 9, 2, 16, 0))
+    recent.deleted = true
+    recent.updatedAt = now.addingTimeInterval(-29 * 86_400)
+    day.applyRemote([old, recent])
+    expect(day.recentlyDeleted(asOf: now).map(\.id) == [morning.id, "srecent"],
+           "the last 30 days, the last deleted first, a deletion of another device among them")
 }
 
 try? FileManager.default.removeItem(at: folder)
 try? FileManager.default.removeItem(at: other)
+try? FileManager.default.removeItem(at: third)
 print(failures == 0 ? "Store: all checks passed" : "Store: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

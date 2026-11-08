@@ -3,8 +3,8 @@ import UIKit
 
 /// The shifts of a pay period, the newest first: the period's hours, hours missing, shifts and income, and
 /// each shift's hours and pay, a running one's going up each second (app.js renderShifts). A shift opens in the
-/// editor, a swipe deletes it, and a long press lifts it with its menu; the plus adds a shift, and on a long press
-/// a day off. The list is drawn again each minute while it is on screen, and of the running shift only its pay
+/// editor, a swipe deletes it (offered back for a few seconds at the bottom, UndoStrip), and a long press lifts it with
+/// its menu; the plus adds a shift, and on a long press a day off. The list is drawn again each minute while it is on screen, and of the running shift only its pay
 /// each second (ShiftRow.live); out of sight, neither.
 struct ShiftsView: View {
     @Environment(ShiftStore.self) private var store
@@ -23,6 +23,10 @@ struct ShiftsView: View {
     var body: some View {
         let range = Calc.period(around: now, monthStartDay: store.settings.monthStartDay, offset: offset)
         list(range, at: now)
+            // a shift just deleted, offered back for a few seconds
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                UndoStrip()
+            }
             .background(Color.appBackground.ignoresSafeArea())
             .navigationTitle("משמרות")
             .minutes($now)

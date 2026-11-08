@@ -9,8 +9,11 @@ final class ShiftStore {
     nonisolated static let appGroup = "group.com.perezari.shifty"
 
     private(set) var settings: Settings
-    /// Every record, a deleted one too: a deletion stays as a tombstone, for the sync.
+    /// Every record, a deleted one too: a deletion stays as a tombstone, for the sync, with all the shift held, so
+    /// that it can be brought back (restore).
     private(set) var records: [Shift]
+    /// The last deletion made here, while the strip under the screen offers to bring it back (UndoStrip).
+    private(set) var deletion: Deletion?
     /// Called after a change made here (not after one applied from the cloud), for the sync to push it.
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private let folder: URL
@@ -123,11 +126,69 @@ final class ShiftStore {
 
     /// Deletes a shift, keeping a tombstone so that the deletion reaches the other devices.
     func delete(_ id: String) {
-        guard let index = records.firstIndex(where: { $0.id == id }) else { return }
-        records[index].deleted = true
-        records[index].updatedAt = Self.now()
+        delete([id])
+    }
+
+    /// Deletes shifts together (a day's), as one deletion for the strip to bring back. Each stays a tombstone,
+    /// stamped with the time it was deleted.
+    func delete(_ ids: [String]) {
+        let now = Self.now()
+        var gone: [String] = []
+        for id in ids {
+            guard let index = records.firstIndex(where: { $0.id == id }), !records[index].deleted else { continue }
+            records[index].deleted = true
+            records[index].updatedAt = now
+            gone.append(id)
+        }
+        guard !gone.isEmpty else { return }
+        deletion = Deletion(ids: gone, at: now)
         saveShifts()
         onChange?()
+    }
+
+    /// Brings deleted shifts back, stamped now, so that the other devices take them back too. A shift deleted while
+    /// it ran runs again, unless another runs now: then it ends, with an open break, when it was deleted.
+    func restore(_ ids: [String]) {
+        let now = Self.now()
+        var changed = false
+        for id in ids {
+            guard let index = records.firstIndex(where: { $0.id == id }), records[index].deleted else { continue }
+            var shift = records[index]
+            if shift.type == .work, shift.end == nil, active != nil {
+                let end = max(shift.start, shift.updatedAt ?? now)
+                for b in shift.breaks.indices where shift.breaks[b].end == nil {
+                    shift.breaks[b].end = max(shift.breaks[b].start, end)
+                }
+                shift.end = end
+            }
+            shift.deleted = false
+            shift.updatedAt = now
+            records[index] = shift
+            changed = true
+        }
+        if let deletion, deletion.ids.contains(where: ids.contains) {
+            self.deletion = nil
+        }
+        guard changed else { return }
+        saveShifts()
+        onChange?()
+    }
+
+    /// The strip's time is over: the deletion is no longer offered there, and stays among the recently deleted.
+    func forget(_ deletion: Deletion) {
+        if self.deletion == deletion { self.deletion = nil }
+    }
+
+    /// The days a deleted shift is offered back (Settings › נמחקו לאחרונה); its tombstone stays after them, for
+    /// the sync.
+    nonisolated static let keptDays = 30
+
+    /// The shifts deleted in the last 30 days, here or on another device, the last deleted first.
+    func recentlyDeleted(asOf date: Date = ShiftStore.now()) -> [Shift] {
+        let since = date.addingTimeInterval(-Double(Self.keptDays) * 86_400)
+        return records
+            .filter { $0.deleted && ($0.updatedAt ?? .distantPast) >= since }
+            .sorted { ($0.updatedAt ?? .distantPast) > ($1.updatedAt ?? .distantPast) }
     }
 
     @discardableResult
@@ -279,4 +340,11 @@ final class ShiftStore {
             // Kept in memory; the next change writes the file again.
         }
     }
+}
+
+/// Shifts deleted together, by a swipe, a menu, the editor or a day's menu: what the strip brings back at once.
+struct Deletion: Equatable {
+    let ids: [String]
+    /// When, as the tombstones are stamped.
+    let at: Date
 }

@@ -21,7 +21,9 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
   of the work, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (the user's own
   settings: the holidays, the income goal, the credit points, the look, the notifications, the lock, iCloud,
-  and the backup to a file and back), `WorkplaceViews` (the workplaces in the settings, each on its page
+  and the backup to a file and back), `UndoStrip` (a deletion offered back for six seconds at the bottom of
+  the Shifts list, the calendar and a day's sheet), `RecentlyDeleted` (Settings › נמחקו לאחרונה: the shifts
+  deleted in the last 30 days, brought back from their tombstones), `WorkplaceViews` (the workplaces in the settings, each on its page
   with what its employer sets: its pay from each date, its pay month (the own one's is the app's pay
   period), standard hours, overtime, breaks, Shabbat and night,
   a holiday's eve, vacation and sick days and the days left of them, the pension's shares (the employee's,

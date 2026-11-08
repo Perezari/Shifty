@@ -198,8 +198,9 @@ struct ShiftEditor: View {
         dismiss()
     }
 
+    /// Deleted, and offered back for a few seconds on the screen under the editor (UndoStrip).
     private func delete() {
-        if let shift { store.delete(shift.id) }
+        if let shift { withAnimation { store.delete(shift.id) } }
         dismiss()
     }
 
