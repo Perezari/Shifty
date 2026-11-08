@@ -118,3 +118,25 @@ Permissions, all optional and asked only when a feature needs them: notification
 
 7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro.lifetime), paid once. It opens the net pay estimate, the vacation and sick-day balances, the bonus and recuperation pay cards, more workplaces, the Live Activity and widgets, Siri and the Control Center, iCloud sync and the location reminder; everything else is free. To reach it: the Shifty Pro card at the top of Settings (הגדרות), anything marked Pro there (such as "הוספת מקום עבודה"), or the net pay line marked Pro on the Now tab. Its sheet has the price, the buy button and "שחזור רכישה" (Restore Purchase), also on the Settings card. Without it, the widgets show a lock and Siri answers that the action is in Shifty Pro.
 ```
+
+## Version 1.2
+
+Submitted from App Store Connect as a new version of the same app: the description, keywords, screenshots,
+App Review notes and the in-app purchase carry over from 1.1 and stay as they are; the build is the newest
+1.2 in TestFlight (its number is the UTC time it was built, `%y%j%H%M`, so the highest is the latest).
+1.1's train is closed since its approval, which is why the app's version is 1.2.
+
+**What's New in This Version** (4000 at most; what was built after 1.1's build, 263051228):
+
+```
+• מחקת משמרת בטעות? אחרי כל מחיקה מופיע "ביטול", ומה שנמחק ב־30 הימים האחרונים נמצא בהגדרות › נמחקו לאחרונה.
+• הגדרה ראשונה: מקום העבודה, השכר והשעות כבר בפתיחה הראשונה.
+• ימי מילואים, ותאריך עברי לצד הלועזי (בהגדרות › תצוגה).
+• לחיצה ארוכה על האייקון במסך הבית: התחלת משמרת או סיומה, הוספת משמרת ויום חופש.
+• בפירוט של יום מחליקים ליום הקודם וליום הבא, ואת שעת ההתחלה אפשר לגרור על השעון.
+• תקופת עבודה עם יום אחרון: השכר נספר רק בתוכה.
+• משמרת לילה של 7 שעות לפי החוק, למי שמפעיל אותה בדף מקום העבודה.
+• שליחת משוב ישר מההגדרות.
+• Shifty Pro: דף "סיום העבודה" עם פיצויים, הודעה מוקדמת, פדיון חופשה ודמי הבראה; אייקונים לבחירה; ותזכורת המיקום מציעה להתחיל בשעת ההגעה ולסיים בשעת היציאה.
+• לחיצה ארוכה ברשימות כבר לא מפריעה לגלילה ולמחיקה בהחלקה.
+```
