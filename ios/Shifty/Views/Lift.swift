@@ -36,14 +36,20 @@ final class Lifter {
     private(set) var lift: Lift?
     /// The iPhone's tap at each lift: a generator of UIKit's, and not a sensoryFeedback over the tabs, which drew
     /// the whole of them again for each tap.
-    private let tap = UIImpactFeedbackGenerator(style: .medium)
+    private static let tap = UIImpactFeedbackGenerator(style: .medium)
 
     var isShowing: Bool { lift != nil }
 
+    /// A finger came down on a thing that lifts: the tap gets ready, to come at once if it does.
+    static func prepare() {
+        tap.prepare()
+    }
+
+    /// Lifted with no animation here: LiftStage starts its own once all of it is made and drawn.
     func show(_ lift: Lift) {
         guard self.lift == nil else { return }
-        tap.impactOccurred()
-        withAnimation(.spring(duration: 0.22, bounce: 0.15)) { self.lift = lift }
+        Self.tap.impactOccurred()
+        self.lift = lift
     }
 
     /// Puts the thing down, then does what was chosen.
@@ -85,7 +91,16 @@ extension View {
     func liftedCard() -> some View {
         padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.appBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background { LiftSurface() }
+    }
+}
+
+/// What a lifted card or menu lies on: solid, with the cards' corners and a shadow. The shadow of this shape alone: one
+/// over the whole card, its words too, is made anew in each frame that it moves.
+private struct LiftSurface: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .fill(Color.appBackground)
             .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
     }
 }
@@ -226,7 +241,9 @@ private final class PressView: UIView, UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard let touched = touch.view, let window, touched.window === window, isShown else { return false }
         let area = bounds.insetBy(dx: min(0, (bounds.width - 44) / 2), dy: min(0, (bounds.height - 44) / 2))
-        return area.contains(touch.location(in: self)) && Self.owner(of: touched) === Self.owner(of: self)
+        guard area.contains(touch.location(in: self)), Self.owner(of: touched) === Self.owner(of: self) else { return false }
+        Lifter.prepare()
+        return true
     }
 
     /// On the screen, and not in a list's cell kept hidden for another row.
@@ -268,34 +285,65 @@ final class LiftSpot {
 /// The screen blurred under the thing lifted and its menu; a tap on it puts the thing down.
 private struct LiftOverlay: View {
     let lifter: Lifter
-    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
         GeometryReader { proxy in
-            if let lift = lifter.lift {
-                let origin = proxy.frame(in: .global).origin
-                ZStack {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Color.black.opacity(scheme == .dark ? 0.3 : 0.06)
+            ZStack {
+                LiftBlur(on: lifter.isShowing)
+                    .ignoresSafeArea()
+                if let lift = lifter.lift {
+                    let origin = proxy.frame(in: .global).origin
+                    ZStack {
+                        Color.clear
+                            .contentShape(Rectangle())
+                            .ignoresSafeArea()
+                            .onTapGesture { lifter.dismiss() }
+                        LiftStage(lift: lift, source: lift.source.offsetBy(dx: -origin.x, dy: -origin.y),
+                                  size: proxy.size, insets: proxy.safeAreaInsets) { item in
+                            lifter.dismiss(then: item.action)
                         }
-                        .ignoresSafeArea()
-                        .onTapGesture { lifter.dismiss() }
-                    LiftStage(lift: lift, source: lift.source.offsetBy(dx: -origin.x, dy: -origin.y),
-                              size: proxy.size, insets: proxy.safeAreaInsets) { item in
-                        lifter.dismiss(then: item.action)
                     }
+                    .transition(.opacity)
                 }
-                .transition(.opacity)
             }
         }
         .allowsHitTesting(lifter.isShowing)
     }
 }
 
-/// The thing lifted and its menu, popping up as they appear: placed in points from the left, as the screen's
-/// are, and drawn right to left.
+/// The screen under a thing lifted, blurred and a little darker. UIKit's, and always there, with no effect until a lift:
+/// its blur grows out of the sharp screen, where a material can only fade in over it as a second image, and the system
+/// runs it, whatever this thread is busy with while the thing is first drawn.
+private struct LiftBlur: UIViewRepresentable {
+    let on: Bool
+
+    func makeUIView(context: Context) -> UIVisualEffectView {
+        let view = UIVisualEffectView(effect: nil)
+        view.isUserInteractionEnabled = false
+        let shade = UIView(frame: view.bounds)
+        shade.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        shade.backgroundColor = UIColor { traits in
+            UIColor.black.withAlphaComponent(traits.userInterfaceStyle == .dark ? 0.3 : 0.06)
+        }
+        shade.alpha = 0
+        view.contentView.addSubview(shade)
+        return view
+    }
+
+    func updateUIView(_ view: UIVisualEffectView, context: Context) {
+        let on = on
+        guard on != (view.effect != nil) else { return }
+        UIView.animate(withDuration: on ? 0.26 : 0.15, delay: 0, options: .curveEaseOut) {
+            view.effect = on ? UIBlurEffect(style: .systemUltraThinMaterial) : nil
+            view.contentView.subviews.first?.alpha = on ? 1 : 0
+        }
+    }
+}
+
+/// The thing lifted and its menu, opening as they appear: placed in points from the left, as the screen's are, and
+/// drawn right to left. They start hidden and all move on one animation, begun once they are made and drawn: whatever
+/// the first frame takes isn't then taken out of the animation's time, as a jump at its start. (Almost hidden: what is
+/// wholly so isn't drawn yet.)
 private struct LiftStage: View {
     let lift: Lift
     /// Where the thing was, in this view's points.
@@ -305,32 +353,45 @@ private struct LiftStage: View {
     let pick: (LiftItem) -> Void
     @State private var shown = false
 
+    /// A card starts at the width of what it lifts, its edges over that thing's, and grows from there; a day, which is
+    /// small, from not so far.
+    private var cardStart: CGFloat {
+        max(0.94, min(1, source.width / (size.width - LiftLayout.margin * 2)))
+    }
+
     var body: some View {
         let above = !lift.card && source.midY > size.height / 2
         let right = lift.card || source.midX > size.width / 2
-        LiftLayout(source: source, card: lift.card, top: insets.top + 8, bottom: insets.bottom + 8) {
+        LiftLayout(source: source, card: lift.card, lifted: shown, top: insets.top + 8, bottom: insets.bottom + 8) {
             lift.preview
                 .environment(\.layoutDirection, .rightToLeft)
                 .allowsHitTesting(false)
-                .scaleEffect(shown ? 1 : 0.94)
+                // over the thing at once, and not a second image of it for as long as it moves
+                .opacity(shown ? 1 : 0.001)
+                .animation(.easeOut(duration: 0.1), value: shown)
+                .scaleEffect(shown || !lift.card ? 1 : cardStart, anchor: .top)
             LiftMenu(sections: lift.sections, pick: pick)
                 .environment(\.layoutDirection, .rightToLeft)
                 .scaleEffect(shown ? 1 : 0.6, anchor: UnitPoint(x: right ? 1 : 0, y: above ? 1 : 0))
-                .opacity(shown ? 1 : 0)
+                .opacity(shown ? 1 : 0.001)
         }
         .environment(\.layoutDirection, .leftToRight)
-        .onAppear {
-            withAnimation(.spring(duration: 0.24, bounce: 0.2)) { shown = true }
+        .task {
+            // on the next turn of the main thread, this frame done
+            withAnimation(.spring(duration: 0.26, bounce: 0)) { shown = true }
         }
     }
 }
 
-/// Places a thing lifted and its menu, the two in that order: a card across the screen where the thing was,
-/// moved up as far as its menu under it needs; or the thing at its own size and place, its menu over it when it
-/// is low on the screen and under it otherwise, on its side.
+/// Places a thing lifted and its menu, the two in that order: a card across the screen where the thing was and,
+/// once `lifted`, moved up as far as its menu under it needs; or the thing at its own size and place, its menu over it
+/// when it is low on the screen and under it otherwise, on its side.
 private struct LiftLayout: Layout {
+    static let margin: CGFloat = 16
+
     let source: CGRect
     let card: Bool
+    let lifted: Bool
     let top: CGFloat
     let bottom: CGFloat
 
@@ -340,7 +401,7 @@ private struct LiftLayout: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard subviews.count == 2 else { return }
-        let margin: CGFloat = 16
+        let margin = Self.margin
         let gap: CGFloat = 10
         let from = source.offsetBy(dx: bounds.minX, dy: bounds.minY)
         let highest = bounds.minY + top
@@ -349,7 +410,7 @@ private struct LiftLayout: Layout {
         if card {
             let width = bounds.width - margin * 2
             let height = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil)).height
-            let y = max(highest, min(from.minY, lowest - height - gap - menu.height))
+            let y = lifted ? max(highest, min(from.minY, lowest - height - gap - menu.height)) : from.minY
             subviews[0].place(at: CGPoint(x: bounds.minX + margin, y: y),
                               proposal: ProposedViewSize(width: width, height: height))
             subviews[1].place(at: CGPoint(x: bounds.maxX - margin - menu.width, y: y + height + gap),
@@ -395,8 +456,7 @@ private struct LiftMenu: View {
         }
         .padding(.vertical, 6)
         .frame(width: 250)
-        .background(Color.appBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
+        .background { LiftSurface() }
     }
 
     private func row(_ item: LiftItem) -> some View {

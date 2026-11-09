@@ -40,6 +40,9 @@ targets:
         UILaunchScreen:
           UIColorName: Background
         UIRequiresFullScreen: true
+        # Animations at the screen's own rate, up to 120 frames a second: without this key Core Animation holds an
+        # iPhone app's own animations to 60, while iOS's scrolling runs at 120.
+        CADisableMinimumFrameDurationOnPhone: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         CFBundleURLTypes:
           - CFBundleURLName: com.perezari.shifty

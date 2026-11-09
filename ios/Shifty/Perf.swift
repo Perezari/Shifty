@@ -15,6 +15,8 @@ final class Perf {
     /// The last few things done (a tab chosen, a long press), each with the time its first frame took to come.
     private(set) var events: [String] = []
     @ObservationIgnored private var pending: (name: String, at: CFTimeInterval)?
+    /// The moments after something done, as its animation runs: their frames and the longest of them.
+    @ObservationIgnored private var settling: (since: CFTimeInterval, frames: Int, worst: CFTimeInterval)?
     @ObservationIgnored private var running = false
     @ObservationIgnored private var link: CADisplayLink?
     @ObservationIgnored private var clock: FrameClock?
@@ -50,6 +52,7 @@ final class Perf {
             line = ""
             events = []
             pending = nil
+            settling = nil
             return
         }
         let clock = FrameClock { [weak self] link in
@@ -68,20 +71,27 @@ final class Perf {
     }
 
     private func frame(_ link: CADisplayLink) {
-        if let done = pending {
-            pending = nil
-            events.append("\(done.name) \(Int(((CACurrentMediaTime() - done.at) * 1000).rounded()))ms")
-            if events.count > 4 { events.removeFirst() }
-        }
         let now = link.timestamp
         if last > 0 {
             let gap = now - last
             // later than one and a half frames at 60 a second
             if gap > 0.025 { late += 1 }
             worst = max(worst, gap)
+            if let s = settling { settling = (s.since, s.frames + 1, max(s.worst, gap)) }
         }
         last = now
         frames += 1
+        if let done = pending {
+            pending = nil
+            events.append("\(done.name) \(Int(((CACurrentMediaTime() - done.at) * 1000).rounded()))ms")
+            if events.count > 3 { events.removeFirst() }
+            settling = (now, 0, 0)
+        }
+        // and once its animation is over, how it ran: 48 frames here are all there are at 120 a second, 24 at 60
+        if let s = settling, now - s.since >= 0.4, let event = events.last {
+            settling = nil
+            events[events.count - 1] = event + " (\(s.frames) פריימים, הארוך \(Int((s.worst * 1000).rounded()))ms)"
+        }
         guard now - since >= 1 else { return }
         let counts = Self.names.compactMap { name in draws[name].map { "\(name) \($0)" } }
         line = "\(frames) פריימים · \(late) איטיים · הארוך \(Int((worst * 1000).rounded()))ms"
