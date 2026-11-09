@@ -775,6 +775,8 @@ func adjustmentChecks() {
     expect(Calc.periodTotals(base + [gone], settings, range: range, asOf: asOf).additions == 0, "a deleted one is not counted")
     expect(Calc.breakdown(sum("a", 2, 500, ""), settings).pay == 0, "no wage of its own")
     expect(sum("a", 2, 500, "").isDayOff == false && off(3, .sick).isDayOff && !work(1, 8, 9).isDayOff, "no day off")
+    let week = Calc.week(list + [off(4, .vacation)], settings, around: LocalTime.date(2026, 10, 4), asOf: asOf)
+    expect(week[3].dayOff == .vacation && week[2].dayOff == nil && week[0].dayOff == nil, "the week's day off, not its sums once")
     expect(Format.signedMoney(500) == "\u{200E}+₪ 500.00" && Format.signedMoney(-12.5) == "\u{200E}−₪ 12.50", "with its sign")
 }
 adjustmentChecks()

@@ -109,6 +109,8 @@ struct WeekDay: Hashable {
     var hours: Double
     /// nil on a day off, where working less is no shortfall.
     var standard: Double?
+    /// A paid vacation or sick day, or a day of reserve duty, recorded on it.
+    var dayOff: ShiftType? = nil
 }
 
 extension Calc {
@@ -119,7 +121,9 @@ extension Calc {
         return (0..<7).map { i in
             let day = LocalTime.date(first.year, first.month0, first.day + i)
             let hours = aggregate(shifts, s, range: dayRange(day), asOf: now).netHours
-            return WeekDay(date: day, hours: hours, standard: expectedStandard(day, s))
+            let range = dayRange(day)
+            return WeekDay(date: day, hours: hours, standard: expectedStandard(day, s),
+                           dayOff: shifts.first { $0.isDayOff && inRange($0, range) }?.type)
         }
     }
 

@@ -4,6 +4,13 @@ import UIKit
 extension Color {
     /// The screens' background, light and dark (Assets.xcassets): the web app's.
     static let appBackground = Color("Background")
+    /// A vacation day's sky blue, and a day of reserve duty's olive (ShiftType.dayOffColor).
+    static let vacation = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(red: 0.23, green: 0.62, blue: 0.96, alpha: 1) : UIColor(red: 0.16, green: 0.58, blue: 0.95, alpha: 1)
+    })
+    static let reserveDuty = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark ? UIColor(red: 0.49, green: 0.56, blue: 0.27, alpha: 1) : UIColor(red: 0.42, green: 0.49, blue: 0.23, alpha: 1)
+    })
     /// A card on the background: white, or a gray a little lighter than the dark background.
     static let cardBackground = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark ? UIColor(red: 0.13, green: 0.14, blue: 0.16, alpha: 1) : .white

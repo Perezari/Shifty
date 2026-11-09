@@ -46,7 +46,7 @@ final class QuickActions {
             let place = settings.workplaces.isEmpty ? nil : settings.place(store.nextWorkplace).name
             items.append(item("start", "התחלת משמרת", "play.fill", place))
             items.append(item("add", "הוספת משמרת", "plus"))
-            items.append(item("vacation", "יום חופש", "sun.max"))
+            items.append(item("vacation", "יום חופש", "beach.umbrella"))
         }
         UIApplication.shared.shortcutItems = items
     }

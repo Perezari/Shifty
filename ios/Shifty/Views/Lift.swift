@@ -96,7 +96,7 @@ extension LiftSection {
                        adjustment: @escaping () -> Void) -> LiftSection {
         LiftSection(items: [
             LiftItem(title: "משמרת", systemImage: "timer", action: shift),
-            LiftItem(title: "יום חופש", systemImage: "sun.max") { dayOff(.vacation) },
+            LiftItem(title: "יום חופש", systemImage: "beach.umbrella") { dayOff(.vacation) },
             LiftItem(title: "יום מחלה", systemImage: "cross.case") { dayOff(.sick) },
             LiftItem(title: "יום מילואים", systemImage: "shield") { dayOff(.reserve) },
             LiftItem(title: "תוספת או ניכוי", systemImage: "plusminus", action: adjustment),

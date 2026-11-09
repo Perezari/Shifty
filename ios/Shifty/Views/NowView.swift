@@ -1214,6 +1214,15 @@ private struct WeekColumn: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(color)
                     .frame(height: 66 * share)
+                // a day off fills its column in its color, as on the calendar
+                if let off = day.dayOff {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(off.dayOffColor.gradient)
+                    Image(systemName: off.dayOffSymbol)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxHeight: .infinity)
+                }
             }
             .frame(width: 24, height: 66)
             Text(Format.weekdayShort(day.date).replacingOccurrences(of: "׳", with: ""))
@@ -1622,7 +1631,7 @@ private struct LeaveCard: View {
                     .foregroundStyle(.secondary)
             }
             HStack(spacing: 0) {
-                column("sun.max.fill", balance.vacation, "ימי חופשה", Color("Holiday"))
+                column(ShiftType.vacation.dayOffSymbol, balance.vacation, "ימי חופשה", ShiftType.vacation.dayOffColor)
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 36)
                 column("cross.case.fill", balance.sick, "ימי מחלה", .pink)
             }

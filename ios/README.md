@@ -19,7 +19,7 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   workplace takes an automatic break; then the week, the pay period, a holiday coming and each workplace's
   days off left), `ShiftsView`
   (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
-  of the work, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (the user's own
+  of the work, a day off filling its day in its color with its symbol, `ShiftType.dayOffColor`, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (the user's own
   settings: the holidays, the income goal, the credit points, the look, the notifications, the lock, iCloud,
   and the backup to a file and back), `UndoStrip` (a deletion offered back for six seconds at the bottom of
   the Shifts list, the calendar and a day's sheet), `RecentlyDeleted` (Settings › נמחקו לאחרונה: the shifts

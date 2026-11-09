@@ -154,8 +154,9 @@ struct DayRef: Identifiable {
     var id: String { LocalTime.dayKey(date) }
 }
 
-/// A day of the calendar: its number, and the hours worked, the kind of day off or the holiday's name; the Hebrew
-/// day in its corner when the Hebrew date is on.
+/// A day of the calendar. Every day has the same lines at the same heights, so that the numbers of a week stay on one
+/// line: the Hebrew day over the number when the Hebrew date is on, and under them what the day holds: the hours worked,
+/// a sum once or the holiday's name; a day off fills the whole day with its color, with its symbol under the number.
 private struct DayCell: View {
     let date: Date
     let inPeriod: Bool
@@ -167,66 +168,79 @@ private struct DayCell: View {
     var body: some View {
         let _ = Perf.drew("יום")
         let holiday = holidayInfo
-        VStack(spacing: 2) {
+        let off = sum?.dayOff
+        VStack(spacing: 0) {
+            if hebrew {
+                Text(verbatim: inPeriod ? Holidays.hebrewDate(date).day : " ")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(off != nil ? Color.white.opacity(0.85) : Color.secondary)
+                    .frame(height: 11)
+            }
             Text(verbatim: String(LocalTime.parts(date).day))
-                .font(.system(size: 15, weight: numberWeight))
+                .font(.system(size: 16.5, weight: numberWeight))
                 .monospacedDigit()
                 .foregroundStyle(numberColor(holiday))
-            if let sum, sum.count > 0 {
-                Text(Format.hoursToHM(sum.netHours))
-                    .font(.system(size: 10, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(sum.short ? Color.red : Color.secondary)
-            } else if let off = sum?.dayOff {
-                Text(Self.name(off))
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-            } else if let sum, sum.adjustment != 0 {
-                Text(Format.signedMoney(sum.adjustment, settings.currency))
-                    .font(.system(size: 8, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            } else if let name = holiday?.name {
-                Text(name)
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundStyle(Color("Holiday"))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
+                .frame(height: 20)
+            Spacer(minLength: 0)
+            under(off, holiday)
+                .frame(height: 20)
         }
+        .padding(.top, 6)
+        .padding(.bottom, 5)
         .padding(.horizontal, 2)
-        .frame(maxWidth: .infinity, minHeight: 48)
+        .frame(maxWidth: .infinity)
+        .frame(height: hebrew ? 62 : 54)
         .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(fill(holiday))
+            if let off {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(off.dayOffColor.gradient)
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(fill(holiday))
+            }
         }
         .overlay {
             if today {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(Color.accentColor, lineWidth: 1.6)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            if hebrew && inPeriod {
-                Text(Holidays.hebrewDate(date).day)
-                    .font(.system(size: 9.5, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
-                    .padding(.trailing, 5)
+                // a gap between the ring and a day's full color
+                if off != nil {
+                    RoundedRectangle(cornerRadius: 10.5, style: .continuous)
+                        .strokeBorder(Color.cardBackground, lineWidth: 1.4)
+                        .padding(1.6)
+                }
             }
         }
         .opacity(inPeriod ? 1 : 0.3)
         .contentShape(Rectangle())
     }
 
-    private static func name(_ dayOff: ShiftType) -> String {
-        switch dayOff {
-        case .vacation: "חופש"
-        case .sick: "מחלה"
-        case .reserve: "מילואים"
-        case .work, .adjustment: ""
+    /// What the day holds, under its number.
+    @ViewBuilder
+    private func under(_ off: ShiftType?, _ holiday: Holidays.Info?) -> some View {
+        if let off {
+            Image(systemName: off.dayOffSymbol)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white)
+                .accessibilityLabel(off.dayOffTitle)
+        } else if let sum, sum.count > 0 {
+            Text(Format.hoursToHM(sum.netHours))
+                .font(.system(size: 10.5, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(sum.short ? Color.red : Color.secondary)
+        } else if let sum, sum.adjustment != 0 {
+            Text(Format.signedMoney(sum.adjustment, settings.currency))
+                .font(.system(size: 8, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        } else if let name = holiday?.name {
+            Text(name)
+                .font(.system(size: 8.5, weight: .medium))
+                .foregroundStyle(Color("Holiday"))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
     }
 
@@ -242,19 +256,21 @@ private struct DayCell: View {
     }
 
     private var numberWeight: Font.Weight {
+        if sum?.dayOff != nil { return .bold }
         if today { return .heavy }
         return worked ? .bold : .medium
     }
 
     private func numberColor(_ holiday: Holidays.Info?) -> Color {
+        if sum?.dayOff != nil { return .white }
         if let sum, sum.short { return .red }
         if worked { return .accentColor }
         if holiday != nil { return Color("Holiday") }
         return today ? .accentColor : .primary
     }
 
-    /// Accent by the share of the standard worked; red when short; grey for a day off; the holiday's color
-    /// for a holiday, lighter for a shortened day.
+    /// Accent by the share of the standard worked; red when short; the holiday's color for a holiday, lighter for a
+    /// shortened day. A day off has its own (body).
     private func fill(_ holiday: Holidays.Info?) -> Color {
         if let sum, sum.count > 0 {
             if sum.short { return Color.red.opacity(0.13) }
@@ -262,7 +278,6 @@ private struct DayCell: View {
             let share = max(0, min(1, standard > 0 ? sum.netHours / standard : 0))
             return Color.accentColor.opacity(0.09 + share * 0.17)
         }
-        if sum?.dayOff != nil { return Color.secondary.opacity(0.12) }
         if let holiday {
             return Color("Holiday").opacity(holiday.kind == .chag ? 0.14 : 0.07)
         }

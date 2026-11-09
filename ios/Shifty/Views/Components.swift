@@ -242,7 +242,7 @@ struct ShiftRow: View {
         let _ = Perf.drew("שורה")
         HStack(spacing: 14) {
             if showsDate {
-                DateBadge(date: shift.start, short: short, dayOff: shift.type != .work)
+                DateBadge(date: shift.start, short: short, dayOff: shift.type != .work, filled: shift.isDayOff ? shift.type : nil)
             }
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -407,11 +407,12 @@ extension View {
 }
 
 /// A shift's day in a list: the day of the month over its weekday, red when the day fell short of its
-/// standard, faint for a day off.
+/// standard, faint for a sum once or a holiday's pay, and a day off in its color, as on the calendar.
 private struct DateBadge: View {
     let date: Date
     let short: Bool
     let dayOff: Bool
+    var filled: ShiftType? = nil
 
     var body: some View {
         let p = LocalTime.parts(date)
@@ -425,12 +426,18 @@ private struct DateBadge: View {
         .foregroundStyle(color)
         .frame(width: 44, height: 46)
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(fill)
+            if let filled {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(filled.dayOffColor.gradient)
+            } else {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(fill)
+            }
         }
     }
 
     private var color: Color {
+        if filled != nil { return .white }
         if short { return .red }
         return dayOff ? .secondary : .primary
     }
@@ -688,6 +695,25 @@ extension ShiftType: Identifiable {
         case .reserve: "יום מילואים"
         case .adjustment: "תוספת או ניכוי"
         case .work: "משמרת"
+        }
+    }
+
+    /// A day off's symbol and color, the same wherever it shows: on the calendar, in a list, on the week's card.
+    var dayOffSymbol: String {
+        switch self {
+        case .vacation: "beach.umbrella.fill"
+        case .sick: "cross.case.fill"
+        case .reserve: "shield.fill"
+        case .work, .adjustment: "circle.fill"
+        }
+    }
+
+    var dayOffColor: Color {
+        switch self {
+        case .vacation: .vacation
+        case .sick: .pink
+        case .reserve: .reserveDuty
+        case .work, .adjustment: .secondary
         }
     }
 }
