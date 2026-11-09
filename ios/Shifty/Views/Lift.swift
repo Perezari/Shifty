@@ -52,9 +52,10 @@ final class Lifter {
         self.lift = lift
     }
 
-    /// Puts the thing down, then does what was chosen.
+    /// Puts the thing down, then does what was chosen. The thing and its menu go at once, and only the blur under them
+    /// takes a moment: faded as well, they showed over the screen already growing sharp, as if the menu came back.
     func dismiss(then action: (() -> Void)? = nil) {
-        withAnimation(.easeOut(duration: 0.1)) { lift = nil }
+        lift = nil
         action?()
     }
 }
@@ -303,7 +304,6 @@ private struct LiftOverlay: View {
                             lifter.dismiss(then: item.action)
                         }
                     }
-                    .transition(.opacity)
                 }
             }
         }
