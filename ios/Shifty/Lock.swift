@@ -63,6 +63,9 @@ struct LockGate: ViewModifier {
             .onChange(of: enabled) { _, on in
                 if !on { locked = false }
             }
+            .onChange(of: locked) { _, now in
+                if !now { Opening.shared.unlocked() }
+            }
             .task {
                 // launched in front; otherwise coming to the front asks
                 if locked && phase == .active { unlock() }

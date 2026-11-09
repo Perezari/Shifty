@@ -50,9 +50,11 @@ struct NowView: View {
                 }
                 arrival()
                 actions()
+                    .openingPart(0.85)
                 TimelineView(.everyMinute) { context in
                     cards(at: context.date)
                 }
+                .openingPart(0.9)
             }
             .padding(.horizontal, ScreenMargin.side)
             .padding(.top, 8)
@@ -136,8 +138,10 @@ struct NowView: View {
         return VStack(spacing: 14) {
             NowCapsule(status: status, place: placeName(settings), choices: placeChoices(settings), now: date,
                        dayOff: Self.offToday(in: shifts, on: date))
+                .openingPart(0.8)
             dial(status, settings, shifts, at: date, reached: reached, overtime: overtime)
             NowFacts(cells: facts(status, settings, totals: periodTotals, global: overtime != nil, at: date))
+                .openingPart(0.8)
         }
         .onChange(of: reached) { was, now in
             // not at the start of a shift with no regular hours left in its week
@@ -215,6 +219,7 @@ struct NowView: View {
                 } close: {
                     withAnimation { arrivalTipShift = active.id }
                 }
+                .openingPart(0.85)
             }
         }
     }
@@ -1041,53 +1046,91 @@ private struct ShiftDial<Center: View>: View {
     var body: some View {
         GeometryReader { geo in
             let size = min(geo.size.width, geo.size.height)
-            ZStack {
-                face(size)
-                    .environment(\.layoutDirection, .leftToRight)
-                center
+            // at a launch it is built out of the icon, a frame at a time (Opening.swift), and then it stands still
+            TimelineView(.animation(minimumInterval: nil, paused: Opening.shared.over)) { context in
+                stage(size, at: Opening.shared.time(at: context.date))
             }
             .frame(width: size, height: size)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .aspectRatio(1, contentMode: .fit)
         .frame(maxWidth: 350)
+        .background {
+            // its place on the screen, for the opening to begin in the screen's middle
+            if !Opening.shared.over {
+                GeometryReader { proxy in
+                    Color.clear
+                        .onChange(of: proxy.frame(in: .global).midY, initial: true) { _, middle in
+                            Opening.shared.dialMiddle = middle
+                        }
+                }
+            }
+        }
     }
 
-    private func face(_ size: CGFloat) -> some View {
+    /// The dial and its middle at the moment `t` of the opening: it rises from the screen's middle to its place, and
+    /// the words come in on the way. Once that is over, as it stays.
+    private func stage(_ size: CGFloat, at t: Double) -> some View {
+        let words = OpeningCurve.out3(t, 0.7, 0.98)
+        let settled = OpeningCurve.out5(t, 0.66, 1.1)
+        return ZStack {
+            face(size, at: t)
+                .environment(\.layoutDirection, .leftToRight)
+            center
+                .opacity(words)
+                .offset(y: CGFloat(1 - words) * 14)
+        }
+        .frame(width: size, height: size)
+        .offset(y: CGFloat(1 - settled) * Opening.shared.travel)
+    }
+
+    private func face(_ size: CGFloat, at t: Double) -> some View {
         let c = size / 2
         let r = size * 160 / 350
         let w = size * 22 / 350
-        let extent = layout.pieces.map(\.to).max() ?? 360
         return ZStack {
-            DialFace(size: size)
-            ZStack {
-                ForEach(layout.pieces, id: \.self) { piece in
-                    Circle()
-                        .trim(from: piece.from / 360, to: piece.to / 360)
-                        .stroke(Self.color(piece.kind), style: StrokeStyle(lineWidth: w, lineCap: .butt))
-                        .frame(width: r * 2, height: r * 2)
-                        .rotationEffect(.degrees(layout.startDeg - 90))
-                }
+            if Opening.shared.over {
+                DialFace(size: size)
+                arc(size, r, w)
+            } else {
+                DialOpening(size: size, layout: layout, time: t)
+                DialHours(size: size)
+                    .opacity(OpeningCurve.line(t, 0.52, 0.74))
             }
-            .frame(width: size, height: size)
-            // a shift just started: the arc comes out of its start, by one mask, since each second's pieces are new
-            // views and what is new has no animation to go on with
-            .mask {
-                Circle()
-                    .trim(from: 0, to: min(extent + 1, 360) / 360 * drawn)
-                    .stroke(style: StrokeStyle(lineWidth: w + 4, lineCap: .butt))
-                    .frame(width: r * 2, height: r * 2)
-                    .rotationEffect(.degrees(layout.startDeg - 90))
-            }
-            .shadow(color: Color.accentColor.opacity(glow ? 0.6 : 0), radius: glow ? 18 : 0)
-            marks(c, r)
+            marks(c, r, at: t)
         }
         .frame(width: size, height: size)
         .coordinateSpace(.named("dial"))
     }
 
+    /// The arc's pieces.
+    private func arc(_ size: CGFloat, _ r: CGFloat, _ w: CGFloat) -> some View {
+        let extent = layout.pieces.map(\.to).max() ?? 360
+        return ZStack {
+            ForEach(layout.pieces, id: \.self) { piece in
+                Circle()
+                    .trim(from: piece.from / 360, to: piece.to / 360)
+                    .stroke(piece.kind.color, style: StrokeStyle(lineWidth: w, lineCap: .butt))
+                    .frame(width: r * 2, height: r * 2)
+                    .rotationEffect(.degrees(layout.startDeg - 90))
+            }
+        }
+        .frame(width: size, height: size)
+        // a shift just started: the arc comes out of its start, by one mask, since each second's pieces are new
+        // views and what is new has no animation to go on with
+        .mask {
+            Circle()
+                .trim(from: 0, to: min(extent + 1, 360) / 360 * drawn)
+                .stroke(style: StrokeStyle(lineWidth: w + 4, lineCap: .butt))
+                .frame(width: r * 2, height: r * 2)
+                .rotationEffect(.degrees(layout.startDeg - 90))
+        }
+        .shadow(color: Color.accentColor.opacity(glow ? 0.6 : 0), radius: glow ? 18 : 0)
+    }
+
+    /// The start, now and the goal's flag, popping up one after another in the opening.
     @ViewBuilder
-    private func marks(_ c: CGFloat, _ r: CGFloat) -> some View {
+    private func marks(_ c: CGFloat, _ r: CGFloat, at t: Double) -> some View {
         if let goal = layout.goalDeg {
             // the start, dragged along the dial to correct it, in a finger's room
             Image(systemName: "play.fill")
@@ -1098,6 +1141,7 @@ private struct ShiftDial<Center: View>: View {
                 .background(Circle().fill(Color.accentColor.opacity(movingStart ? 0.22 : 0)).frame(width: 40, height: 40))
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
+                .scaleEffect(OpeningCurve.pop(t, 0.66))
                 .position(Self.point(layout.startDeg, r, c))
                 .gesture(DragGesture(minimumDistance: 3, coordinateSpace: .named("dial"))
                     .onChanged { value in
@@ -1115,9 +1159,10 @@ private struct ShiftDial<Center: View>: View {
                     .position(Self.point(layout.startDeg + goal, r, c))
             }
             knobView
+                .scaleEffect(OpeningCurve.pop(t, 0.74))
                 .position(Self.point(layout.startDeg + layout.nowDeg, r, c))
             flag
-                .scaleEffect(0.4 + 0.6 * drawn)
+                .scaleEffect((0.4 + 0.6 * drawn) * OpeningCurve.pop(t, 0.82))
                 .opacity(drawn)
                 .position(Self.point(layout.startDeg + (layout.leaveDeg ?? goal), r, c))
                 .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("dial"))
@@ -1129,6 +1174,7 @@ private struct ShiftDial<Center: View>: View {
                 .accessibilityLabel("גרירה לבחירת שעת יציאה")
         } else {
             knobView
+                .scaleEffect(OpeningCurve.pop(t, 0.74))
                 .position(Self.point(layout.startDeg + layout.nowDeg, r, c))
         }
     }
@@ -1168,9 +1214,12 @@ private struct ShiftDial<Center: View>: View {
         let radians = degrees * .pi / 180
         return CGPoint(x: c + radius * CGFloat(sin(radians)), y: c - radius * CGFloat(cos(radians)))
     }
+}
 
-    static func color(_ kind: DialLayout.Kind) -> Color {
-        switch kind {
+extension DialLayout.Kind {
+    /// A piece's color on the dial.
+    var color: Color {
+        switch self {
         case .work: Color.accentColor
         case .overtime: Color("Holiday")
         case .pause: Color.orange
@@ -1189,7 +1238,6 @@ private struct DialFace: View {
     let size: CGFloat
 
     var body: some View {
-        let c = size / 2
         let r = size * 160 / 350
         let w = size * 22 / 350
         ZStack {
@@ -1203,11 +1251,23 @@ private struct DialFace: View {
                     .offset(y: -(r - w / 2 - (i % 5 == 0 ? 11.5 : 9)))
                     .rotationEffect(.degrees(Double(i) * 6))
             }
+            DialHours(size: size)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+/// The dial's four hours.
+private struct DialHours: View {
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
             ForEach([12, 3, 6, 9], id: \.self) { hour in
                 Text(verbatim: String(hour))
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(.tertiary)
-                    .position(ShiftDial<EmptyView>.point(Double(hour % 12) * 30, size * 120 / 350, c))
+                    .position(ShiftDial<EmptyView>.point(Double(hour % 12) * 30, size * 120 / 350, size / 2))
             }
         }
         .frame(width: size, height: size)

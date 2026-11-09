@@ -53,6 +53,7 @@ final class QuickActions {
 
     /// An action of the icon, done: the shift's on the Now screen.
     func perform(_ type: String) {
+        Opening.shared.skip()
         let actions: [String: ShiftAction] = ["start": .start, "end": .end, "break": .startBreak, "back": .endBreak]
         if let action = actions[type] {
             shiftActions += 1

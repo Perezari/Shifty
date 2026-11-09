@@ -24,6 +24,7 @@ struct ShiftyApp: App {
         UNUserNotificationCenter.current().delegate = Notifications.shared
         Place.registerCategories()
         Place.shared.start()
+        Opening.shared.arm(firstSetup: Welcome.due(ShiftStore.shared))
     }
 
     var body: some Scene {
@@ -117,6 +118,10 @@ struct RootView: View {
         .tabBarMinimizeBehavior(.onScrollDown)
         // a long press lifts a shift, a day or a button over the tabs, the tab bar blurred too (Lift.swift)
         .liftHost()
+        // at a launch, the opening (Opening.swift)
+        .overlay {
+            OpeningCover()
+        }
         // Shifty Pro, from anything marked Pro
         .sheet(isPresented: Bindable(pro).offering) {
             ProSheet()
@@ -211,6 +216,7 @@ struct RootView: View {
         }
         // a widget or the Live Activity opens the app on the running shift; a widget without Pro, on Pro
         .onOpenURL { url in
+            Opening.shared.skip()
             if url.host == "pro" {
                 pro.offer()
             } else {
