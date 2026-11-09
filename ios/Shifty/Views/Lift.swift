@@ -45,7 +45,7 @@ final class Lifter {
         tap.prepare()
     }
 
-    /// Lifted with no animation here: LiftStage starts its own once all of it is made and drawn.
+    /// There at once, with no animation (the user's wish: animations slowed it): only the blur under it takes a moment.
     func show(_ lift: Lift) {
         guard self.lift == nil else { return }
         Self.tap.impactOccurred()
@@ -54,7 +54,7 @@ final class Lifter {
 
     /// Puts the thing down, then does what was chosen.
     func dismiss(then action: (() -> Void)? = nil) {
-        withAnimation(.easeOut(duration: 0.15)) { lift = nil }
+        lift = nil
         action?()
     }
 }
@@ -149,7 +149,7 @@ private struct Liftable: ViewModifier {
                 place.frame = frame
             }
             .background {
-                LongPress(duration: 0.25) { lift() }
+                LongPress(duration: 0.2) { lift() }
                     .allowsHitTesting(false)
             }
             .accessibilityAction(named: "אפשרויות") { lift() }
@@ -299,11 +299,10 @@ private struct LiftOverlay: View {
                             .ignoresSafeArea()
                             .onTapGesture { lifter.dismiss() }
                         LiftStage(lift: lift, source: lift.source.offsetBy(dx: -origin.x, dy: -origin.y),
-                                  size: proxy.size, insets: proxy.safeAreaInsets) { item in
+                                  insets: proxy.safeAreaInsets) { item in
                             lifter.dismiss(then: item.action)
                         }
                     }
-                    .transition(.opacity)
                 }
             }
         }
@@ -333,65 +332,39 @@ private struct LiftBlur: UIViewRepresentable {
     func updateUIView(_ view: UIVisualEffectView, context: Context) {
         let on = on
         guard on != (view.effect != nil) else { return }
-        UIView.animate(withDuration: on ? 0.26 : 0.15, delay: 0, options: .curveEaseOut) {
+        UIView.animate(withDuration: 0.1, delay: 0, options: .curveEaseOut) {
             view.effect = on ? UIBlurEffect(style: .systemUltraThinMaterial) : nil
             view.contentView.subviews.first?.alpha = on ? 1 : 0
         }
     }
 }
 
-/// The thing lifted and its menu, opening as they appear: placed in points from the left, as the screen's are, and
-/// drawn right to left. They start hidden and all move on one animation, begun once they are made and drawn: whatever
-/// the first frame takes isn't then taken out of the animation's time, as a jump at its start. (Almost hidden: what is
-/// wholly so isn't drawn yet.)
+/// The thing lifted and its menu: placed in points from the left, as the screen's are, and drawn right to left.
 private struct LiftStage: View {
     let lift: Lift
     /// Where the thing was, in this view's points.
     let source: CGRect
-    let size: CGSize
     let insets: EdgeInsets
     let pick: (LiftItem) -> Void
-    @State private var shown = false
-
-    /// A card starts at the width of what it lifts, its edges over that thing's, and grows from there; a day, which is
-    /// small, from not so far.
-    private var cardStart: CGFloat {
-        max(0.94, min(1, source.width / (size.width - LiftLayout.margin * 2)))
-    }
 
     var body: some View {
-        let above = !lift.card && source.midY > size.height / 2
-        let right = lift.card || source.midX > size.width / 2
-        LiftLayout(source: source, card: lift.card, lifted: shown, top: insets.top + 8, bottom: insets.bottom + 8) {
+        LiftLayout(source: source, card: lift.card, top: insets.top + 8, bottom: insets.bottom + 8) {
             lift.preview
                 .environment(\.layoutDirection, .rightToLeft)
                 .allowsHitTesting(false)
-                // over the thing at once, and not a second image of it for as long as it moves
-                .opacity(shown ? 1 : 0.001)
-                .animation(.easeOut(duration: 0.1), value: shown)
-                .scaleEffect(shown || !lift.card ? 1 : cardStart, anchor: .top)
             LiftMenu(sections: lift.sections, pick: pick)
                 .environment(\.layoutDirection, .rightToLeft)
-                .scaleEffect(shown ? 1 : 0.6, anchor: UnitPoint(x: right ? 1 : 0, y: above ? 1 : 0))
-                .opacity(shown ? 1 : 0.001)
         }
         .environment(\.layoutDirection, .leftToRight)
-        .task {
-            // on the next turn of the main thread, this frame done
-            withAnimation(.spring(duration: 0.26, bounce: 0)) { shown = true }
-        }
     }
 }
 
-/// Places a thing lifted and its menu, the two in that order: a card across the screen where the thing was and,
-/// once `lifted`, moved up as far as its menu under it needs; or the thing at its own size and place, its menu over it
-/// when it is low on the screen and under it otherwise, on its side.
+/// Places a thing lifted and its menu, the two in that order: a card across the screen where the thing was,
+/// moved up as far as its menu under it needs; or the thing at its own size and place, its menu over it when it
+/// is low on the screen and under it otherwise, on its side.
 private struct LiftLayout: Layout {
-    static let margin: CGFloat = 16
-
     let source: CGRect
     let card: Bool
-    let lifted: Bool
     let top: CGFloat
     let bottom: CGFloat
 
@@ -401,7 +374,7 @@ private struct LiftLayout: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard subviews.count == 2 else { return }
-        let margin = Self.margin
+        let margin: CGFloat = 16
         let gap: CGFloat = 10
         let from = source.offsetBy(dx: bounds.minX, dy: bounds.minY)
         let highest = bounds.minY + top
@@ -410,7 +383,7 @@ private struct LiftLayout: Layout {
         if card {
             let width = bounds.width - margin * 2
             let height = subviews[0].sizeThatFits(ProposedViewSize(width: width, height: nil)).height
-            let y = lifted ? max(highest, min(from.minY, lowest - height - gap - menu.height)) : from.minY
+            let y = max(highest, min(from.minY, lowest - height - gap - menu.height))
             subviews[0].place(at: CGPoint(x: bounds.minX + margin, y: y),
                               proposal: ProposedViewSize(width: width, height: height))
             subviews[1].place(at: CGPoint(x: bounds.maxX - margin - menu.width, y: y + height + gap),
