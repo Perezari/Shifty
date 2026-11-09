@@ -37,6 +37,14 @@ struct ShiftsView: View {
             .onAppear { shown = true }
             .onDisappear { shown = false }
             .toolbar {
+                // back to the period of today, from any other
+                if offset != 0 {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("היום") {
+                            withAnimation { offset = 0 }
+                        }
+                    }
+                }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         if pro.unlocked { reporting = true } else { pro.offer() }

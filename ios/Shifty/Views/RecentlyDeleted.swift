@@ -40,7 +40,7 @@ struct RecentlyDeletedPage: View {
                         .padding(.top, 4)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, ScreenMargin.side)
             .padding(.top, 8)
             .padding(.bottom, 24)
         }

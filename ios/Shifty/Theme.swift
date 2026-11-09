@@ -24,6 +24,11 @@ enum CardLook {
     static let key = "glassCards"
 }
 
+/// The side margin of every screen: their cards' edges stay in place from tab to tab.
+enum ScreenMargin {
+    static let side: CGFloat = 20
+}
+
 /// The Hebrew date beside the Gregorian, this device's (Settings › תצוגה): on the dial, in each day of the calendar
 /// and over a day's shifts.
 enum HebrewDates {

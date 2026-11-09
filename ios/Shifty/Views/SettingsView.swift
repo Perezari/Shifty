@@ -148,7 +148,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, ScreenMargin.side)
             .padding(.top, 4)
             .padding(.bottom, 24)
         }

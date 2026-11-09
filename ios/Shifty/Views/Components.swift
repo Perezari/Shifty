@@ -402,7 +402,7 @@ extension View {
     func cardRow() -> some View {
         listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
-            .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+            .listRowInsets(EdgeInsets(top: 5, leading: ScreenMargin.side, bottom: 5, trailing: ScreenMargin.side))
     }
 }
 
@@ -645,7 +645,7 @@ struct DayOffSheet: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, ScreenMargin.side)
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

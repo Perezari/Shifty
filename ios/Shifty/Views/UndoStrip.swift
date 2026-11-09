@@ -81,7 +81,7 @@ struct UndoStrip: View {
             // the text, its gray and the tint as the other look draws them, to stand on the capsule
             .environment(\.colorScheme, scheme == .dark ? .light : .dark)
             .shadow(color: .black.opacity(scheme == .dark ? 0.5 : 0.25), radius: 18, y: 8)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, ScreenMargin.side)
             .padding(.bottom, 10)
     }
 

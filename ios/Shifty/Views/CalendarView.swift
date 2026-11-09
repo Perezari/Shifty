@@ -29,6 +29,16 @@ struct CalendarView: View {
             .background(Color.appBackground.ignoresSafeArea())
             .navigationTitle("לוח")
             .minutes($now)
+            .toolbar {
+                // back to the period of today, from any other
+                if offset != 0 {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("היום") {
+                            withAnimation { offset = 0 }
+                        }
+                    }
+                }
+            }
             .sheet(item: $opened) { day in
                 // its own place to lift a shift over, as a sheet is drawn over the tabs
                 DayDetail(date: day.date)
@@ -122,11 +132,11 @@ struct CalendarView: View {
                         }
                     }
                 }
-                .card(padding: 8)
+                .card(padding: 6)
                 SummaryCard(cells: cells)
                 PeriodCards(summary: summary, shifts: store.shifts, settings: settings, date: date)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, ScreenMargin.side)
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
@@ -493,7 +503,7 @@ struct DayDetail: View {
                 .buttonStyle(.glass)
                 .controlSize(.large)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, ScreenMargin.side)
             .padding(.top, 8)
             .padding(.bottom, 24)
         }

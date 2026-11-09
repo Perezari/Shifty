@@ -49,7 +49,7 @@ struct NowView: View {
                     cards(at: context.date)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, ScreenMargin.side)
             .padding(.top, 8)
             .padding(.bottom, 24)
         }

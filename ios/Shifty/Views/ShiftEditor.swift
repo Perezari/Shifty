@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A shift by hand, new or edited: its workplace, with more than one; its day, its hours in 24-hour time, its
-/// break in minutes, Shabbat or holiday and a note; and deleting it (app.js openShiftEditor).
+/// A shift by hand, new or edited: what it comes to as it changes; its workplace, with more than one; its day, its hours
+/// in 24-hour time, its break in minutes, Shabbat or holiday and a note; and deleting it (app.js openShiftEditor).
 struct ShiftEditor: View {
     /// The shift edited; nil for a new one.
     let shift: Shift?
@@ -38,6 +38,11 @@ struct ShiftEditor: View {
         let settings = store.settings
         NavigationStack {
             Form {
+                if dayOff == nil && loaded {
+                    Section {
+                        sumRow
+                    }
+                }
                 if dayOff == nil && !settings.workplaces.isEmpty {
                     Section {
                         Picker("מקום עבודה", selection: $workplace) {
@@ -119,6 +124,32 @@ struct ShiftEditor: View {
         .onChange(of: workplace) { _, _ in markRest() }
     }
 
+    /// What the shift comes to as the editor has it now: its hours, its overtime and its wage, none paid by a month's pay.
+    @ViewBuilder
+    private var sumRow: some View {
+        let settings = store.settings
+        let draft = edited(shift ?? Shift(id: "draft", start: date))
+        let now = Date().ms
+        let others = store.shifts.filter { $0.id != draft.id }
+        let b = Calc.breakdown(draft, settings, asOf: now, before: Calc.workedBefore(of: draft, in: others + [draft], settings, asOf: now))
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(Format.hoursShort(b.netHours))
+                .font(.headline)
+            if b.overtimeHours > 0.01 {
+                Text(Format.hoursToHM(b.overtimeHours) + " נוספות")
+                    .font(.subheadline)
+                    .foregroundStyle(Color("Holiday"))
+            }
+            Spacer(minLength: 8)
+            if !settings.isMonthly(draft) {
+                Text(Format.money(b.pay, settings.currency))
+                    .font(.headline)
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .monospacedDigit()
+    }
+
     /// A new shift marked Shabbat or a holiday by its day and hour, where overtime is counted as the law does; the
     /// switch can still change it.
     private func markRest() {
@@ -197,7 +228,8 @@ struct ShiftEditor: View {
         return Int(jsRound(ms / 60000))
     }
 
-    private func save() {
+    /// `base` as the editor has it now.
+    private func edited(_ base: Shift) -> Shift {
         let d = LocalTime.parts(date)
         let s = LocalTime.parts(start)
         let startDate = LocalTime.date(d.year, d.month0, d.day, s.hour, s.minute)
@@ -208,7 +240,7 @@ struct ShiftEditor: View {
             if value <= startDate { value = LocalTime.addingDays(1, to: value) } // over midnight
             endDate = value
         }
-        var edited = shift ?? Shift(id: ShiftStore.newID(), start: startDate)
+        var edited = base
         edited.start = startDate
         edited.end = endDate
         edited.isHoliday = isHoliday
@@ -221,7 +253,11 @@ struct ShiftEditor: View {
         } else {
             edited.breaks = []
         }
-        store.upsert(edited)
+        return edited
+    }
+
+    private func save() {
+        store.upsert(edited(shift ?? Shift(id: ShiftStore.newID(), start: date)))
         dismiss()
     }
 

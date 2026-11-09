@@ -438,7 +438,7 @@ struct WorkplacePage: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, ScreenMargin.side)
             .padding(.top, 4)
             .padding(.bottom, 24)
         }

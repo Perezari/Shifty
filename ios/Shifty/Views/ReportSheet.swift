@@ -39,7 +39,7 @@ struct ReportSheet: View {
                 options
                 page
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, ScreenMargin.side)
             .padding(.top, 8)
             .background(Color.appBackground.ignoresSafeArea())
             .navigationTitle("דוח שעות")
