@@ -365,8 +365,9 @@ private struct LiftLayout: Layout {
     }
 }
 
-/// A lifted thing's menu on glass, as iOS's: each item's title from the right and its symbol on the left, and a
-/// line between the parts.
+/// A lifted thing's menu, solid over the blur as a lifted card is (glass let the screen under it show through, the bar
+/// of the Shifts screen under its plus's most of all): each item's title from the right and its symbol on the left, and
+/// a line between the parts.
 private struct LiftMenu: View {
     let sections: [LiftSection]
     let pick: (LiftItem) -> Void
@@ -394,7 +395,8 @@ private struct LiftMenu: View {
         }
         .padding(.vertical, 6)
         .frame(width: 250)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(Color.appBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
     }
 
     private func row(_ item: LiftItem) -> some View {

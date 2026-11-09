@@ -84,11 +84,12 @@ struct PeriodBar: View {
     }
 }
 
-/// Any month of any year, for its pay period (app.js openPeriodPicker).
+/// Any month of any year, for its pay period (app.js openPeriodPicker), each with what it came to (Calc.monthIncomes).
 struct PeriodPicker: View {
     /// The month shown now.
     let current: (year: Int, month0: Int)
     let pick: (Int, Int) -> Void
+    @Environment(ShiftStore.self) private var store
     @Environment(\.dismiss) private var dismiss
     @State private var year: Int
 
@@ -98,7 +99,16 @@ struct PeriodPicker: View {
         _year = State(initialValue: current.year)
     }
 
+    /// What each month of the year came to, as its button says it.
+    private func monthIncomes() -> [String?] {
+        let currency = store.settings.currency
+        return Calc.monthIncomes(store.shifts, store.settings, year: year, asOf: Date().ms).map { income in
+            income.map { Format.moneyShort($0, currency) }
+        }
+    }
+
     var body: some View {
+        let incomes = monthIncomes()
         NavigationStack {
             VStack(spacing: 18) {
                 HStack {
@@ -126,7 +136,8 @@ struct PeriodPicker: View {
                 .buttonStyle(.plain)
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                     ForEach(0..<12, id: \.self) { month in
-                        MonthButton(name: Format.monthName(month), on: year == current.year && month == current.month0) {
+                        MonthButton(name: Format.monthName(month), income: incomes[month],
+                                    on: year == current.year && month == current.month0) {
                             pick(year, month)
                             dismiss()
                         }
@@ -156,25 +167,35 @@ struct PeriodPicker: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.height(400)])
     }
 }
 
 private struct MonthButton: View {
     let name: String
+    /// What it came to, when anything is recorded in it.
+    let income: String?
     let on: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(name)
-                .font(.body.weight(on ? .semibold : .regular))
-                .foregroundStyle(on ? Color.white : Color.primary)
-                .frame(maxWidth: .infinity, minHeight: 46)
-                .background {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(on ? Color.accentColor : Color.primary.opacity(0.06))
+            VStack(spacing: 1) {
+                Text(name)
+                    .font(.body.weight(on ? .semibold : .regular))
+                    .foregroundStyle(on ? Color.white : Color.primary)
+                if let income {
+                    Text(income)
+                        .font(.caption2.weight(.medium))
+                        .monospacedDigit()
+                        .foregroundStyle(on ? Color.white.opacity(0.85) : Color.secondary)
                 }
+            }
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .background {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(on ? Color.accentColor : Color.primary.opacity(0.06))
+            }
         }
         .buttonStyle(.plain)
     }

@@ -155,6 +155,16 @@ extension Calc {
         return fixed + variable + variable / Double(totals.workedDays) * Double(left)
     }
 
+    /// What each month of a year came to, the period picker's: the income of its period, the one around its 15th as the
+    /// picker takes it; nil for one still ahead of `now`, or with nothing recorded in it. `shifts` are all of them.
+    static func monthIncomes(_ shifts: [Shift], _ s: Settings, year: Int, asOf now: Double) -> [Double?] {
+        (0..<12).map { month0 -> Double? in
+            let range = period(around: LocalTime.date(year, month0, 15), monthStartDay: s.monthStartDay)
+            guard range.start.ms <= now, shifts.contains(where: { !$0.deleted && inRange($0, range) }) else { return nil }
+            return periodTotals(shifts, s, range: range, asOf: now).total
+        }
+    }
+
     /// A period's weeks, each as far as it lies in the period, their hours adding up to the period's.
     static func periodWeeks(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> [PeriodWeek] {
         var weeks: [PeriodWeek] = []

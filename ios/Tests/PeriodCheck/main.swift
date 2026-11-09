@@ -980,5 +980,32 @@ func cardChecks() {
 }
 cardChecks()
 
+// the period picker's sums (Calc.monthIncomes)
+func monthChecks() {
+    var settings = Settings()
+    settings.standardByDay = [8, 8, 8, 8, 8, nil, nil]
+    settings.hourlyWage = 50
+    let asOf = LocalTime.date(2026, 10, 20, 9).ms // 20 November 2026
+    let list = [work(2, 8, 16), Shift(id: "m", start: LocalTime.date(2026, 2, 3, 8), end: LocalTime.date(2026, 2, 3, 12))]
+    let months = Calc.monthIncomes(list, settings, year: 2026, asOf: asOf)
+    expect(months.count == 12 && near(months[10] ?? 0, 8 * 50) && near(months[2] ?? 0, 4 * 50), "the months with shifts: \(months)")
+    expect(months[0] == nil && months[11] == nil, "nothing for one with nothing, or one ahead")
+    expect(Calc.monthIncomes(list, settings, year: 2027, asOf: asOf).allSatisfy { $0 == nil }, "a year ahead")
+    // a month's pay is counted only where something is recorded
+    var global = settings
+    global.payTerms = [PayTerms(id: "g", from: PayTerms.start, kind: .monthly, monthlySalary: 10_000)]
+    let globalMonths = Calc.monthIncomes(list, global, year: 2026, asOf: asOf)
+    expect(near(globalMonths[10] ?? 0, 10_000) && globalMonths[0] == nil, "a month's pay in a month with a record")
+    // by its pay period: from the 25th, November is the period from 25 October
+    var late = settings
+    late.monthStartDay = 25
+    let lateMonths = Calc.monthIncomes([work(26, 8, 16)], late, year: 2026, asOf: LocalTime.date(2026, 11, 30).ms)
+    expect(near(lateMonths[11] ?? 0, 8 * 50) && lateMonths[10] == nil, "26 November is December's: \(lateMonths)")
+    var gone = work(2, 8, 16)
+    gone.deleted = true
+    expect(Calc.monthIncomes([gone], settings, year: 2026, asOf: asOf)[10] == nil, "a deleted one is nothing")
+}
+monthChecks()
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

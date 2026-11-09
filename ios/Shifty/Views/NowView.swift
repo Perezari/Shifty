@@ -33,6 +33,11 @@ struct NowView: View {
     @State private var draftStart: Date?
     /// The start just moved: the shift, its start before, and until when it can be undone.
     @State private var startUndo: (shift: String, start: Date, until: Date)?
+    /// How much of the arc is drawn, from 0 to 1: it runs along the dial as a shift starts.
+    @State private var drawn = 1.0
+    /// The dial's middle shows the time left to the goal, not the time worked: a tap on it changes that.
+    @AppStorage("dialShowsLeft") private var showsLeft = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let running = store.active != nil
@@ -84,10 +89,11 @@ struct NowView: View {
                 press(kind, at: moment)
             }
         }
-        .onChange(of: store.active?.id) { _, _ in
+        .onChange(of: store.active?.id) { old, new in
             plan = nil
             draftStart = nil
             startUndo = nil
+            if old == nil, new != nil, shown { drawArc() }
         }
         .onAppear {
             shown = true
@@ -274,12 +280,11 @@ struct NowView: View {
                           plan = Calc.dialTime(degrees, start: active.start, now: Date())
                       },
                       moveStart: plan == nil ? moveStart(to:) : nil,
-                      movingStart: draftStart != nil) {
+                      movingStart: draftStart != nil, drawn: drawn) {
                 if let leave = plan {
                     planCenter(active, leave: leave, settings, at: date, global: overtime != nil)
                 } else {
-                    shiftCenter(hoursText: Format.timer(status.netMs), pay: status.pay, overtime: overtime, faint: false, settings, at: date,
-                                note: note, undo: undo != nil ? undoStart : nil)
+                    runningCenter(status, overtime: overtime, settings, at: date, note: note, undo: undo != nil ? undoStart : nil)
                 }
             }
         } else if let off = Self.offToday(in: shifts, on: date) {
@@ -293,6 +298,38 @@ struct NowView: View {
                 shiftCenter(hoursText: Format.hoursToHM(status.netHours), pay: status.pay, overtime: overtime,
                             faint: status.netHours == 0, settings, at: date)
             }
+        }
+    }
+
+    /// A running shift's middle: the time worked, or the time left to the goal and past it the time beyond it; a tap
+    /// changes which, and it stays so.
+    private func runningCenter(_ status: NowStatus, overtime: MonthOvertime?, _ settings: Settings, at date: Date,
+                               note: (text: String, accent: Bool)?, undo: (() -> Void)?) -> some View {
+        let left = status.remaining * Calc.hour
+        let past = status.remaining <= 0.001
+        let time: String = !showsLeft ? Format.timer(status.netMs) : past ? "+" + Format.timer(-left) : Format.timer(left)
+        let leftLine: (text: String, accent: Bool)? = showsLeft ? (past ? "מעבר ליעד" : "נשארו עד היעד", false) : nil
+        return shiftCenter(hoursText: time, pay: status.pay, overtime: overtime, faint: false, settings, at: date,
+                           note: note ?? leftLine, undo: undo, timeColor: showsLeft && past ? Color("Holiday") : nil)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                showsLeft.toggle()
+                UISelectionFeedbackGenerator().selectionChanged()
+            }
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("מחליף בין הזמן שעבר לזמן שנשאר")
+    }
+
+    /// A shift just started: its arc runs along the dial to the goal's flag, which comes up as it arrives, with a tap.
+    private func drawArc() {
+        guard !reduceMotion else { return }
+        drawn = 0
+        Task {
+            // the arc gone first, for a frame, or the two changes are one and nothing moves
+            try? await Task.sleep(for: .milliseconds(40))
+            withAnimation(.easeInOut(duration: 0.7)) { drawn = 1 }
+            try? await Task.sleep(for: .milliseconds(700))
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 
@@ -337,7 +374,8 @@ struct NowView: View {
     /// The day, the time worked and the wage: the running shift's, or today's. A global pay's has the period's
     /// overtime instead of the wage, and with a bonus at targets, the hours left to the next.
     private func shiftCenter(hoursText: String, pay: Double, overtime: MonthOvertime?, faint: Bool, _ settings: Settings,
-                             at date: Date, note: (text: String, accent: Bool)? = nil, undo: (() -> Void)? = nil) -> some View {
+                             at date: Date, note: (text: String, accent: Bool)? = nil, undo: (() -> Void)? = nil,
+                             timeColor: Color? = nil) -> some View {
         VStack(spacing: 8) {
             // the day, or the start dragged instead
             Text(note?.text ?? dayLine(date, settings))
@@ -351,7 +389,7 @@ struct NowView: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-                .foregroundStyle(faint ? Color.secondary : Color.primary)
+                .foregroundStyle(timeColor ?? (faint ? Color.secondary : Color.primary))
             if let overtime {
                 Text(Format.hoursToHM(overtime.hours) + " נוספות החודש")
                     .font(.system(size: 23, weight: .semibold, design: .rounded))
@@ -996,6 +1034,8 @@ private struct ShiftDial<Center: View>: View {
     var moveStart: ((Double?) -> Void)? = nil
     /// The start being dragged: it has a halo, as the flag has.
     var movingStart = false
+    /// How much of the arc is drawn, from 0 to 1.
+    var drawn = 1.0
     @ViewBuilder var center: Center
 
     var body: some View {
@@ -1017,6 +1057,7 @@ private struct ShiftDial<Center: View>: View {
         let c = size / 2
         let r = size * 160 / 350
         let w = size * 22 / 350
+        let extent = layout.pieces.map(\.to).max() ?? 360
         return ZStack {
             DialFace(size: size)
             ZStack {
@@ -1027,6 +1068,16 @@ private struct ShiftDial<Center: View>: View {
                         .frame(width: r * 2, height: r * 2)
                         .rotationEffect(.degrees(layout.startDeg - 90))
                 }
+            }
+            .frame(width: size, height: size)
+            // a shift just started: the arc comes out of its start, by one mask, since each second's pieces are new
+            // views and what is new has no animation to go on with
+            .mask {
+                Circle()
+                    .trim(from: 0, to: min(extent + 1, 360) / 360 * drawn)
+                    .stroke(style: StrokeStyle(lineWidth: w + 4, lineCap: .butt))
+                    .frame(width: r * 2, height: r * 2)
+                    .rotationEffect(.degrees(layout.startDeg - 90))
             }
             .shadow(color: Color.accentColor.opacity(glow ? 0.6 : 0), radius: glow ? 18 : 0)
             marks(c, r)
@@ -1066,6 +1117,8 @@ private struct ShiftDial<Center: View>: View {
             knobView
                 .position(Self.point(layout.startDeg + layout.nowDeg, r, c))
             flag
+                .scaleEffect(0.4 + 0.6 * drawn)
+                .opacity(drawn)
                 .position(Self.point(layout.startDeg + (layout.leaveDeg ?? goal), r, c))
                 .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("dial"))
                     .onChanged { value in

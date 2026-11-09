@@ -99,6 +99,7 @@ struct ShiftsView: View {
                 PeriodPicker(current: Calc.periodMonth(range)) { year, month in
                     offset = Calc.periodOffset(year: year, month0: month, monthStartDay: store.settings.monthStartDay, now: Date())
                 }
+                .environment(store)
             }
             #if DEBUG
             .task {
