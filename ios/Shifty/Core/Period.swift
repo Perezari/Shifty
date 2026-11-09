@@ -149,6 +149,29 @@ extension Calc {
         return fixed + variable + variable / Double(totals.workedDays) * Double(left)
     }
 
+    /// The days of a period, by day key, that were days of work and passed with nothing recorded: the calendar's dashed
+    /// frame. Before today, on a weekday with a standard at a workplace whose work went on then, not a holiday; from the
+    /// pay period of the first record on, so that months before the app was in use stay clean, while that period's first
+    /// days ask to be filled in. A sum once is no record. `shifts` are all of them.
+    static func unrecordedDays(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> Set<String> {
+        let records = shifts.filter { !$0.deleted && $0.type != .adjustment }
+        guard let first = records.map(\.start).min() else { return [] }
+        let recorded = Set(records.map { LocalTime.dayKey($0.start) })
+        let places = [s.place(nil)] + s.workplaces
+        let today = LocalTime.startOfDay(Date(ms: now))
+        var days = Set<String>()
+        var day = LocalTime.startOfDay(max(range.start, period(around: first, monthStartDay: s.monthStartDay).start))
+        while day < range.end && day < today {
+            let key = LocalTime.dayKey(day)
+            if !recorded.contains(key), !(s.holidaysEnabled && Holidays.info(day).kind == .chag),
+               places.contains(where: { $0.employs(day) && workdayStandard($0, day) != nil }) {
+                days.insert(key)
+            }
+            day = LocalTime.addingDays(1, to: day)
+        }
+        return days
+    }
+
     /// The next shortened day or holiday after `date`, within `days` days.
     static func nextHoliday(after date: Date, within days: Int) -> (date: Date, info: Holidays.Info)? {
         let today = LocalTime.startOfDay(date)

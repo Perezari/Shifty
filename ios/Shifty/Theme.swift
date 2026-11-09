@@ -30,6 +30,12 @@ enum HebrewDates {
     static let key = "hebrewDate"
 }
 
+/// The dashed frame on a past day of work with nothing recorded, this device's (Settings › תצוגה): on by default, and
+/// off for whoever does not work by a fixed week.
+enum UnrecordedDays {
+    static let key = "unrecordedDays"
+}
+
 extension EnvironmentValues {
     /// The cards are of glass (CardLook), set over the tabs.
     @Entry var glassCards = false

@@ -19,7 +19,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   workplace takes an automatic break; then the week, the pay period, a holiday coming and each workplace's
   days off left), `ShiftsView`
   (a pay period's shifts, its hours, hours missing and income), `CalendarView` (the period as a heat map
-  of the work, a day off filling its day in its color with its symbol, `ShiftType.dayOffColor`, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (the user's own
+  of the work, its days square and as large as the screen's width has room for, a day off filling its day in its color with its symbol,
+  `ShiftType.dayOffColor`, a past day of work with nothing recorded in a dashed frame, and a day's sheet, `DayDetail`, to add a shift or a day off), `SettingsView` (the user's own
   settings: the holidays, the income goal, the credit points, the look, the notifications, the lock, iCloud,
   and the backup to a file and back), `UndoStrip` (a deletion offered back for six seconds at the bottom of
   the Shifts list, the calendar and a day's sheet), `RecentlyDeleted` (Settings › נמחקו לאחרונה: the shifts
@@ -31,7 +32,7 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   place's reminder; and the sheet of a pay: by the hour or global, what a global pay does with the overtime, all
   of it covered, some hours, none, or a bonus at each target of hours a month, and an annual bonus) and
   `ShiftEditor` (a shift by hand), `AdjustmentSheet` (a sum once on a day, added or taken off) and `ReportSheet` (the
-  pay period's hours report as a PDF, Shifty Pro, on `Core/Report.swift`). `Components` holds what they share: the period's bar and picker, the
+  pay period's hours report, or the year's on one page for Form 106, as a PDF, Shifty Pro, on `Core/Report.swift`). `Components` holds what they share: the period's bar and picker, the
   summary card, a shift's row, the settings' cards and the wheel of hours and minutes.
 - `Shifty/Live/`: the shift outside the app. `ShiftIntents` holds what its buttons do (start, end, a
   break, as App Intents that the system performs in the app, woken in the background if need be),

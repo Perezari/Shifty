@@ -3,7 +3,8 @@ import UIKit
 
 /// The last deletion, for six seconds at the bottom of a screen that deletes (the Shifts list, the calendar, a day's
 /// sheet), above its tab bar: what was deleted, and ביטול to bring it back. After it, the deletion is still in
-/// Settings › נמחקו לאחרונה. Set as the screen's bottom safe area, so that its last row scrolls above it.
+/// Settings › נמחקו לאחרונה. Set as the screen's bottom safe area, so that its last row scrolls above it. Also what is
+/// left after a day off is added, with Shifty Pro where the days left are kept (there and on the Now screen).
 ///
 /// It has to be seen: a solid capsule in the other look's colors (dark on a light screen, light on a dark one) with
 /// a shadow, rising with a bounce and a tap of the iPhone. Glass, as at first, sank into the cards and the tab bar.
@@ -31,12 +32,62 @@ struct UndoStrip: View {
                         // the list's room for it closing smoothly too
                         withAnimation(.easeOut(duration: 0.25)) { store.forget(deletion) }
                     }
+            } else if let added = store.addedDayOff, Date().timeIntervalSince(added.at) < Self.seconds, let text = left(added) {
+                capsule {
+                    HStack(spacing: 12) {
+                        Image(systemName: added.type.dayOffSymbol)
+                            .font(.subheadline)
+                            .foregroundStyle(added.type.dayOffColor)
+                        Text(text)
+                            .font(.body.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                        Spacer(minLength: 8)
+                    }
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .task(id: added.at) {
+                    let left = Self.seconds - Date().timeIntervalSince(added.at)
+                    if left > 0 { try? await Task.sleep(for: .seconds(left)) }
+                    guard !Task.isCancelled else { return }
+                    withAnimation(.easeOut(duration: 0.25)) { store.forget(added) }
+                }
             }
         }
         .animation(.spring(duration: 0.4, bounce: 0.3), value: store.deletion)
+        .animation(.spring(duration: 0.4, bounce: 0.3), value: store.addedDayOff)
+    }
+
+    /// "נשארו 11.5 ימי חופש", as of the day added when it is still ahead; nil without Shifty Pro, for a day of reserve
+    /// duty, and where the workplace does not keep its days left.
+    private func left(_ added: AddedDayOff) -> String? {
+        guard ProFlag.on, added.type == .vacation || added.type == .sick, let shift = store.shift(added.id),
+              let balance = Calc.leave(store.shifts, store.settings, asOf: max(Date(), shift.start),
+                                       at: store.settings.workplace(of: shift)?.id) else { return nil }
+        let days = added.type == .vacation ? balance.vacation : balance.sick
+        let word = added.type == .vacation ? "חופש" : "מחלה"
+        if days < -0.04 { return "חריגה של " + Format.days(-days) + " ימי " + word }
+        if Format.days(days) == "1" { return "נשאר יום " + word + " אחד" }
+        return "נשארו " + Format.days(days) + " ימי " + word
+    }
+
+    /// The solid capsule in the other look's colors.
+    private func capsule<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .foregroundStyle(.primary)
+            .padding(.leading, 20)
+            .padding(.trailing, 4)
+            .frame(height: 54)
+            .background(Capsule().fill(Color(white: scheme == .dark ? 0.94 : 0.12)))
+            // the text, its gray and the tint as the other look draws them, to stand on the capsule
+            .environment(\.colorScheme, scheme == .dark ? .light : .dark)
+            .shadow(color: .black.opacity(scheme == .dark ? 0.5 : 0.25), radius: 18, y: 8)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
     }
 
     private func strip(_ deletion: Deletion) -> some View {
+        capsule {
         HStack(spacing: 12) {
             Image(systemName: "trash.fill")
                 .font(.subheadline)
@@ -59,16 +110,7 @@ struct UndoStrip: View {
             .foregroundStyle(.tint)
             .accessibilityLabel("ביטול המחיקה")
         }
-        .foregroundStyle(.primary)
-        .padding(.leading, 20)
-        .padding(.trailing, 4)
-        .frame(height: 54)
-        .background(Capsule().fill(Color(white: scheme == .dark ? 0.94 : 0.12)))
-        // the text, its gray and the tint as the other look draws them, to stand on the capsule
-        .environment(\.colorScheme, scheme == .dark ? .light : .dark)
-        .shadow(color: .black.opacity(scheme == .dark ? 0.5 : 0.25), radius: 18, y: 8)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 10)
+        }
     }
 
     /// "המשמרת נמחקה", "יום החופש נמחק", or "2 משמרות נמחקו".

@@ -445,7 +445,7 @@ extension Calc {
     }
 
     /// A workplace's standard hours on a day, by its weekday; nil on a day it does not work.
-    private static func workdayStandard(_ place: Workplace, _ day: Date) -> Double? {
+    static func workdayStandard(_ place: Workplace, _ day: Date) -> Double? {
         let weekday = LocalTime.parts(day).weekday
         guard place.standardByDay.indices.contains(weekday), let hours = place.standardByDay[weekday], hours > 0 else { return nil }
         return hours

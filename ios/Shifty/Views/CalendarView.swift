@@ -17,6 +17,7 @@ struct CalendarView: View {
     /// The minute the month shows, again each minute while it is on screen.
     @State private var now = Date()
     @AppStorage(HebrewDates.key) private var hebrewDate = false
+    @AppStorage(UnrecordedDays.key) private var marksUnrecorded = true
 
     var body: some View {
         let range = Calc.period(around: now, monthStartDay: store.settings.monthStartDay, offset: offset)
@@ -76,6 +77,7 @@ struct CalendarView: View {
                                  by: { LocalTime.dayKey($0.start) })
         let sick = Calc.sickDates(of: store.shifts)
         let before = Calc.workedBefore(store.shifts, settings, range: range, asOf: date.ms)
+        let unrecorded: Set<String> = marksUnrecorded ? Calc.unrecordedDays(store.shifts, settings, range: range, asOf: date.ms) : []
         let cells = [
             SummaryCell(title: "ימי עבודה", value: String(summary.totals.workedDays)),
             SummaryCell(title: "שעות", value: Format.hoursToHM(summary.totals.netHours)),
@@ -86,7 +88,8 @@ struct CalendarView: View {
             VStack(spacing: 12) {
                 PeriodBar(range: range, offset: $offset, hebrew: hebrewDate) { picking = true }
                 VStack(spacing: 8) {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 5), count: 7), spacing: 5) {
+                    // the days as large as the screen's width has room for, square
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 4) {
                         ForEach(Format.weekdays, id: \.self) { name in
                             Text(name.replacingOccurrences(of: "׳", with: ""))
                                 .font(.caption.weight(.semibold))
@@ -96,7 +99,8 @@ struct CalendarView: View {
                             let key = LocalTime.dayKey(day)
                             let inPeriod = day >= range.start && day < range.end
                             let cell = DayCell(date: day, inPeriod: inPeriod, today: key == today,
-                                               sum: inPeriod ? summary.days[key] : nil, settings: settings, hebrew: hebrewDate)
+                                               sum: inPeriod ? summary.days[key] : nil, settings: settings, hebrew: hebrewDate,
+                                               unrecorded: unrecorded.contains(key))
                             if inPeriod {
                                 let onDay = (records[key] ?? []).sorted { $0.start < $1.start }
                                 Button {
@@ -118,10 +122,20 @@ struct CalendarView: View {
                         }
                     }
                 }
-                .card(padding: 12)
+                .card(padding: 8)
+                if !unrecorded.isEmpty {
+                    HStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .strokeBorder(Color.secondary.opacity(0.75), style: StrokeStyle(lineWidth: 1.2, dash: [2.5, 2.5]))
+                            .frame(width: 13, height: 13)
+                        Text(unrecorded.count == 1 ? "יום עבודה אחד בלי רישום" : "\(unrecorded.count) ימי עבודה בלי רישום")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 SummaryCard(cells: cells)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 10)
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
@@ -154,9 +168,9 @@ struct DayRef: Identifiable {
     var id: String { LocalTime.dayKey(date) }
 }
 
-/// A day of the calendar. Every day has the same lines at the same heights, so that the numbers of a week stay on one
-/// line: the Hebrew day over the number when the Hebrew date is on, and under them what the day holds: the hours worked,
-/// a sum once or the holiday's name; a day off fills the whole day with its color, with its symbol under the number.
+/// A day of the calendar, square. Every day has the same lines at the same heights, so that the numbers of a week stay on
+/// one line: the number, and under it what the day holds: the hours worked, a sum once or the holiday's name; a day off
+/// fills the whole day with its color, with its symbol under the number. The Hebrew day is in its corner when it is on.
 private struct DayCell: View {
     let date: Date
     let inPeriod: Bool
@@ -164,18 +178,14 @@ private struct DayCell: View {
     let sum: DaySum?
     let settings: Settings
     let hebrew: Bool
+    /// A past day of work with nothing recorded (Calc.unrecordedDays): a dashed frame.
+    var unrecorded = false
 
     var body: some View {
         let _ = Perf.drew("יום")
         let holiday = holidayInfo
         let off = sum?.dayOff
         VStack(spacing: 0) {
-            if hebrew {
-                Text(verbatim: inPeriod ? Holidays.hebrewDate(date).day : " ")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(off != nil ? Color.white.opacity(0.85) : Color.secondary)
-                    .frame(height: 11)
-            }
             Text(verbatim: String(LocalTime.parts(date).day))
                 .font(.system(size: 16.5, weight: numberWeight))
                 .monospacedDigit()
@@ -183,13 +193,22 @@ private struct DayCell: View {
                 .frame(height: 20)
             Spacer(minLength: 0)
             under(off, holiday)
-                .frame(height: 20)
+                .frame(height: 18)
         }
-        .padding(.top, 6)
-        .padding(.bottom, 5)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
         .padding(.horizontal, 2)
-        .frame(maxWidth: .infinity)
-        .frame(height: hebrew ? 62 : 54)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .overlay(alignment: .topLeading) {
+            if hebrew && inPeriod {
+                Text(Holidays.hebrewDate(date).day)
+                    .font(.system(size: 8.5, weight: .medium))
+                    .foregroundStyle(off != nil ? Color.white.opacity(0.85) : Color.secondary)
+                    .padding(.top, 3)
+                    .padding(.leading, 4)
+            }
+        }
         .background {
             if let off {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -209,8 +228,12 @@ private struct DayCell: View {
                         .strokeBorder(Color.cardBackground, lineWidth: 1.4)
                         .padding(1.6)
                 }
+            } else if unrecorded {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(Color.secondary.opacity(0.75), style: StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
             }
         }
+        .accessibilityHint(unrecorded ? "יום עבודה בלי רישום" : "")
         .opacity(inPeriod ? 1 : 0.3)
         .contentShape(Rectangle())
     }

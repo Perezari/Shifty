@@ -1,8 +1,9 @@
 import PDFKit
 import SwiftUI
 
-/// A pay period's hours report at one workplace (Shifty Pro): a PDF to send to the employer, a manpower company or an
-/// accountant, seen as it will go. The worker's name on it stays on this iPhone; nothing leaves it but by the share.
+/// A pay period's hours report at one workplace, or its year on one page, to check Form 106 (Shifty Pro): a PDF to send
+/// to the employer, a manpower company or an accountant, seen as it will go. The worker's name on it stays on this
+/// iPhone; nothing leaves it but by the share.
 struct ReportSheet: View {
     /// A day of the pay period on screen: the report's is the one around it, by the workplace's own pay month.
     let around: Date
@@ -10,6 +11,9 @@ struct ReportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("reportName") private var name = ""
     @AppStorage("reportAmounts") private var amounts = true
+    @AppStorage("reportYearly") private var yearly = false
+    /// The yearly report's year.
+    @State private var year: Int
     /// nil for the settings' own workplace.
     @State private var place: String?
     @State private var file: URL?
@@ -19,6 +23,7 @@ struct ReportSheet: View {
     init(around: Date, place: String?) {
         self.around = around
         _place = State(initialValue: place)
+        _year = State(initialValue: LocalTime.parts(around).year)
     }
 
     var body: some View {
@@ -26,6 +31,27 @@ struct ReportSheet: View {
         NavigationStack {
             VStack(spacing: 12) {
                 VStack(spacing: 0) {
+                    Picker("סוג הדוח", selection: $yearly) {
+                        Text("תקופת שכר").tag(false)
+                        Text("שנה").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.vertical, 12)
+                    Divider()
+                    if yearly {
+                        HStack {
+                            Text("שנה")
+                            Spacer()
+                            Picker("שנה", selection: $year) {
+                                ForEach(Array(Set(Calc.reportYears(store.shifts, settings, place: place) + [year])).sorted(by: >), id: \.self) { value in
+                                    Text(verbatim: String(value)).tag(value)
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                        .settingsRow()
+                        Divider()
+                    }
                     if !settings.workplaces.isEmpty {
                         HStack {
                             Text("מקום עבודה")
@@ -91,13 +117,19 @@ struct ReportSheet: View {
                 }
             }
             // made again as the choices change, a moment after the last letter of a name
-            .task(id: (place ?? "") + "|" + name + "|" + String(amounts)) {
+            .task(id: (place ?? "") + "|" + name + "|" + String(amounts) + "|" + (yearly ? String(year) : "")) {
                 if made > 0 {
                     try? await Task.sleep(for: .milliseconds(300))
                     guard !Task.isCancelled else { return }
                 }
-                let report = Calc.report(store.shifts, store.settings, place: place, around: around, asOf: Date().ms)
-                file = ReportPDF.file(report, name: name.trimmingCharacters(in: .whitespacesAndNewlines), amounts: amounts)
+                let worker = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                if yearly {
+                    file = ReportPDF.file(Calc.yearReport(store.shifts, store.settings, place: place, year: year, asOf: Date().ms),
+                                          name: worker, amounts: amounts)
+                } else {
+                    file = ReportPDF.file(Calc.report(store.shifts, store.settings, place: place, around: around, asOf: Date().ms),
+                                          name: worker, amounts: amounts)
+                }
                 made += 1
             }
         }
@@ -150,6 +182,21 @@ enum ReportPDF {
                 draw(pdf)
                 pdf.endPDFPage()
             }
+        }
+        pdf.closePDF()
+        return url
+    }
+
+    /// A year's report, on its one page.
+    static func file(_ report: YearReport, name: String, amounts: Bool) -> URL? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("דוח שנתי \(report.year).pdf")
+        var box = CGRect(x: 0, y: 0, width: width, height: height)
+        guard let pdf = CGContext(url as CFURL, mediaBox: &box, nil) else { return nil }
+        let renderer = ImageRenderer(content: YearPage(report: report, name: name, amounts: amounts))
+        renderer.render { _, draw in
+            pdf.beginPDFPage(nil)
+            draw(pdf)
+            pdf.endPDFPage()
         }
         pdf.closePDF()
         return url
@@ -360,5 +407,112 @@ private struct ReportPage: View {
         }
         .font(.system(size: 8))
         .foregroundStyle(Color(white: 0.4))
+    }
+}
+
+/// A year on one page, right to left, black on white: its pay periods, each a row, and their total.
+private struct YearPage: View {
+    let report: YearReport
+    let name: String
+    let amounts: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("דוח שנתי")
+                    .font(.system(size: 20, weight: .bold))
+                Spacer()
+                Text(verbatim: String(report.year))
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            Text(name.isEmpty ? report.workplace : name + " · " + report.workplace)
+                .font(.system(size: 10.5))
+                .foregroundStyle(Color(white: 0.3))
+                .padding(.top, 3)
+                .padding(.bottom, 14)
+            cells(title: "תקופה", days: "ימים", hours: "שעות", overtime: "נוספות", vacation: "חופש", sick: "מחלה",
+                  gross: "ברוטו", tax: "מס הכנסה", insurance: "ב״ל ובריאות", saved: "פנסיה", net: "נטו")
+                .font(.system(size: 8.5, weight: .semibold))
+                .background(Color(white: 0.92))
+            ForEach(report.rows) { row in
+                rowLine(row)
+                    .font(.system(size: 9))
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(Color(white: 0.85))
+                            .frame(height: 0.5)
+                    }
+            }
+            if report.rows.isEmpty {
+                Text("אין נתונים בשנה זו")
+                    .font(.system(size: 10))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+            } else {
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(height: 0.75)
+                rowLine(report.total)
+                    .font(.system(size: 9.5, weight: .bold))
+            }
+            if amounts {
+                Text("הסכומים בשקלים. המס, הביטוח והפנסיה הם הערכה של האפליקציה לכל תקופה בנפרד, להשוואה מול טופס 106 של המעסיק.")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Color(white: 0.3))
+                    .padding(.top, 12)
+            }
+            Spacer(minLength: 0)
+            Text("הופק ב־Shifty.")
+                .font(.system(size: 8))
+                .foregroundStyle(Color(white: 0.4))
+        }
+        .monospacedDigit()
+        .padding(28)
+        .frame(width: ReportPDF.width, height: ReportPDF.height, alignment: .topLeading)
+        .background(Color.white)
+        .foregroundStyle(Color.black)
+        .environment(\.layoutDirection, .rightToLeft)
+        .environment(\.colorScheme, .light)
+    }
+
+    private func rowLine(_ row: YearReport.Row) -> some View {
+        cells(title: row.title, days: count(row.workedDays), hours: Format.hoursToHM(row.netHours),
+              overtime: row.overtimeHours > 0.001 ? Format.hoursToHM(row.overtimeHours) : "",
+              vacation: count(row.vacationDays), sick: count(row.sickDays), gross: number(row.gross), tax: number(row.incomeTax),
+              insurance: number(row.insurance), saved: number(row.saved), net: number(row.net))
+    }
+
+    /// A row of the table, the period on the right: without the amounts, its hours and days alone.
+    private func cells(title: String, days: String, hours: String, overtime: String, vacation: String, sick: String,
+                       gross: String, tax: String, insurance: String, saved: String, net: String) -> some View {
+        HStack(spacing: 0) {
+            Text(title)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 4)
+            Text(days).frame(width: 28)
+            Text(hours).frame(width: 40)
+            Text(overtime).frame(width: 36)
+            Text(vacation).frame(width: 26)
+            Text(sick).frame(width: 26)
+            if amounts {
+                Text(gross).frame(width: 52)
+                Text(tax).frame(width: 46)
+                Text(insurance).frame(width: 50)
+                Text(saved).frame(width: 40)
+                Text(net).frame(width: 52)
+            }
+        }
+        .frame(height: 24)
+    }
+
+    private func count(_ value: Int) -> String {
+        value > 0 ? String(value) : ""
+    }
+
+    /// A sum in whole shekels, its symbol left to the note.
+    private func number(_ value: Double) -> String {
+        Format.moneyShort(value, "").trimmingCharacters(in: .whitespaces)
     }
 }

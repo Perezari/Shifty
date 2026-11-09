@@ -14,6 +14,8 @@ final class ShiftStore {
     private(set) var records: [Shift]
     /// The last deletion made here, while the strip under the screen offers to bring it back (UndoStrip).
     private(set) var deletion: Deletion?
+    /// The last day off added here, while the strip under the screen tells what is left of its kind (UndoStrip).
+    private(set) var addedDayOff: AddedDayOff?
     /// Called after a change made here (not after one applied from the cloud), for the sync to push it.
     @ObservationIgnored var onChange: (() -> Void)?
     @ObservationIgnored private let folder: URL
@@ -236,7 +238,13 @@ final class ShiftStore {
         var shift = Shift(id: Self.newID(), start: noon, end: noon, type: type)
         shift.workplaceId = nextWorkplace
         upsert(shift)
+        addedDayOff = AddedDayOff(id: shift.id, type: type, at: Self.now())
         return shift
+    }
+
+    /// The strip's time is over.
+    func forget(_ added: AddedDayOff) {
+        if addedDayOff == added { addedDayOff = nil }
     }
 
     /// A sum once on a day, added or, below zero, taken off, anchored at noon as a day off is. It goes with the shifts:
@@ -353,6 +361,13 @@ final class ShiftStore {
             // Kept in memory; the next change writes the file again.
         }
     }
+}
+
+/// A day off just added.
+struct AddedDayOff: Equatable {
+    let id: String
+    let type: ShiftType
+    let at: Date
 }
 
 /// Shifts deleted together, by a swipe, a menu, the editor or a day's menu: what the strip brings back at once.

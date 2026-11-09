@@ -855,5 +855,89 @@ func reportChecks() {
 }
 reportChecks()
 
+// the days of work that passed with nothing recorded (Calc.unrecordedDays)
+func unrecordedChecks() {
+    var settings = Settings()
+    settings.standardByDay = [8, 8, 8, 8, 8, nil, nil]
+    let range = Calc.period(around: LocalTime.date(2026, 10, 15), monthStartDay: 1)
+    let asOf = LocalTime.date(2026, 10, 8, 9).ms // a Sunday
+    let list = [work(2, 8, 16), work(4, 8, 16), off(5, .vacation)].sorted { $0.start > $1.start }
+    let keys = { (day: Int) in LocalTime.dayKey(LocalTime.date(2026, 10, day)) }
+    expect(Calc.unrecordedDays(list, settings, range: range, asOf: asOf) == [keys(1), keys(3)],
+           "the period's first day and the 3rd; not a shift, a day off, Friday, Shabbat, today or what is ahead")
+    expect(Calc.unrecordedDays(list, settings, range: Calc.period(around: LocalTime.date(2026, 9, 15), monthStartDay: 1), asOf: asOf).isEmpty,
+           "nothing in the period before the first record's")
+    expect(Calc.unrecordedDays([], settings, range: range, asOf: asOf).isEmpty, "nothing with no records")
+    var adjustment = off(3, .vacation)
+    adjustment.type = .adjustment
+    adjustment.amount = 5
+    expect(Calc.unrecordedDays([adjustment], settings, range: range, asOf: asOf).isEmpty, "a sum alone is no record")
+    expect(Calc.unrecordedDays(list + [adjustment], settings, range: range, asOf: asOf).contains(keys(3)), "nor makes its day one")
+    // Yom Kippur 2026, Monday 21 September, is no day of work; its eve is
+    let holiday = TimeRange(start: LocalTime.date(2026, 8, 20), end: LocalTime.date(2026, 8, 23))
+    let around = [Shift(id: "h", start: LocalTime.date(2026, 8, 1, 8), end: LocalTime.date(2026, 8, 1, 16))]
+    let marked = Calc.unrecordedDays(around, settings, range: holiday, asOf: asOf)
+    expect(marked == [LocalTime.dayKey(LocalTime.date(2026, 8, 20)), LocalTime.dayKey(LocalTime.date(2026, 8, 22))], "the holiday left out")
+    // the work's span, and another workplace's week
+    var started = settings
+    started.startDate = LocalTime.date(2026, 10, 3)
+    expect(Calc.unrecordedDays(list, started, range: range, asOf: asOf) == [keys(3)], "not before the start date")
+    var ended = settings
+    ended.endDate = LocalTime.date(2026, 10, 1)
+    expect(Calc.unrecordedDays(list, ended, range: range, asOf: asOf) == [keys(1)], "not after the last day")
+    var two = settings
+    two.workplaces = [Workplace(id: "x", name: "שני", pay: [PayTerms(id: "p", from: PayTerms.start)], standardByDay: [nil, nil, nil, nil, nil, 5, nil])]
+    expect(Calc.unrecordedDays(list, two, range: range, asOf: asOf) == [keys(1), keys(3), keys(6)], "another workplace's Friday")
+    var there = work(3, 8, 9)
+    there.workplaceId = "x"
+    expect(!Calc.unrecordedDays(list + [there], two, range: range, asOf: asOf).contains(keys(3)), "a shift at any workplace records its day")
+    expect(Format.days(12) == "12" && Format.days(7.54) == "7.5" && Format.days(1.04) == "1", "days to a tenth")
+    let dial = Calc.dial(dayOff: .vacation, at: LocalTime.date(2026, 10, 3, 3))
+    expect(dial.pieces == [.init(from: 0, to: 360, kind: .dayOff(.vacation))] && dial.goalDeg == nil && near(dial.startDeg, 90), "a day off's whole round, now at 3:00")
+}
+unrecordedChecks()
+
+// the yearly report (Report.swift): its periods, by the year each counts in, and their total
+func yearChecksReport() {
+    var settings = Settings()
+    settings.hourlyWage = 50
+    settings.standardByDay = [8, 8, 8, 8, 8, nil, nil]
+    func shift(_ year: Int, _ month0: Int, _ day: Int) -> Shift {
+        Shift(id: "y\(year)-\(month0)-\(day)", start: LocalTime.date(year, month0, day, 8), end: LocalTime.date(year, month0, day, 18))
+    }
+    var vacationDay = off(3, .vacation)
+    vacationDay.id = "v"
+    let list = [shift(2025, 11, 10), shift(2026, 1, 3), shift(2026, 1, 4), shift(2026, 3, 7), shift(2026, 9, 6), vacationDay].sorted { $0.start > $1.start }
+    let asOf = LocalTime.date(2026, 10, 20).ms
+    let year = Calc.yearReport(list, settings, place: nil, year: 2026, asOf: asOf)
+    expect(year.rows.count == 11 && year.rows.first?.title == "ינואר" && year.rows.last?.title == "נובמבר", "January to the period of now, the empty ones too: \(year.rows.map(\.title))")
+    let february = year.rows[1]
+    expect(february.workedDays == 2 && near(february.netHours, 20) && near(february.overtimeHours, 4), "February's days and hours")
+    expect(near(february.gross, Calc.periodTotals(list, settings, range: Calc.period(around: LocalTime.date(2026, 1, 15), monthStartDay: 1), asOf: asOf).total), "its income")
+    expect(near(february.net, february.gross - february.incomeTax - february.insurance - february.saved), "and what is taken off it")
+    expect(year.rows.last?.vacationDays == 1, "November's day off")
+    expect(near(year.total.gross, year.rows.reduce(0) { $0 + $1.gross }) && year.total.workedDays == 4 && near(year.total.netHours, 40), "the total")
+    let before = Calc.yearReport(list, settings, place: nil, year: 2025, asOf: asOf)
+    expect(before.rows.map(\.title) == ["דצמבר"], "2025: from the first record's period")
+    expect(Calc.yearReport(list, settings, place: nil, year: 2027, asOf: asOf).rows.isEmpty, "a year ahead has none")
+    expect(Calc.reportYears(list, settings, place: nil) == [2026, 2025], "the years with a record, the last first")
+    // a period from the 25th counts in the year of its last day
+    var late = settings
+    late.monthStartDay = 25
+    let lateYear = Calc.yearReport(list, late, place: nil, year: 2026, asOf: asOf)
+    expect(lateYear.rows.first?.title == "25 בדצמבר – 24 בינואר", "from 25 December: \(lateYear.rows.map(\.title))")
+    expect(Calc.yearReport(list, late, place: nil, year: 2025, asOf: asOf).rows.count == 1, "2025's last")
+    // one workplace of two
+    var two = settings
+    two.workplaces = [Workplace(id: "x", name: "שני", pay: [PayTerms(id: "p", from: PayTerms.start, hourlyWage: 60)], standardByDay: settings.standardByDay)]
+    var elsewhere = shift(2026, 4, 5)
+    elsewhere.workplaceId = "x"
+    let there = Calc.yearReport(list + [elsewhere], two, place: "x", year: 2026, asOf: asOf)
+    expect(there.workplace == "שני" && there.rows.first?.title == "מאי" && there.total.workedDays == 1 && Calc.reportYears(list + [elsewhere], two, place: "x") == [2026], "the other's alone")
+    let empty = Calc.yearReport([], settings, place: nil, year: 2026, asOf: asOf)
+    expect(empty.rows.isEmpty && empty.total.gross == 0, "no records, no rows")
+}
+yearChecksReport()
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)

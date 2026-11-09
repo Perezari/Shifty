@@ -50,6 +50,49 @@ struct HoursReport {
     var title: String { Calc.periodTitle(range) }
 }
 
+/// A year's pay periods at one workplace, on one page (Views/ReportSheet.swift, Shifty Pro): to check against the
+/// employer's Form 106. The year of a period is the one its net counts in, its last day's (Calc.taxYear).
+struct YearReport {
+    struct Row: Hashable, Identifiable {
+        let id: String
+        let title: String
+        var workedDays = 0
+        var netHours = 0.0
+        var overtimeHours = 0.0
+        var vacationDays = 0
+        var sickDays = 0
+        var gross = 0.0
+        var incomeTax = 0.0
+        /// National Insurance and health tax.
+        var insurance = 0.0
+        /// The employee's pension and study fund.
+        var saved = 0.0
+        var net = 0.0
+    }
+
+    let year: Int
+    let workplace: String
+    /// From the period of the first record, or the year's first, to the period of now.
+    let rows: [Row]
+    let currency: String
+
+    /// The rows added up.
+    var total: Row {
+        rows.reduce(into: Row(id: "total", title: "סה״כ")) { sum, row in
+            sum.workedDays += row.workedDays
+            sum.netHours += row.netHours
+            sum.overtimeHours += row.overtimeHours
+            sum.vacationDays += row.vacationDays
+            sum.sickDays += row.sickDays
+            sum.gross += row.gross
+            sum.incomeTax += row.incomeTax
+            sum.insurance += row.insurance
+            sum.saved += row.saved
+            sum.net += row.net
+        }
+    }
+}
+
 extension Settings {
     /// These settings with one workplace alone, as their own: all that is counted of them is then that workplace's.
     func alone(_ id: String?) -> Settings {
@@ -65,13 +108,7 @@ extension Calc {
     /// all of them.
     static func report(_ shifts: [Shift], _ s: Settings, place id: String?, around date: Date, asOf now: Double) -> HoursReport {
         let one = s.alone(id)
-        let there = shifts
-            .filter { id == nil ? s.workplace(of: $0) == nil : $0.workplaceId == id }
-            .map { shift -> Shift in
-                var shift = shift
-                shift.workplaceId = nil
-                return shift
-            }
+        let there = shiftsAlone(shifts, s, place: id)
         let range = period(around: date, monthStartDay: one.monthStartDay)
         let sum = Calc.summary(there, one, range: range, asOf: now)
 
@@ -171,6 +208,49 @@ extension Calc {
                            overtimeHours: totals.overtimeHours, workedDays: totals.workedDays, total: totals.total,
                            hourlyWage: wages.count == 1 ? wages.first : nil, firstTier: Format.percent(one.overtime1Mult),
                            secondTier: Format.percent(one.overtime2Mult), currency: one.currency)
+    }
+}
+
+extension Calc {
+    /// A workplace's shifts, as the settings with it alone (Settings.alone) count them.
+    private static func shiftsAlone(_ shifts: [Shift], _ s: Settings, place id: String?) -> [Shift] {
+        shifts
+            .filter { id == nil ? s.workplace(of: $0) == nil : $0.workplaceId == id }
+            .map { shift -> Shift in
+                var shift = shift
+                shift.workplaceId = nil
+                return shift
+            }
+    }
+
+    /// The years with a record at a workplace, the last first.
+    static func reportYears(_ shifts: [Shift], _ s: Settings, place id: String?) -> [Int] {
+        let day = s.alone(id).monthStartDay
+        let years = shiftsAlone(shifts, s, place: id).filter { !$0.deleted }.map { taxYear(of: period(around: $0.start, monthStartDay: day)) }
+        return Array(Set(years)).sorted(by: >)
+    }
+
+    /// A workplace's year, period by period, as of `now`: its income, what the net estimates are taken off of it, and
+    /// its hours and days. `shifts` are all of them.
+    static func yearReport(_ shifts: [Shift], _ s: Settings, place id: String?, year: Int, asOf now: Double) -> YearReport {
+        let one = s.alone(id)
+        let there = shiftsAlone(shifts, s, place: id)
+        let first = there.filter { !$0.deleted && $0.type != .adjustment }.map(\.start).min()
+        var rows: [YearReport.Row] = []
+        // from a period that surely comes before the year's first
+        var range = period(around: LocalTime.date(year - 1, 10, 20), monthStartDay: one.monthStartDay)
+        for _ in 0..<16 {
+            defer { range = period(around: range.end, monthStartDay: one.monthStartDay) }
+            guard taxYear(of: range) == year, range.start.ms <= now, let first, range.end > first else { continue }
+            let sum = Calc.summary(there, one, range: range, asOf: now)
+            let pay = periodNet(there, one, range: range, asOf: now, projected: false)
+            rows.append(.init(id: LocalTime.dayKey(range.start), title: periodTitle(range, year: false), workedDays: sum.totals.workedDays,
+                              netHours: sum.totals.netHours, overtimeHours: sum.totals.overtimeHours,
+                              vacationDays: sum.shifts.filter { $0.type == .vacation }.count,
+                              sickDays: sum.shifts.filter { $0.type == .sick }.count, gross: pay.gross, incomeTax: pay.incomeTax,
+                              insurance: pay.nationalInsurance + pay.health, saved: pay.pension + pay.studyFund, net: pay.net))
+        }
+        return YearReport(year: year, workplace: one.workplaceName, rows: rows, currency: one.currency)
     }
 }
 

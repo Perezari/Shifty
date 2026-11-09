@@ -15,6 +15,8 @@ struct DialLayout: Equatable {
         case short, plannedOvertime
         /// A shift of today's, with none running.
         case today
+        /// Today, a day off.
+        case dayOff(ShiftType)
     }
 
     struct Piece: Hashable {
@@ -114,6 +116,11 @@ extension Calc {
             return .init(from: rel(shift.start), to: rel(end), kind: .today)
         }
         return DialLayout(startDeg: dialDegrees(first.start), pieces: pieces, nowDeg: rel(now), goalDeg: nil, leaveDeg: nil)
+    }
+
+    /// A day off on the dial, with none running: the whole round in its color, and now.
+    static func dial(dayOff type: ShiftType, at now: Date) -> DialLayout {
+        DialLayout(startDeg: dialDegrees(now), pieces: [.init(from: 0, to: 360, kind: .dayOff(type))], nowDeg: 0, goalDeg: nil, leaveDeg: nil)
     }
 
     /// The time of a point dragged on the dial, at `degrees` clockwise from 12: the first after the start, by five

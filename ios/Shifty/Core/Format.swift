@@ -62,6 +62,12 @@ enum Format {
         "\(Int(jsRound(multiplier * 100)))%"
     }
 
+    /// 12, 7.5, 8.7: days, to a tenth of a day. The app's own.
+    static func days(_ value: Double) -> String {
+        let tenths = (value * 10).rounded() / 10
+        return tenths == tenths.rounded() ? String(Int(tenths)) : String(tenths)
+    }
+
     /// "₪ 1,235"
     static func moneyShort(_ amount: Double, _ symbol: String = "₪") -> String {
         symbol + " " + jsRound(amount).formatted(.number.precision(.fractionLength(0)).locale(hebrew))

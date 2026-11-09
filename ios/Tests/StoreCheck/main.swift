@@ -178,6 +178,11 @@ MainActor.assumeIsolated {
     lawStore.endShift(at: LocalTime.date(2026, 10, 15, 10))
     let oneSum = lawStore.addAdjustment(LocalTime.date(2026, 10, 16, 20), amount: -50, title: "ארוחות", at: nil)
     expect(LocalTime.parts(oneSum.start).hour == 12 && oneSum.end == oneSum.start && oneSum.type == .adjustment && lawStore.active == nil, "a sum once sits at noon, and never runs")
+    expect(lawStore.addedDayOff == nil, "a sum once is no day off")
+    let marked = lawStore.addDayOff(LocalTime.date(2026, 10, 17), type: .vacation)
+    expect(lawStore.addedDayOff?.id == marked.id && lawStore.addedDayOff?.type == .vacation, "a day off just added, for the strip")
+    if let added = lawStore.addedDayOff { lawStore.forget(added) }
+    expect(lawStore.addedDayOff == nil, "and forgotten")
     lawStore.delete(oneSum.id)
     expect(lawStore.deletion?.ids == [oneSum.id] && lawStore.recentlyDeleted(asOf: ShiftStore.now()).contains { $0.id == oneSum.id }, "deleted as a shift is")
     lawStore.restore([oneSum.id])

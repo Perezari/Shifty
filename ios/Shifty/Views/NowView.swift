@@ -54,6 +54,10 @@ struct NowView: View {
             .padding(.bottom, 24)
         }
         .scrollIndicators(.hidden)
+        // what is left of the days off, after one is added from here
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            UndoStrip()
+        }
         .background(Color.appBackground.ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .medium), trigger: tapped)
         .sensoryFeedback(.success, trigger: celebrations)
@@ -124,7 +128,8 @@ struct NowView: View {
         let overtime: MonthOvertime? = current.kind == .monthly
             ? MonthOvertime(hours: overtimeOfMonth(shifts, settings, at: date), terms: current) : nil
         return VStack(spacing: 14) {
-            NowCapsule(status: status, place: placeName(settings), choices: placeChoices(settings), now: date)
+            NowCapsule(status: status, place: placeName(settings), choices: placeChoices(settings), now: date,
+                       dayOff: Self.offToday(in: shifts, on: date))
             dial(status, settings, shifts, at: date, reached: reached, overtime: overtime)
             NowFacts(cells: facts(status, settings, totals: periodTotals, global: overtime != nil, at: date))
         }
@@ -277,6 +282,11 @@ struct NowView: View {
                                 note: note, undo: undo != nil ? undoStart : nil)
                 }
             }
+        } else if let off = Self.offToday(in: shifts, on: date) {
+            ShiftDial(layout: Calc.dial(dayOff: off, at: date), reached: false, planned: false, glow: false,
+                      knob: off.dayOffColor, drag: nil) {
+                dayOffCenter(off, pay: status.pay, settings, at: date)
+            }
         } else {
             ShiftDial(layout: Calc.dial(today: shifts, at: date), reached: false, planned: false, glow: false,
                       knob: Color.secondary, drag: nil) {
@@ -284,6 +294,40 @@ struct NowView: View {
                             faint: status.netHours == 0, settings, at: date)
             }
         }
+    }
+
+    /// Today's day off, if any.
+    private static func offToday(in shifts: [Shift], on date: Date) -> ShiftType? {
+        let today = Calc.dayRange(date)
+        return shifts.first { $0.isDayOff && Calc.inRange($0, today) }?.type
+    }
+
+    /// The day, its symbol, what kind of day off it is and what it pays.
+    private func dayOffCenter(_ type: ShiftType, pay: Double, _ settings: Settings, at date: Date) -> some View {
+        VStack(spacing: 6) {
+            Text(dayLine(date, settings))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Image(systemName: type.dayOffSymbol)
+                .font(.system(size: 54, weight: .semibold))
+                .foregroundStyle(type.dayOffColor)
+                .padding(.vertical, 4)
+            Text(type.dayOffTitle)
+                .font(.system(size: 23, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            // nothing on a day that pays nothing by itself: a first sick day, reserve duty, a month's fixed pay
+            if pay > 0.005 {
+                Text(Format.money(pay, settings.currency))
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.accentColor)
+            }
+        }
+        .frame(maxWidth: 230)
     }
 
     private func knobColor(_ status: NowStatus, reached: Bool) -> Color {
@@ -438,11 +482,15 @@ struct NowView: View {
         let currency = settings.currency
         let hours = FactCell(title: "שעות בתקופה", value: Format.hoursToHM(totals.netHours))
         guard let active = status.active else {
-            return [
+            var cells = [
                 FactCell(title: "משמרות בתקופה", value: String(totals.count)),
                 global ? hours : FactCell(title: "הכנסה בתקופה", value: Format.moneyShort(totals.total, currency)),
-                FactCell(title: "יעד יומי", value: Format.hoursToHM(status.goal)),
             ]
+            // a day off has no goal
+            if Self.offToday(in: store.shifts, on: date) == nil {
+                cells.append(FactCell(title: "יעד יומי", value: Format.hoursToHM(status.goal)))
+            }
+            return cells
         }
         var cells = [FactCell(title: "התחלה", value: Format.clock(active.start))]
         if let plan {
@@ -866,6 +914,8 @@ private struct NowCapsule: View {
     let place: String?
     let choices: [PlaceChoice]
     let now: Date
+    /// Today's day off.
+    var dayOff: ShiftType? = nil
     @Environment(ShiftStore.self) private var store
 
     var body: some View {
@@ -920,13 +970,13 @@ private struct NowCapsule: View {
     }
 
     private var title: String {
-        guard status.active != nil else { return "לא במשמרת" }
+        guard status.active != nil else { return dayOff?.dayOffTitle ?? "לא במשמרת" }
         guard let pause = status.activeBreak else { return "במשמרת" }
         return "בהפסקה " + Format.timer(now.ms - pause.start.ms)
     }
 
     private var dot: Color {
-        guard status.active != nil else { return .secondary }
+        guard status.active != nil else { return dayOff?.dayOffColor ?? .secondary }
         return status.activeBreak == nil ? .green : .orange
     }
 }
@@ -1076,6 +1126,7 @@ private struct ShiftDial<Center: View>: View {
         case .short: Color.red.opacity(0.22)
         case .plannedOvertime: Color("Holiday").opacity(0.4)
         case .today: Color.accentColor.opacity(0.45)
+        case .dayOff(let type): type.dayOffColor.opacity(0.85)
         }
     }
 }
@@ -1647,7 +1698,7 @@ private struct LeaveCard: View {
                 .frame(width: 34, height: 34)
                 .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(color.opacity(0.16)))
             VStack(alignment: .leading, spacing: 1) {
-                Text(Self.days(days))
+                Text(Format.days(days))
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(days < 0 ? Color.red : Color.primary)
@@ -1661,11 +1712,6 @@ private struct LeaveCard: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// 12, 7.5, 8.7: to a tenth of a day.
-    private static func days(_ value: Double) -> String {
-        let tenths = (value * 10).rounded() / 10
-        return tenths == tenths.rounded() ? String(Int(tenths)) : String(tenths)
-    }
 }
 
 /// A shortened day or a holiday within two weeks, from the Hebrew calendar: its standard.
