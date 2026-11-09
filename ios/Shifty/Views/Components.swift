@@ -261,7 +261,8 @@ struct ShiftRow: View {
                     .font(.footnote)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                if !shift.note.isEmpty {
+                // a sum once has its name as its title
+                if !shift.note.isEmpty && shift.type != .adjustment {
                     Text(shift.note)
                         .font(.footnote)
                         .foregroundStyle(.tertiary)
@@ -277,14 +278,16 @@ struct ShiftRow: View {
     /// whose seconds stay the same as the list is drawn (NowView.anchor): the row and the list are not.
     @ViewBuilder
     private var pay: some View {
-        if shift.type == .reserve {
+        if shift.type == .adjustment {
+            Text(Format.signedMoney(shift.amount ?? 0, currency))
+        } else if shift.type == .reserve {
             // a day of reserve duty has no pay counted
             EmptyView()
         } else if byHours {
             Text(Format.hoursToHM(breakdown.netHours))
         } else if let live, shift.type == .work, shift.end == nil {
             TimelineView(.periodic(from: NowView.anchor, by: 1)) { context in
-                Text(Format.money(Calc.breakdown(shift, live, asOf: context.date.ms).pay, currency))
+                Text(Format.money(Calc.breakdown(shift, live, asOf: context.date.ms, before: breakdown.before).pay, currency))
             }
         } else {
             Text(Format.money(breakdown.pay, currency))
@@ -301,6 +304,8 @@ struct ShiftRow: View {
             return Text("יום מחלה")
         case .reserve:
             return Text("יום מילואים")
+        case .adjustment:
+            return Text(shift.dayTitle)
         case .work:
             guard let end = shift.end else {
                 return Text("התחלה " + Format.clock(shift.start))
@@ -325,6 +330,8 @@ struct ShiftRow: View {
         case .reserve:
             // its pay is Bituach Leumi's, not counted here; a month's fixed pay goes on
             parts.append(byHours ? "המשכורת ממשיכה" : "התגמול לא נכלל בחישוב")
+        case .adjustment:
+            parts.append(shift.note.isEmpty ? "סכום חד־פעמי" : shift.adjustmentTitle)
         case .work:
             if !byHours { parts.append(Format.hoursToHM(b.netHours) + " שע׳") }
             if b.breakMs > 0 { parts.append("הפסקה \(Int(jsRound(b.breakMs / 60000)))׳") }
@@ -332,6 +339,37 @@ struct ShiftRow: View {
             if b.isHoliday { parts.append("שבת/חג") }
         }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// A holiday paid by itself (Calc.holidayPays), among a period's shifts or on its day.
+struct HolidayPayRow: View {
+    let day: HolidayPayDay
+    let currency: String
+    /// Its workplace's name, with more than one.
+    var place: String? = nil
+    var showsDate = true
+
+    var body: some View {
+        HStack(spacing: 14) {
+            if showsDate {
+                DateBadge(date: day.date, short: false, dayOff: true)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("דמי חג")
+                    Spacer(minLength: 0)
+                    Text(Format.money(day.amount, currency))
+                        .monospacedDigit()
+                }
+                .font(.body.weight(.semibold))
+                Text(([place, day.name, Format.hoursShort(day.hours)] as [String?]).compactMap { $0 }.joined(separator: " · "))
+                    .font(.footnote)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .card(padding: 14)
     }
 }
 
@@ -587,7 +625,7 @@ struct DayOffSheet: View {
 
     var body: some View {
         let key = LocalTime.dayKey(day)
-        let taken = store.shifts.contains { LocalTime.dayKey($0.start) == key }
+        let taken = store.shifts.contains { $0.type != .adjustment && LocalTime.dayKey($0.start) == key }
         NavigationStack {
             VStack(spacing: 8) {
                 DatePicker(title, selection: $day, displayedComponents: .date)
@@ -648,6 +686,7 @@ extension ShiftType: Identifiable {
         case .vacation: "חופשה בתשלום"
         case .sick: "יום מחלה"
         case .reserve: "יום מילואים"
+        case .adjustment: "תוספת או ניכוי"
         case .work: "משמרת"
         }
     }
@@ -661,6 +700,24 @@ extension Shift {
         return "\u{200F}" + Format.clock(start) + " – " + Format.clock(end)
     }
 
+    /// A sum once's word: "תוספת" or "ניכוי".
+    var adjustmentTitle: String {
+        (amount ?? 0) < 0 ? "ניכוי" : "תוספת"
+    }
+
+    /// Its line on a day: its hours, a sum once's name, or the kind of day off.
+    var dayTitle: String {
+        if type == .adjustment { return note.isEmpty ? adjustmentTitle : note }
+        return span ?? type.dayOffTitle
+    }
+
+    /// What it adds to its day's sum: a sum once, or a wage; nothing of its own on a day of reserve duty or paid by a
+    /// month's fixed pay.
+    func dayPay(_ breakdown: Breakdown, _ settings: Settings) -> Double? {
+        if type == .adjustment { return amount ?? 0 }
+        return type == .reserve || settings.isMonthly(self) ? nil : breakdown.pay
+    }
+
     /// For the clipboard: "יום ג׳, 28 באוקטובר · 07:10 – 16:20 · 8:40 שע׳ · ₪ 470.25", the note under it.
     func summary(_ breakdown: Breakdown, _ settings: Settings) -> String {
         var parts = [Format.weekday(start) + ", " + Format.dateLong(start)]
@@ -671,6 +728,10 @@ extension Shift {
             parts.append("יום מחלה")
         case .reserve:
             parts.append("יום מילואים")
+        case .adjustment:
+            parts.append(dayTitle)
+            parts.append(Format.signedMoney(amount ?? 0, settings.currency))
+            return parts.joined(separator: " · ")
         case .work:
             if let span { parts.append(span) }
             parts.append(Format.hoursShort(breakdown.netHours))
@@ -689,7 +750,7 @@ extension ShiftStore {
         let today = LocalTime.startOfDay(Date())
         let tomorrow = LocalTime.addingDays(1, to: today)
         guard shift.type == .work, shift.end != nil, shift.start < today || shift.start >= tomorrow else { return false }
-        return !records.contains { !$0.deleted && $0.type != .work && $0.start >= today && $0.start < tomorrow }
+        return !records.contains { !$0.deleted && $0.isDayOff && $0.start >= today && $0.start < tomorrow }
     }
 }
 
@@ -721,7 +782,7 @@ private struct ShiftMenu: ViewModifier {
     private func sections() -> [LiftSection] {
         var items: [LiftItem] = []
         // a day off has no hours to edit (ShiftEditor)
-        if shift.type == .work {
+        if !shift.isDayOff {
             items.append(LiftItem(title: "עריכה", systemImage: "pencil", action: edit))
         }
         if store.canCopyToToday(shift) {
@@ -729,7 +790,7 @@ private struct ShiftMenu: ViewModifier {
         }
         items.append(LiftItem(title: "העתקת הסיכום", systemImage: "doc.on.doc") {
             // a running shift's as it is now
-            let now = shift.end == nil ? Calc.breakdown(shift, settings, asOf: Date().ms) : breakdown
+            let now = shift.end == nil ? Calc.breakdown(shift, settings, asOf: Date().ms, before: breakdown.before) : breakdown
             UIPasteboard.general.string = shift.summary(now, settings)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         })
@@ -746,6 +807,8 @@ struct PayLine: View {
     let hours: String
     let pay: Double?
     let currency: String
+    /// A sum once, with its sign.
+    var signed = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -754,7 +817,7 @@ struct PayLine: View {
             Text(hours)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
-            Text(pay.map { Format.money($0, currency) } ?? "")
+            Text(pay.map { signed ? Format.signedMoney($0, currency) : Format.money($0, currency) } ?? "")
                 .monospacedDigit()
                 .frame(width: 96, alignment: .trailing)
         }
@@ -772,7 +835,7 @@ struct ShiftPreview: View {
     var body: some View {
         if shift.type == .work && shift.end == nil {
             TimelineView(.periodic(from: NowView.anchor, by: 1)) { context in
-                card(Calc.breakdown(shift, settings, asOf: context.date.ms))
+                card(Calc.breakdown(shift, settings, asOf: context.date.ms, before: breakdown.before))
             }
         } else {
             card(breakdown)
@@ -794,10 +857,11 @@ struct ShiftPreview: View {
             }
             VStack(spacing: 8) {
                 ForEach(Array(lines(b).enumerated()), id: \.offset) { _, line in
-                    PayLine(title: line.title, hours: line.hours, pay: line.pay, currency: settings.currency)
+                    PayLine(title: line.title, hours: line.hours, pay: line.pay, currency: settings.currency,
+                            signed: shift.type == .adjustment)
                 }
             }
-            if !shift.note.isEmpty {
+            if !shift.note.isEmpty && shift.type != .adjustment {
                 Text(shift.note)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -813,7 +877,7 @@ struct ShiftPreview: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
+            } else if shift.type != .adjustment {
                 Divider()
                 HStack(alignment: .firstTextBaseline) {
                     Text(b.ongoing ? "עד עכשיו" : "סה״כ")
@@ -844,10 +908,21 @@ struct ShiftPreview: View {
             return [("יום מחלה \(tier)" + (tier >= 4 ? "+" : ""), "\(Int(jsRound(b.sickPct ?? 0)))%", pay(b.pay))]
         case .reserve:
             return [("יום מילואים", "", nil)]
+        case .adjustment:
+            return [(shift.dayTitle, "", shift.amount ?? 0)]
         case .work:
             var list: [(title: String, hours: String, pay: Double?)] = []
             if b.isHoliday {
-                list.append(("שבת / חג · " + Self.percent(s.holidayMult), Format.hoursToHM(b.netHours), pay(b.basePay)))
+                list.append(("שבת / חג · " + Self.percent(s.holidayMult), Format.hoursToHM(s.lawOvertime ? b.regularHours : b.netHours), pay(b.basePay)))
+                // its overtime on top of it, where the law's count is set
+                if s.lawOvertime && b.ot1Hours > 0.001 {
+                    let rate = s.holidayMult + s.overtime1Mult - 1
+                    list.append(("נוספות " + Self.percent(rate), Format.hoursToHM(b.ot1Hours), pay(b.ot1Hours * rate * s.hourlyWage)))
+                }
+                if s.lawOvertime && b.ot2Hours > 0.001 {
+                    let rate = s.holidayMult + s.overtime2Mult - 1
+                    list.append(("נוספות " + Self.percent(rate), Format.hoursToHM(b.ot2Hours), pay(b.ot2Hours * rate * s.hourlyWage)))
+                }
             } else {
                 list.append(("שעות רגילות", Format.hoursToHM(b.regularHours), pay(b.basePay)))
                 if b.ot1Hours > 0.001 {
@@ -883,11 +958,15 @@ struct DayPreview: View {
     let shifts: [Shift]
     let settings: Settings
     let sickDates: Set<String>
+    /// What came before each shift in its day and week (Calc.workedBefore).
+    var before: [String: WorkedBefore] = [:]
+    /// The day as a holiday paid by itself (Calc.holidayPays).
+    var holidayPays: [HolidayPayDay] = []
     @AppStorage(HebrewDates.key) private var hebrewDate = false
 
     var body: some View {
         let now = Date().ms
-        let breakdowns = shifts.map { Calc.breakdown($0, settings, asOf: now, sickDates: sickDates) }
+        let breakdowns = shifts.map { Calc.breakdown($0, settings, asOf: now, sickDates: sickDates, before: before[$0.id]) }
         let worked = zip(shifts, breakdowns).filter { $0.0.type == .work }.reduce(0) { $0 + $1.1.netHours }
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
@@ -913,7 +992,7 @@ struct DayPreview: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(Color("Holiday"))
             }
-            if shifts.isEmpty {
+            if shifts.isEmpty && holidayPays.isEmpty {
                 Text("אין משמרת ביום זה")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
@@ -921,21 +1000,24 @@ struct DayPreview: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(Array(zip(shifts, breakdowns).enumerated()), id: \.offset) { _, pair in
-                        PayLine(title: pair.0.span ?? pair.0.type.dayOffTitle,
+                        PayLine(title: pair.0.dayTitle,
                                 hours: pair.0.type == .work ? Format.hoursToHM(pair.1.netHours) : "",
-                                pay: settings.isMonthly(pair.0) || pair.0.type == .reserve ? nil : pair.1.pay, currency: settings.currency)
+                                pay: pair.0.dayPay(pair.1, settings), currency: settings.currency,
+                                signed: pair.0.type == .adjustment)
+                    }
+                    ForEach(holidayPays) { pay in
+                        PayLine(title: "דמי חג", hours: Format.hoursToHM(pay.hours), pay: pay.amount, currency: settings.currency)
                     }
                 }
                 // a day of reserve duty alone has no total: its pay is not counted
-                if !shifts.allSatisfy({ $0.type == .reserve }) {
+                if !holidayPays.isEmpty || !shifts.allSatisfy({ $0.type == .reserve }) {
                     Divider()
                     HStack(alignment: .firstTextBaseline) {
                         Text("סה״כ")
                             .font(.headline)
                         Spacer()
                         // a day of a month's fixed pay alone: its hours
-                        Text(shifts.allSatisfy { settings.isMonthly($0) } ? Format.hoursShort(worked)
-                             : Format.money(zip(shifts, breakdowns).reduce(0) { settings.isMonthly($1.0) ? $0 : $0 + $1.1.pay }, settings.currency))
+                        Text(total(breakdowns) ?? Format.hoursShort(worked))
                             .font(.system(.title2, design: .rounded).weight(.bold))
                             .monospacedDigit()
                             .foregroundStyle(Color.accentColor)
@@ -944,6 +1026,15 @@ struct DayPreview: View {
             }
         }
         .liftedCard()
+    }
+
+    /// What the day comes to; nil when nothing on it is paid by itself.
+    private func total(_ breakdowns: [Breakdown]) -> String? {
+        var paid: [Double] = holidayPays.map(\.amount)
+        for (shift, breakdown) in zip(shifts, breakdowns) {
+            if let pay = shift.dayPay(breakdown, settings) { paid.append(pay) }
+        }
+        return paid.isEmpty ? nil : Format.money(paid.reduce(0, +), settings.currency)
     }
 
     /// "ערב פסח · יום מקוצר", or the holiday's name.

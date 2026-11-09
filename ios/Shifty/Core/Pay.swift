@@ -94,6 +94,10 @@ struct EmployerRules: Hashable {
     var recuperationRate = 451.5
     var recuperationMonthly = false
     var recuperationMonth = 6
+    /// Overtime as the law counts it, by the day and by the week's hours (Settings.lawOvertime), and holiday pay.
+    var lawOvertime = false
+    var weeklyHours = 42.0
+    var holidayPay = false
 }
 
 /// A workplace besides the settings' own (Shifty Pro): its name, its pay from each date, the standard hours of
@@ -152,6 +156,19 @@ struct RecuperationDue: Identifiable {
     let years: Int
 }
 
+/// A holiday a worker paid by the hour is paid for (Calc.holidayPays).
+struct HolidayPayDay: Identifiable, Hashable {
+    let date: Date
+    /// The workplace's id; "" for the own.
+    let place: String
+    let name: String
+    /// The average day it pays, and what that comes to.
+    let hours: Double
+    let amount: Double
+
+    var id: String { place + "/" + LocalTime.dayKey(date) }
+}
+
 /// A yearly bonus accrued since it was last paid, toward its next payment.
 struct AccruedBonus: Identifiable {
     /// The workplace's id; "" for the own.
@@ -177,7 +194,8 @@ extension Settings {
                           pensionEmployerPercent: pensionEmployerPercent, severancePercent: severancePercent,
                           studyFundPercent: studyFundPercent, studyFundEmployerPercent: studyFundEmployerPercent,
                           extensionOrder: extensionOrder, recuperationOn: recuperationOn, recuperationRate: recuperationRate,
-                          recuperationMonthly: recuperationMonthly, recuperationMonth: recuperationMonth)
+                          recuperationMonthly: recuperationMonthly, recuperationMonth: recuperationMonth,
+                          lawOvertime: lawOvertime, weeklyHours: weeklyHours, holidayPay: holidayPay)
         }
         set {
             overtime1Hours = newValue.overtime1Hours
@@ -211,6 +229,9 @@ extension Settings {
             recuperationRate = newValue.recuperationRate
             recuperationMonthly = newValue.recuperationMonthly
             recuperationMonth = newValue.recuperationMonth
+            lawOvertime = newValue.lawOvertime
+            weeklyHours = newValue.weeklyHours
+            holidayPay = newValue.holidayPay
         }
     }
 
@@ -337,6 +358,13 @@ extension Calc {
         totals.total += monthly
         totals.recuperation = recuperation(s, range: range)
         totals.total += totals.recuperation
+        totals.holidayPay = holidayPays(shifts, s, range: range, asOf: asOf).reduce(0) { $0 + $1.amount }
+        totals.total += totals.holidayPay
+        for shift in shifts where shift.type == .adjustment && !shift.deleted && inRange(shift, range) {
+            let amount = shift.amount ?? 0
+            if amount < 0 { totals.deductions -= amount } else { totals.additions += amount }
+        }
+        totals.total += totals.additions - totals.deductions
         let places = s.payPlaces
         guard places.contains(where: { place in place.pay.contains { $0.kind == .monthly || $0.bonus > 0 } }) else { return totals }
         let years = LocalTime.parts(range.start).year...LocalTime.parts(range.end).year
@@ -357,7 +385,70 @@ extension Calc {
         }
         totals.extraOvertime = extraOvertime(shifts, s, range: range, asOf: asOf)
         totals.total = totals.pay + totals.travel + totals.salary + totals.extraOvertime + totals.bonus + totals.recuperation
+            + totals.holidayPay + totals.additions - totals.deductions
         return totals
+    }
+
+    /// The holidays a period pays, the first first, up to the day of `asOf`, at each workplace where holiday pay is on
+    /// (EmployerRules.holidayPay). As kolzchut.org.il's דמי חגים has it: the nine holidays, for a worker paid by the hour,
+    /// on a day of work there, from three months of work (so not without a start date). Not when the day before or
+    /// after it, a day of work there, passed with nothing on it, which is an absence: the employer's consent to one is
+    /// not known here, and a sum once can make up for it. Each pays the average day of the three months before it,
+    /// without overtime, at the wage of its day, or its weekday's standard with no shift in them. (Its site says the
+    /// period is in dispute, three months or twelve; the press has three.) Also when the holiday is worked, on top of its
+    /// 150%, as it has that too.
+    static func holidayPays(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double? = nil) -> [HolidayPayDay] {
+        guard s.holidaysEnabled, s.holidayPay || s.workplaces.contains(where: { $0.rules.holidayPay }) else { return [] }
+        let today = LocalTime.startOfDay(Date(ms: asOf ?? Date().ms))
+        let places: [String?] = [nil] + s.workplaces.map { Optional($0.id) }
+        var paid: [HolidayPayDay] = []
+        var day = LocalTime.startOfDay(range.start)
+        while day < range.end && day <= today {
+            let info = Holidays.info(day)
+            if info.kind == .chag, let name = info.name {
+                for id in places {
+                    if let pay = holidayPay(on: day, name: name, at: id, shifts, s, today: today, asOf: asOf) { paid.append(pay) }
+                }
+            }
+            day = LocalTime.addingDays(1, to: day)
+        }
+        return paid
+    }
+
+    private static func holidayPay(on day: Date, name: String, at id: String?, _ shifts: [Shift], _ s: Settings,
+                                   today: Date, asOf: Double?) -> HolidayPayDay? {
+        let place = s.place(id)
+        guard place.rules.holidayPay, let start = place.startDate, place.employs(day),
+              let terms = Settings.terms(place.pay, at: day), terms.kind == .hourly,
+              let standard = workdayStandard(place, day) else { return nil }
+        let worked = seniority(from: start, to: day)
+        guard worked.years * 12 + worked.months >= 3 else { return nil }
+        let there = shifts.filter { !$0.deleted && s.workplace(of: $0)?.id == id }
+        // a day still going on or ahead, or before anything was recorded here, is not held against it
+        let first = there.map(\.start).min().map(LocalTime.startOfDay)
+        for near in [LocalTime.addingDays(-1, to: day), LocalTime.addingDays(1, to: day)] {
+            guard near < today, let first, near >= first, workdayStandard(place, near) != nil,
+                  Holidays.info(near).kind != .chag else { continue }
+            let key = LocalTime.dayKey(near)
+            if !there.contains(where: { $0.type != .adjustment && LocalTime.dayKey($0.start) == key }) { return nil }
+        }
+        let window = TimeRange(start: LocalTime.addingMonths(-3, to: day), end: day)
+        let before = workedBefore(there, s, range: window, asOf: asOf)
+        var hours = 0.0
+        var days = Set<String>()
+        for shift in there where shift.type == .work && inRange(shift, window) {
+            hours += breakdown(shift, s, asOf: asOf, before: before[shift.id]).regularHours
+            days.insert(LocalTime.dayKey(shift.start))
+        }
+        let average = days.isEmpty ? standard : hours / Double(days.count)
+        return HolidayPayDay(date: day, place: id ?? "", name: name, hours: average, amount: average * terms.hourlyWage)
+    }
+
+    /// A workplace's standard hours on a day, by its weekday; nil on a day it does not work.
+    private static func workdayStandard(_ place: Workplace, _ day: Date) -> Double? {
+        let weekday = LocalTime.parts(day).weekday
+        guard place.standardByDay.indices.contains(weekday), let hours = place.standardByDay[weekday], hours > 0 else { return nil }
+        return hours
     }
 
     /// The travel paid as a fixed sum a month (Workplace.travelMonthly): each such workplace's, in a period with a
@@ -541,6 +632,7 @@ extension Calc {
 
     /// A pay month's overtime that its pay does not cover, of the shifts given.
     private static func monthExtra(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double?) -> Double {
+        let before = workedBefore(shifts, s, range: range, asOf: asOf)
         struct Overtime {
             var terms: PayTerms
             var hours = 0.0
@@ -550,12 +642,13 @@ extension Calc {
         for shift in shifts where shift.type == .work && !shift.deleted && inRange(shift, range) && s.isMonthly(shift) {
             let t = s.terms(of: shift)
             let rules = s.effective(for: shift)
-            let b = breakdown(shift, s, asOf: asOf)
+            let b = breakdown(shift, s, asOf: asOf, before: before[shift.id])
             guard b.overtimeHours > 0 else { continue }
             let key = (s.workplace(of: shift)?.id ?? "") + "/" + t.id
             var o = byTerms[key] ?? Overtime(terms: t)
             o.hours += b.overtimeHours
-            o.worth += (b.ot1Hours * rules.overtime1Mult + b.ot2Hours * rules.overtime2Mult) * t.hourValue
+            // the law's count has its own rates on Shabbat and holidays
+            o.worth += rules.lawOvertime ? b.otPay : (b.ot1Hours * rules.overtime1Mult + b.ot2Hours * rules.overtime2Mult) * t.hourValue
             byTerms[key] = o
         }
         return byTerms.values.reduce(0) { sum, o in
@@ -573,8 +666,9 @@ extension Calc {
     static func monthlyOvertime(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf: Double? = nil) -> (hours: Double, terms: PayTerms)? {
         var hours = 0.0
         var terms: PayTerms?
+        let before = workedBefore(shifts, s, range: range, asOf: asOf)
         for shift in shifts where shift.type == .work && !shift.deleted && inRange(shift, range) && s.isMonthly(shift) {
-            hours += breakdown(shift, s, asOf: asOf).overtimeHours
+            hours += breakdown(shift, s, asOf: asOf, before: before[shift.id]).overtimeHours
             if terms == nil { terms = s.terms(of: shift) }
         }
         return terms.map { (hours, $0) }
@@ -632,7 +726,8 @@ extension EmployerRules: Codable {
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, pensionPercent,
              vacationBalance, sickBalance, balanceDate, vacationDaysPerYear,
              pensionEmployerPercent, severancePercent, studyFundPercent, studyFundEmployerPercent,
-             extensionOrder, recuperationOn, recuperationRate, recuperationMonthly, recuperationMonth
+             extensionOrder, recuperationOn, recuperationRate, recuperationMonthly, recuperationMonth,
+             lawOvertime, weeklyHours, holidayPay
     }
 
     /// A missing key takes the default, as the settings' do.
@@ -673,6 +768,9 @@ extension EmployerRules: Codable {
         recuperationRate = value(.recuperationRate, d.recuperationRate)
         recuperationMonthly = value(.recuperationMonthly, d.recuperationMonthly)
         recuperationMonth = value(.recuperationMonth, d.recuperationMonth)
+        lawOvertime = value(.lawOvertime, d.lawOvertime)
+        weeklyHours = value(.weeklyHours, d.weeklyHours)
+        holidayPay = value(.holidayPay, d.holidayPay)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -708,6 +806,9 @@ extension EmployerRules: Codable {
         try c.encode(recuperationRate, forKey: .recuperationRate)
         try c.encode(recuperationMonthly, forKey: .recuperationMonthly)
         try c.encode(recuperationMonth, forKey: .recuperationMonth)
+        try c.encode(lawOvertime, forKey: .lawOvertime)
+        try c.encode(weeklyHours, forKey: .weeklyHours)
+        try c.encode(holidayPay, forKey: .holidayPay)
     }
 }
 

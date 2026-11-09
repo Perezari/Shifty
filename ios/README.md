@@ -30,7 +30,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   the employer's and severance) and the study fund's, travel by the day or a fixed sum a month, and the
   place's reminder; and the sheet of a pay: by the hour or global, what a global pay does with the overtime, all
   of it covered, some hours, none, or a bonus at each target of hours a month, and an annual bonus) and
-  `ShiftEditor` (a shift by hand). `Components` holds what they share: the period's bar and picker, the
+  `ShiftEditor` (a shift by hand), `AdjustmentSheet` (a sum once on a day, added or taken off) and `ReportSheet` (the
+  pay period's hours report as a PDF, Shifty Pro, on `Core/Report.swift`). `Components` holds what they share: the period's bar and picker, the
   summary card, a shift's row, the settings' cards and the wheel of hours and minutes.
 - `Shifty/Live/`: the shift outside the app. `ShiftIntents` holds what its buttons do (start, end, a
   break, as App Intents that the system performs in the app, woken in the background if need be),
@@ -76,7 +77,12 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   seniority (`Calc.seniority`): the vacation days a year by the law (`legalVacationDays`, the extension order's
   or the law's table, in a five- or six-day week) when more than its own number, and recuperation pay
   (`recuperation`, by the years of work, its day's worth and the job's share of 42 hours) in the period of its
-  month, or each month's twelfth. With one workplace and one pay, the settings are as the web
+  month, or each month's twelfth. Three things are the law's as kolzchut.org.il gives them, each off unless the
+  workplace turns it on (the first setup does for a worker paid by the hour), so that the engine stays the web
+  app's: overtime by the day and the week (`lawOvertime`, `Calc.workedBefore`: a day's shifts together, the hours past
+  `weeklyHours`, on Shabbat and holidays 175% and 200%, a new shift on them marked by the clock), and holiday pay
+  (`holidayPay`, `Calc.holidayPays`). `Net` has each year's rates in `Calc.taxYears`: each January its year is added
+  there and a version submitted; a period takes its last day's year, and until its rates are in, the net says so. With one workplace and one pay, the settings are as the web
   app's and the engine gives its results.
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
   `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay

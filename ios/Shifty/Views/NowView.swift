@@ -15,6 +15,7 @@ struct NowView: View {
     @Environment(Pro.self) private var pro
     @Environment(\.lifter) private var lifter
     @State private var adding = false
+    @State private var adjusting = false
     @State private var dayOff: ShiftType?
     /// A press made too late, its time picked on the wheels.
     @State private var picking: Press?
@@ -66,6 +67,10 @@ struct NowView: View {
         }
         .sheet(item: $dayOff) { type in
             DayOffSheet(type: type)
+                .environment(store)
+        }
+        .sheet(isPresented: $adjusting) {
+            AdjustmentSheet()
                 .environment(store)
         }
         .sheet(item: $picking) { kind in
@@ -124,7 +129,8 @@ struct NowView: View {
             NowFacts(cells: facts(status, settings, totals: periodTotals, global: overtime != nil, at: date))
         }
         .onChange(of: reached) { was, now in
-            if now && !was && draftStart == nil { celebrate() }
+            // not at the start of a shift with no regular hours left in its week
+            if now && !was && draftStart == nil && status.goal > 0 { celebrate() }
         }
     }
 
@@ -251,7 +257,8 @@ struct NowView: View {
     private func dial(_ status: NowStatus, _ settings: Settings, _ shifts: [Shift], at date: Date, reached: Bool,
                       overtime: MonthOvertime?) -> some View {
         if let active = status.active {
-            let layout = Calc.dial(active, settings, at: date, leave: plan)
+            let layout = Calc.dial(active, settings, at: date, leave: plan,
+                                   before: Calc.workedBefore(of: active, in: shifts, settings, asOf: date.ms))
             // the start dragged: its time over the clock, then that it changed, with an undo, for a few seconds
             let undo = startUndo.flatMap { $0.shift == active.id && date < $0.until ? $0 : nil }
             let note: (text: String, accent: Bool)? = draftStart != nil ? ("התחלה ב־" + Format.clock(active.start), false)
@@ -367,9 +374,10 @@ struct NowView: View {
     /// Leaving at the time chosen: the wage then (a global pay's, the hours), and the overtime it adds or the hours
     /// it leaves short.
     private func planCenter(_ active: Shift, leave: Date, _ settings: Settings, at date: Date, global: Bool) -> some View {
-        let leaving = Calc.leaving(active, at: leave, settings, now: date)
-        let atGoal = Calc.leaving(active, at: Calc.goalTime(active, settings, asOf: date.ms), settings, now: date)
-        let extra = leaving.netHours - Calc.shiftStandard(active.start.ms, leave.ms, settings.effective(for: active))
+        let before = Calc.workedBefore(of: active, in: store.shifts, settings, asOf: date.ms)
+        let leaving = Calc.leaving(active, at: leave, settings, now: date, before: before)
+        let atGoal = Calc.leaving(active, at: Calc.goalTime(active, settings, asOf: date.ms, before: before), settings, now: date, before: before)
+        let extra = leaving.netHours - Calc.regularRoom(active.start.ms, leave.ms, settings.effective(for: active), before: before)
         return VStack(spacing: 8) {
             Text("אם תצא ב־" + Format.clock(leave))
                 .font(.subheadline.weight(.medium))
@@ -512,7 +520,7 @@ struct NowView: View {
                     .controlSize(.large)
                     .buttonBorderShape(.roundedRectangle(radius: 24))
                 } sections: {
-                    [.adding(shift: { adding = true }, dayOff: { dayOff = $0 })]
+                    [.adding(shift: { adding = true }, dayOff: { dayOff = $0 }, adjustment: { adjusting = true })]
                 }
             }
             .controlSize(.large)
@@ -1341,7 +1349,7 @@ private struct PeriodCard: View {
         }
         .card()
         .sheet(isPresented: $showsNet) {
-            NetSheet(title: Calc.periodTitle(range), pay: net, settings: settings)
+            NetSheet(title: Calc.periodTitle(range), year: Calc.taxYear(of: range), pay: net, settings: settings)
         }
     }
 
@@ -1400,6 +1408,8 @@ private struct PeriodCard: View {
 /// what is left (Net.swift); under it, what the employers save besides.
 private struct NetSheet: View {
     let title: String
+    /// The year the period's payslip counts in.
+    let year: Int
     let pay: NetPay
     let settings: Settings
 
@@ -1422,6 +1432,9 @@ private struct NetSheet: View {
                     row("פנסיה", pay.pension)
                     if pay.studyFund > 0 {
                         row("קרן השתלמות", pay.studyFund)
+                    }
+                    if pay.deductions > 0 {
+                        row("ניכויים", pay.deductions)
                     }
                 }
                 Divider()
@@ -1497,7 +1510,9 @@ private struct NetSheet: View {
 
     private var note: String {
         let points = Self.number(settings.creditPoints)
-        return "לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026 ו־\(points) נקודות זיכוי. הפנסיה וקרן ההשתלמות מהשכר בלי שעות נוספות ונסיעות, כמו שנקבע בדף של כל מקום עבודה."
+        // a year whose rates are not in the app yet says so (Calc.taxYears)
+        let early = year > pay.ratesYear ? "השיעורים של \(year) עוד לא עודכנו באפליקציה. " : ""
+        return early + "לפי מדרגות המס, ביטוח לאומי ומס בריאות של \(pay.ratesYear) ו־\(points) נקודות זיכוי. הפנסיה וקרן ההשתלמות מהשכר בלי שעות נוספות ונסיעות, כמו שנקבע בדף של כל מקום עבודה."
     }
 
     /// 6 as "6", 2.25 as "2.25".

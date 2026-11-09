@@ -4,13 +4,17 @@ import UIKit
 /// The shifts of a pay period, the newest first: the period's hours, hours missing, shifts and income, and
 /// each shift's hours and pay, a running one's going up each second (app.js renderShifts). A shift opens in the
 /// editor, a swipe deletes it (offered back for a few seconds at the bottom, UndoStrip), and a long press lifts it with
-/// its menu; the plus adds a shift, and on a long press a day off. The list is drawn again each minute while it is on screen, and of the running shift only its pay
+/// its menu; the plus adds a shift, and on a long press a day off or a sum once. The period's hours report goes out from
+/// the bar, with Shifty Pro. The list is drawn again each minute while it is on screen, and of the running shift only its pay
 /// each second (ShiftRow.live); out of sight, neither.
 struct ShiftsView: View {
     @Environment(ShiftStore.self) private var store
+    @Environment(Pro.self) private var pro
     @Environment(\.lifter) private var lifter
     @State private var offset = 0
     @State private var adding = false
+    @State private var adjusting = false
+    @State private var reporting = false
     @State private var editing: Shift?
     @State private var copying: Shift?
     @State private var dayOff: ShiftType?
@@ -33,6 +37,14 @@ struct ShiftsView: View {
             .onAppear { shown = true }
             .onDisappear { shown = false }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        if pro.unlocked { reporting = true } else { pro.offer() }
+                    } label: {
+                        Image(systemName: "doc.text")
+                    }
+                    .accessibilityLabel("דוח שעות")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     // a long press lifts it with a day off, as the Now screen's plus: sooner than a menu of iOS's,
                     // and with the iPhone's tap
@@ -47,7 +59,7 @@ struct ShiftsView: View {
                             .glassEffect(.regular, in: Circle())
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } sections: {
-                        [.adding(shift: { adding = true }, dayOff: { dayOff = $0 })]
+                        [.adding(shift: { adding = true }, dayOff: { dayOff = $0 }, adjustment: { adjusting = true })]
                     }
                 }
             }
@@ -67,11 +79,28 @@ struct ShiftsView: View {
                 DayOffSheet(type: type)
                     .environment(store)
             }
+            .sheet(isPresented: $adjusting) {
+                AdjustmentSheet()
+                    .environment(store)
+            }
+            .sheet(isPresented: $reporting) {
+                ReportSheet(around: Date(ms: (range.start.ms + range.end.ms) / 2), place: store.nextWorkplace)
+                    .environment(store)
+            }
             .sheet(isPresented: $picking) {
                 PeriodPicker(current: Calc.periodMonth(range)) { year, month in
                     offset = Calc.periodOffset(year: year, month0: month, monthStartDay: store.settings.monthStartDay, now: Date())
                 }
             }
+            #if DEBUG
+            .task {
+                if Screenshot.current == .report {
+                    // after the tab has appeared: a sheet asked for during the switch is dropped
+                    try? await Task.sleep(for: .seconds(1.5))
+                    reporting = true
+                }
+            }
+            #endif
     }
 
     /// A shift by hand, with the iPhone's tap; not the finger lifted after a long press.
@@ -102,6 +131,11 @@ struct ShiftsView: View {
                 ContentUnavailableView("אין משמרות בתקופה זו", systemImage: "calendar",
                                        description: Text("אפשר להוסיף משמרת בכפתור הפלוס למעלה."))
                     .padding(.top, 24)
+                    .cardRow()
+            }
+            ForEach(summary.holidayPays) { day in
+                HolidayPayRow(day: day, currency: settings.currency,
+                              place: settings.workplaces.isEmpty ? nil : settings.place(day.place.isEmpty ? nil : day.place).name)
                     .cardRow()
             }
             ForEach(summary.shifts) { shift in

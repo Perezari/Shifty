@@ -11,6 +11,8 @@ struct PeriodSummary {
     var shortfall: Shortfall
     /// By day key (LocalTime.dayKey), the days with a shift.
     var days: [String: DaySum]
+    /// The holidays it pays (Calc.holidayPays), the first first.
+    var holidayPays: [HolidayPayDay] = []
 }
 
 /// A day's shifts on the calendar.
@@ -25,22 +27,27 @@ struct DaySum {
     var dayOff: ShiftType?
     /// The day fell short of its standard.
     var short = false
+    /// The sums once on it, those taken off below zero.
+    var adjustment = 0.0
 }
 
 extension Calc {
     /// The period `range` at `now`. `shifts` are all of them, the newest first.
     static func summary(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> PeriodSummary {
         let sick = sickDates(of: shifts)
+        let before = workedBefore(shifts, s, range: range, asOf: now)
         let list = shifts.filter { inRange($0, range) }
         var breakdowns: [String: Breakdown] = [:]
         var days: [String: DaySum] = [:]
         for shift in list {
-            let b = breakdown(shift, s, asOf: now, sickDates: sick)
+            let b = breakdown(shift, s, asOf: now, sickDates: sick, before: before[shift.id])
             breakdowns[shift.id] = b
             let key = LocalTime.dayKey(shift.start)
             var day = days[key] ?? DaySum(date: shift.start)
             if !s.isMonthly(shift) { day.pay += b.pay }
-            if b.type != .work {
+            if b.type == .adjustment {
+                day.adjustment += shift.amount ?? 0
+            } else if b.type != .work {
                 day.dayOff = b.type
             } else {
                 day.netHours += b.netHours
@@ -53,7 +60,8 @@ extension Calc {
             days[key]?.short = true
         }
         return PeriodSummary(range: range, shifts: list, breakdowns: breakdowns,
-                             totals: periodTotals(shifts, s, range: range, asOf: now), shortfall: missing, days: days)
+                             totals: periodTotals(shifts, s, range: range, asOf: now), shortfall: missing, days: days,
+                             holidayPays: holidayPays(shifts, s, range: range, asOf: now))
     }
 
     /// The calendar's days for a period: whole weeks from the Sunday before its first day to the Shabbat
@@ -116,11 +124,13 @@ extension Calc {
     }
 
     /// Where the pay period's income is heading: what it has, and its average day worked for each day left in
-    /// it, from tomorrow, that has a standard and no reserve duty. A month's fixed pay and a bonus stay as they are.
+    /// it, from tomorrow, that has a standard and no reserve duty. A month's fixed pay, a bonus and the sums once stay
+    /// as they are.
     static func projectedIncome(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> Double {
         let totals = periodTotals(shifts, s, range: range, asOf: now)
         guard totals.workedDays > 0 else { return totals.total }
-        let fixed = totals.salary + totals.bonus + totals.recuperation + monthlyTravel(shifts, s, range: range)
+        let fixed = totals.salary + totals.bonus + totals.recuperation + totals.holidayPay + totals.additions - totals.deductions
+            + monthlyTravel(shifts, s, range: range)
         let variable = totals.total - fixed
         let reserve = Set(shifts.filter { $0.type == .reserve && !$0.deleted }.map { LocalTime.dayKey($0.start) })
         var day = LocalTime.addingDays(1, to: LocalTime.startOfDay(Date(ms: now)))

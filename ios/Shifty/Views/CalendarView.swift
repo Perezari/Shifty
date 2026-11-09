@@ -12,6 +12,7 @@ struct CalendarView: View {
     @State private var picking = false
     @State private var opened: DayRef?
     @State private var adding: DayRef?
+    @State private var adjusting: DayRef?
     @State private var copying: Shift?
     /// The minute the month shows, again each minute while it is on screen.
     @State private var now = Date()
@@ -35,6 +36,10 @@ struct CalendarView: View {
             }
             .sheet(item: $adding) { day in
                 ShiftEditor(shift: nil, day: day.date)
+                    .environment(store)
+            }
+            .sheet(item: $adjusting) { day in
+                AdjustmentSheet(day: day.date)
                     .environment(store)
             }
             .sheet(item: $copying) { shift in
@@ -70,6 +75,7 @@ struct CalendarView: View {
         let records = Dictionary(grouping: store.shifts.filter { $0.start >= range.start && $0.start < range.end },
                                  by: { LocalTime.dayKey($0.start) })
         let sick = Calc.sickDates(of: store.shifts)
+        let before = Calc.workedBefore(store.shifts, settings, range: range, asOf: date.ms)
         let cells = [
             SummaryCell(title: "ימי עבודה", value: String(summary.totals.workedDays)),
             SummaryCell(title: "שעות", value: Format.hoursToHM(summary.totals.netHours)),
@@ -101,7 +107,8 @@ struct CalendarView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .liftable(card: true) {
-                                    DayPreview(date: day, shifts: onDay, settings: settings, sickDates: sick)
+                                    DayPreview(date: day, shifts: onDay, settings: settings, sickDates: sick, before: before,
+                                               holidayPays: summary.holidayPays.filter { LocalTime.dayKey($0.date) == key })
                                 } sections: {
                                     daySections(day, onDay)
                                 }
@@ -127,7 +134,7 @@ struct CalendarView: View {
             return [.adding(shift: { adding = DayRef(date: day) }, dayOff: { type in
                 withAnimation { _ = store.addDayOff(day, type: type) }
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-            })]
+            }, adjustment: { adjusting = DayRef(date: day) })]
         }
         var items = [LiftItem(title: "פתיחת היום", systemImage: "calendar") { opened = DayRef(date: day) }]
         if onDay.count == 1, let only = onDay.first, store.canCopyToToday(only) {
@@ -174,6 +181,13 @@ private struct DayCell: View {
                 Text(Self.name(off))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
+            } else if let sum, sum.adjustment != 0 {
+                Text(Format.signedMoney(sum.adjustment, settings.currency))
+                    .font(.system(size: 8, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             } else if let name = holiday?.name {
                 Text(name)
                     .font(.system(size: 8, weight: .medium))
@@ -212,7 +226,7 @@ private struct DayCell: View {
         case .vacation: "חופש"
         case .sick: "מחלה"
         case .reserve: "מילואים"
-        case .work: ""
+        case .work, .adjustment: ""
         }
     }
 
@@ -268,6 +282,7 @@ struct DayDetail: View {
     /// The day shown, in days from `date`.
     @State private var page: Int? = 0
     @State private var adding = false
+    @State private var adjusting = false
     @State private var editing: Shift?
     @State private var copying: Shift?
 
@@ -283,6 +298,7 @@ struct DayDetail: View {
         let settings = store.settings
         let all = store.shifts
         let sick = Calc.sickDates(of: all)
+        let before = Calc.workedBefore(all, settings, asOf: Date().ms)
         // each day's shifts, once for all the pages
         let byDay = Dictionary(grouping: all) { LocalTime.dayKey($0.start) }
         NavigationStack {
@@ -290,7 +306,7 @@ struct DayDetail: View {
                 LazyHStack(spacing: 0) {
                     ForEach(-Self.reach...Self.reach, id: \.self) { offset in
                         let day = LocalTime.addingDays(offset, to: LocalTime.startOfDay(date))
-                        dayPage(day, (byDay[LocalTime.dayKey(day)] ?? []).sorted { $0.start < $1.start }, settings, sick)
+                        dayPage(day, (byDay[LocalTime.dayKey(day)] ?? []).sorted { $0.start < $1.start }, settings, sick, before, all)
                             .containerRelativeFrame(.horizontal)
                             .id(offset)
                     }
@@ -347,6 +363,10 @@ struct DayDetail: View {
                 ShiftEditor(shift: nil, day: day)
                     .environment(store)
             }
+            .sheet(isPresented: $adjusting) {
+                AdjustmentSheet(day: day)
+                    .environment(store)
+            }
             .sheet(item: $editing) { shift in
                 ShiftEditor(shift: shift, day: nil)
                     .environment(store)
@@ -360,19 +380,21 @@ struct DayDetail: View {
     }
 
     /// A day's page: its shifts or day off, each opening, and lifted by a long press with its menu; and adding to it.
-    private func dayPage(_ day: Date, _ shifts: [Shift], _ settings: Settings, _ sick: Set<String>) -> some View {
-        let hasDayOff = shifts.contains { $0.type != .work }
+    private func dayPage(_ day: Date, _ shifts: [Shift], _ settings: Settings, _ sick: Set<String>,
+                         _ before: [String: WorkedBefore], _ all: [Shift]) -> some View {
+        let hasDayOff = shifts.contains { $0.isDayOff }
         let hasWork = shifts.contains { $0.type == .work }
+        let holidayPays = Calc.holidayPays(all, settings, range: Calc.dayRange(day), asOf: Date().ms)
         return ScrollView {
             VStack(spacing: 10) {
-                if shifts.isEmpty {
+                if shifts.isEmpty && holidayPays.isEmpty {
                     Text("אין משמרת ביום זה")
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 24)
                 }
                 ForEach(shifts) { shift in
-                    let breakdown = Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick)
+                    let breakdown = Calc.breakdown(shift, settings, asOf: Date().ms, sickDates: sick, before: before[shift.id])
                     Button {
                         // not the finger lifted after a long press
                         if lifter?.isShowing != true { editing = shift }
@@ -382,6 +404,11 @@ struct DayDetail: View {
                     }
                     .buttonStyle(.plain)
                     .shiftMenu(shift, breakdown, settings, edit: { editing = shift }, copy: { copying = shift })
+                }
+                ForEach(holidayPays) { pay in
+                    HolidayPayRow(day: pay, currency: settings.currency,
+                                  place: settings.workplaces.isEmpty ? nil : settings.place(pay.place.isEmpty ? nil : pay.place).name,
+                                  showsDate: false)
                 }
                 if !hasDayOff {
                     VStack(spacing: 10) {
@@ -421,6 +448,14 @@ struct DayDetail: View {
                     .controlSize(.large)
                     .padding(.top, 6)
                 }
+                Button {
+                    adjusting = true
+                } label: {
+                    Label("תוספת או ניכוי", systemImage: "plusminus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+                .controlSize(.large)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)

@@ -25,6 +25,16 @@ struct ShiftEditor: View {
     @State private var deleting = false
 
     var body: some View {
+        // a sum once has a sheet of its own, wherever it is opened from
+        if let shift, shift.type == .adjustment {
+            AdjustmentSheet(shift: shift)
+        } else {
+            editor
+        }
+    }
+
+    @ViewBuilder
+    private var editor: some View {
         let settings = store.settings
         NavigationStack {
             Form {
@@ -104,6 +114,21 @@ struct ShiftEditor: View {
         }
         .environment(\.locale, Locale(identifier: "he_IL"))
         .onAppear(perform: load)
+        .onChange(of: date) { _, _ in markRest() }
+        .onChange(of: start) { _, _ in markRest() }
+        .onChange(of: workplace) { _, _ in markRest() }
+    }
+
+    /// A new shift marked Shabbat or a holiday by its day and hour, where overtime is counted as the law does; the
+    /// switch can still change it.
+    private func markRest() {
+        guard shift == nil, loaded else { return }
+        var next = Shift(id: "", start: date)
+        next.workplaceId = workplace
+        guard store.settings.effective(for: next).lawOvertime else { return }
+        let d = LocalTime.parts(date)
+        let s = LocalTime.parts(start)
+        isHoliday = Calc.isRestDay(LocalTime.date(d.year, d.month0, d.day, s.hour, s.minute), store.settings)
     }
 
     /// The shift edited, when it is a paid vacation or sick day.
@@ -118,6 +143,7 @@ struct ShiftEditor: View {
         case .vacation: return "יום חופש"
         case .sick: return "יום מחלה"
         case .reserve: return "יום מילואים"
+        case .adjustment: return "תוספת או ניכוי"
         case .work: return "עריכת משמרת"
         }
     }
@@ -148,6 +174,7 @@ struct ShiftEditor: View {
                 start = Self.time(9, 0, on: base)
                 end = Self.time(17, 0, on: base)
             }
+            markRest()
             return
         }
         date = shift.start

@@ -25,6 +25,7 @@ struct ProSheet: View {
         Feature(symbol: "icloud", title: "סנכרון ב-iCloud", text: "אותן משמרות והגדרות בכל מכשיר עם אותו Apple ID."),
         Feature(symbol: "mappin.and.ellipse", title: "תזכורת לפי מיקום", text: "שאלה כשמגיעים לעבודה וכשיוצאים ממנה."),
         Feature(symbol: "briefcase", title: "סיום העבודה", text: "פיצויים, הודעה מוקדמת, פדיון חופשה והבראה, לפי החוק."),
+        Feature(symbol: "doc.text", title: "דוח שעות", text: "כל תקופת שכר כקובץ PDF, לשליחה למעסיק או לרואה חשבון."),
         Feature(symbol: "paintpalette", title: "אייקונים לבחירה", text: "לבן, כהה או שחור־לבן, במסך הבית."),
     ]
 

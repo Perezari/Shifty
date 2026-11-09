@@ -84,6 +84,7 @@ struct RecentlyDeletedPage: View {
         case .vacation: "לשחזר את יום החופש?"
         case .sick: "לשחזר את יום המחלה?"
         case .reserve: "לשחזר את יום המילואים?"
+        case .adjustment: "לשחזר את הסכום?"
         }
     }
 

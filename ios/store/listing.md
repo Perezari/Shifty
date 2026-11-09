@@ -116,7 +116,7 @@ Permissions, all optional and asked only when a feature needs them: notification
 
 6. Regulated industry or third-party material: neither. The app computes the user's own wage from the hours they record; it moves no money and gives no financial advice, and it shows the net pay as an estimate.
 
-7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro.lifetime), paid once. It opens the net pay estimate, the vacation and sick-day balances, the bonus and recuperation pay cards, more workplaces, the Live Activity and widgets, Siri and the Control Center, iCloud sync and the location reminder; everything else is free. To reach it: the Shifty Pro card at the top of Settings (הגדרות), anything marked Pro there (such as "הוספת מקום עבודה"), or the net pay line marked Pro on the Now tab. Its sheet has the price, the buy button and "שחזור רכישה" (Restore Purchase), also on the Settings card. Without it, the widgets show a lock and Siri answers that the action is in Shifty Pro.
+7. In-App Purchase: one non-consumable, "Shifty Pro" (com.perezari.shifty.pro.lifetime), paid once. It opens the net pay estimate, the vacation and sick-day balances, the bonus and recuperation pay cards, more workplaces, the Live Activity and widgets, Siri and the Control Center, iCloud sync, the location reminder and the hours report as a PDF; everything else is free. To reach it: the Shifty Pro card at the top of Settings (הגדרות), anything marked Pro there (such as "הוספת מקום עבודה"), or the net pay line marked Pro on the Now tab. Its sheet has the price, the buy button and "שחזור רכישה" (Restore Purchase), also on the Settings card. Without it, the widgets show a lock and Siri answers that the action is in Shifty Pro.
 ```
 
 ## Version 1.2
@@ -139,4 +139,19 @@ App Review notes and the in-app purchase carry over from 1.1 and stay as they ar
 • שליחת משוב ישר מההגדרות.
 • Shifty Pro: דף "סיום העבודה" עם פיצויים, הודעה מוקדמת, פדיון חופשה ודמי הבראה; אייקונים לבחירה; ותזכורת המיקום מציעה להתחיל בשעת ההגעה ולסיים בשעת היציאה.
 • לחיצה ארוכה ברשימות כבר לא מפריעה לגלילה ולמחיקה בהחלקה.
+```
+
+## Version 1.3
+
+Submitted as 1.2 was: the rest of the page carries over; the build is the newest 1.3 in TestFlight. If 1.2 was never
+submitted, this version holds its list too, so both lists go in the one field.
+
+**What's New in This Version** (what was built after 1.2's build):
+
+```
+• שעות נוספות לפי החוק: כל שעות היום נספרות יחד, גם בכמה משמרות, וכל שעה מעבר ל־42 בשבוע היא נוספת. מפעילים בדף מקום העבודה.
+• שבת וחג: שעות נוספות ב־175% וב־200%, ומשמרת שמתחילה בהם מסומנת לבד.
+• דמי חג לעובד לפי שעה, לפי ממוצע השעות ב־3 החודשים שלפני החג.
+• תוספות וניכויים: עמלה, מענק, מקדמה או ארוחות, בתאריך שלהם.
+• Shifty Pro: דוח שעות ב־PDF לכל תקופת שכר, עם סכומים או בלי, לשליחה למעסיק.
 ```

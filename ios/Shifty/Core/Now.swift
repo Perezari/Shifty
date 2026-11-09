@@ -27,12 +27,14 @@ struct NowStatus {
 extension Calc {
     /// The Now screen at `now`. `shifts` are all of them, the newest first; `active` the running one.
     static func nowStatus(_ shifts: [Shift], _ s: Settings, active: Shift?, at now: Double) -> NowStatus {
+        // the running shift's place in its day and week, where overtime is counted as the law does
+        let before = active.flatMap { workedBefore(of: $0, in: shifts, s, asOf: now) }
         // the running shift's workplace's standard hours (a night shift's, where it is set), or today's
-        let goal = active.map { goalHours($0, s, asOf: now) } ?? standardHours(Date(ms: now), s)
+        let goal = active.map { goalHours($0, s, asOf: now, before: before) } ?? standardHours(Date(ms: now), s)
         var netMs: Double, netHours: Double, overtimeHours: Double, pay: Double
         var open: Break? = nil
         if let active {
-            let b = breakdown(active, s, asOf: now)
+            let b = breakdown(active, s, asOf: now, before: before)
             netMs = b.netMs
             netHours = b.netHours
             overtimeHours = b.overtimeHours
@@ -65,7 +67,7 @@ extension Calc {
         return NowStatus(active: active, activeBreak: open, goal: goal, netMs: netMs, netHours: netHours,
                          overtimeHours: overtimeHours, pay: pay,
                          progress: max(0, min(1, goal > 0 ? netHours / goal : 0)), remaining: remaining,
-                         finishMs: finishMs, projected: netHours > 0.001 ? pay * (goal / netHours) : nil,
+                         finishMs: finishMs, projected: netHours > 0.001 && goal > 0 ? pay * (goal / netHours) : nil,
                          periodTotal: periodTotal)
     }
 }

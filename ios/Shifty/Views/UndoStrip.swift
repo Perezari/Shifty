@@ -78,6 +78,7 @@ struct UndoStrip: View {
         case .vacation: return "יום החופש נמחק"
         case .sick: return "יום המחלה נמחק"
         case .reserve: return "יום המילואים נמחק"
+        case .adjustment: return "הסכום נמחק"
         default: return "המשמרת נמחקה"
         }
     }

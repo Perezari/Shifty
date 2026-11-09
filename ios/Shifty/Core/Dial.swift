@@ -49,18 +49,18 @@ extension Calc {
 
     /// When the running shift reaches the day's goal: its start, the goal's hours, and the breaks that apply
     /// (as NowStatus's finish, which is nil once it is reached).
-    static func goalTime(_ shift: Shift, _ s: Settings, asOf now: Double) -> Date {
+    static func goalTime(_ shift: Shift, _ s: Settings, asOf now: Double, before: WorkedBefore? = nil) -> Date {
         // the shift's workplace's standard hours, or a night shift's
-        let goal = goalHours(shift, s, asOf: now)
+        let goal = goalHours(shift, s, asOf: now, before: before)
         let s = s.effective(for: shift)
         return Date(ms: shift.start.ms + goal * hour + max(breaksMs(shift, asOf: now), s.autoBreakMinutes * 60000))
     }
 
     /// The running shift on the dial at `now`, with a leave time chosen or none.
-    static func dial(_ shift: Shift, _ s: Settings, at now: Date, leave: Date? = nil) -> DialLayout {
+    static func dial(_ shift: Shift, _ s: Settings, at now: Date, leave: Date? = nil, before: WorkedBefore? = nil) -> DialLayout {
         let startMs = shift.start.ms
         let rel = { (date: Date) -> Double in dialSpan(date.ms - startMs) }
-        let goal = rel(goalTime(shift, s, asOf: now.ms))
+        let goal = rel(goalTime(shift, s, asOf: now.ms, before: before))
         let nowDeg = rel(now)
         var pieces: [DialLayout.Piece] = []
         // time worked, the part past the goal as overtime
@@ -137,12 +137,13 @@ extension Calc {
     }
 
     /// The shift as it would be if it ended at `end`: an open break ended now, and the hours and the wage then.
-    static func leaving(_ shift: Shift, at end: Date, _ s: Settings, now: Date, sickDates: Set<String>? = nil) -> Breakdown {
+    static func leaving(_ shift: Shift, at end: Date, _ s: Settings, now: Date, sickDates: Set<String>? = nil,
+                        before: WorkedBefore? = nil) -> Breakdown {
         var shift = shift
         for i in shift.breaks.indices where shift.breaks[i].end == nil {
             shift.breaks[i].end = now
         }
         shift.end = end
-        return breakdown(shift, s, sickDates: sickDates)
+        return breakdown(shift, s, sickDates: sickDates, before: before)
     }
 }

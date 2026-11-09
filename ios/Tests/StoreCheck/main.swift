@@ -166,6 +166,24 @@ MainActor.assumeIsolated {
     day.applyRemote([old, recent])
     expect(day.recentlyDeleted(asOf: now).map(\.id) == [morning.id, "srecent"],
            "the last 30 days, the last deleted first, a deletion of another device among them")
+    // a new shift on Shabbat, marked by itself where overtime is counted as the law does; a sum once goes with the shifts
+    let lawStore = ShiftStore(folder: third.appendingPathComponent("law"))
+    let saturdayShift = lawStore.startShift(at: LocalTime.date(2026, 10, 7, 9))
+    expect(!saturdayShift.isHoliday, "not marked with the law's count off")
+    lawStore.endShift(at: LocalTime.date(2026, 10, 7, 10))
+    lawStore.updateSettings { $0.lawOvertime = true }
+    expect(lawStore.startShift(at: LocalTime.date(2026, 10, 14, 9)).isHoliday, "marked with it on")
+    lawStore.endShift(at: LocalTime.date(2026, 10, 14, 10))
+    expect(!lawStore.startShift(at: LocalTime.date(2026, 10, 15, 9)).isHoliday, "a Sunday is not")
+    lawStore.endShift(at: LocalTime.date(2026, 10, 15, 10))
+    let oneSum = lawStore.addAdjustment(LocalTime.date(2026, 10, 16, 20), amount: -50, title: "ארוחות", at: nil)
+    expect(LocalTime.parts(oneSum.start).hour == 12 && oneSum.end == oneSum.start && oneSum.type == .adjustment && lawStore.active == nil, "a sum once sits at noon, and never runs")
+    lawStore.delete(oneSum.id)
+    expect(lawStore.deletion?.ids == [oneSum.id] && lawStore.recentlyDeleted(asOf: ShiftStore.now()).contains { $0.id == oneSum.id }, "deleted as a shift is")
+    lawStore.restore([oneSum.id])
+    expect(lawStore.shift(oneSum.id)?.amount == -50, "and comes back")
+    let reread = ShiftStore(folder: third.appendingPathComponent("law"))
+    expect(reread.shift(oneSum.id)?.amount == -50 && reread.settings.lawOvertime, "read back from the files")
 }
 
 try? FileManager.default.removeItem(at: folder)

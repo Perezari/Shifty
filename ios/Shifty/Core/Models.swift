@@ -16,6 +16,14 @@ struct Shift: Identifiable, Hashable {
     var updatedAt: Date?
     /// The workplace it is at (Settings.workplaces); nil for the settings' own. The app's alone.
     var workplaceId: String?
+    /// A sum once (ShiftType.adjustment): added to its pay period's income, or taken off it when below zero, with its
+    /// name in `note`. The app's alone.
+    var amount: Double?
+
+    /// A paid vacation or sick day, or a day of reserve duty: a day is either work or one of these.
+    var isDayOff: Bool {
+        type == .vacation || type == .sick || type == .reserve
+    }
 }
 
 struct Break: Hashable {
@@ -24,9 +32,11 @@ struct Break: Hashable {
 }
 
 /// Hours worked, a paid vacation or sick day, or a day of reserve duty: kept for the record alone, with no hours
-/// and no pay, as Bituach Leumi's pay for it changes every year.
+/// and no pay, as Bituach Leumi's pay for it changes every year. Or a sum once on a day, beside whatever else the day
+/// holds (Shift.amount): a commission, a grant, an advance, the meals taken off. The web app reads it as a shift of no
+/// hours.
 enum ShiftType: String {
-    case work, vacation, sick, reserve
+    case work, vacation, sick, reserve, adjustment
 }
 
 /// The settings, with the web app's keys and defaults (store.js DEFAULT_SETTINGS). Hours are decimal
@@ -48,6 +58,12 @@ struct Settings: Hashable {
     var overtime1Hours = 2.0
     var overtime1Mult = 1.25
     var overtime2Mult = 1.5
+    /// Overtime as the law counts it (Calc.regularRoom): all the day's shifts together, the week's hours past
+    /// `weeklyHours` too, and on Shabbat and holidays the overtime's rates on top of the holiday's. The app's alone.
+    var lawOvertime = false
+    var weeklyHours = 42.0
+    /// Holiday pay, for a worker paid by the hour (Calc.holidayPays). The app's alone.
+    var holidayPay = false
 
     var nightEnabled = false
     /// The night's window, in hours of the day (22.5 is 22:30); it may cross midnight.
@@ -235,7 +251,7 @@ enum ISODate {
 
 extension Shift: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, start, end, breaks, isHoliday, note, type, deleted, updatedAt, workplaceId
+        case id, start, end, breaks, isHoliday, note, type, deleted, updatedAt, workplaceId, amount
     }
 
     /// As the web app reads a shift: a missing or unknown type is work, a missing flag is false.
@@ -251,6 +267,7 @@ extension Shift: Codable {
         deleted = (try? c.decodeIfPresent(Bool.self, forKey: .deleted)) ?? false
         updatedAt = ISODate.decodeIfPresent(c, .updatedAt)
         workplaceId = (try? c.decodeIfPresent(String.self, forKey: .workplaceId)) ?? nil
+        amount = (try? c.decodeIfPresent(Double.self, forKey: .amount)) ?? nil
     }
 
     func encode(to encoder: Encoder) throws {
@@ -265,6 +282,7 @@ extension Shift: Codable {
         if deleted { try c.encode(true, forKey: .deleted) }
         try c.encodeIfPresent(updatedAt.map(ISODate.string), forKey: .updatedAt)
         try c.encodeIfPresent(workplaceId, forKey: .workplaceId)
+        try c.encodeIfPresent(amount, forKey: .amount)
     }
 }
 
@@ -289,7 +307,8 @@ extension Break: Codable {
 extension Settings: Codable {
     private enum CodingKeys: String, CodingKey {
         case appName, workplaceName, currency, theme, hourlyWage, regularDailyHours, standardByDay,
-             overtime1Hours, overtime1Mult, overtime2Mult, nightEnabled, nightStart, nightEnd, nightMult, nightShift,
+             overtime1Hours, overtime1Mult, overtime2Mult, lawOvertime, weeklyHours, holidayPay,
+             nightEnabled, nightStart, nightEnd, nightMult, nightShift,
              holidayMult, holidaysEnabled, holidayEveHours, vacationHours,
              sickDay1Pct, sickDay2Pct, sickDay3Pct, sickDay4Pct, autoBreakMinutes, autoBreakAfterHours,
              travelPerDay, travelMonthlyCap, monthlyIncomeGoal, monthStartDay, weekStartsOn,
@@ -321,6 +340,9 @@ extension Settings: Codable {
         overtime1Hours = value(.overtime1Hours, d.overtime1Hours)
         overtime1Mult = value(.overtime1Mult, d.overtime1Mult)
         overtime2Mult = value(.overtime2Mult, d.overtime2Mult)
+        lawOvertime = value(.lawOvertime, d.lawOvertime)
+        weeklyHours = value(.weeklyHours, d.weeklyHours)
+        holidayPay = value(.holidayPay, d.holidayPay)
         nightEnabled = value(.nightEnabled, d.nightEnabled)
         nightStart = value(.nightStart, d.nightStart)
         nightEnd = value(.nightEnd, d.nightEnd)
@@ -380,6 +402,9 @@ extension Settings: Codable {
         try c.encode(overtime1Hours, forKey: .overtime1Hours)
         try c.encode(overtime1Mult, forKey: .overtime1Mult)
         try c.encode(overtime2Mult, forKey: .overtime2Mult)
+        try c.encode(lawOvertime, forKey: .lawOvertime)
+        try c.encode(weeklyHours, forKey: .weeklyHours)
+        try c.encode(holidayPay, forKey: .holidayPay)
         try c.encode(nightEnabled, forKey: .nightEnabled)
         try c.encode(nightStart, forKey: .nightStart)
         try c.encode(nightEnd, forKey: .nightEnd)

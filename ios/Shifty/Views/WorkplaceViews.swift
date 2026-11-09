@@ -223,10 +223,17 @@ struct WorkplacePage: View {
                     }
                 }
 
-                SettingsSection(title: "שעות נוספות") {
+                SettingsSection(title: "שעות נוספות", note: overtimeNote(place.rules)) {
                     PercentRow(title: "שעתיים ראשונות", value: multiplier(\.overtime1Mult), range: 100...300)
                     Divider()
                     PercentRow(title: "מעבר לכך", value: multiplier(\.overtime2Mult), range: 100...300)
+                    Divider()
+                    Toggle("ספירה לפי יום ושבוע", isOn: rule(\.lawOvertime))
+                        .settingsRow()
+                    if place.rules.lawOvertime {
+                        Divider()
+                        NumberRow(title: "שעות בשבוע", value: rule(\.weeklyHours), unit: "שעות")
+                    }
                 }
 
                 SettingsSection(title: "הפסקות, שבת ולילה",
@@ -254,6 +261,13 @@ struct WorkplacePage: View {
 
                 SettingsSection(title: "ערב חג", note: "בערב חג וביום מקוצר, התקן הוא השעות שכאן.") {
                     hoursRow("שעות עבודה בערב חג", \.holidayEveHours, place.rules)
+                }
+
+                if now.kind == .hourly {
+                    SettingsSection(title: "דמי חג", note: holidayPayNote(place)) {
+                        Toggle("תשלום על ימי חג", isOn: rule(\.holidayPay))
+                            .settingsRow()
+                    }
                 }
 
                 SettingsSection(title: "חופשה ומחלה",
@@ -331,7 +345,7 @@ struct WorkplacePage: View {
                 }
 
                 SettingsSection(title: "קרן השתלמות",
-                                note: "משכר של עד " + Format.moneyShort(Calc.studyFundWage, s.currency) + " בחודש, התקרה הפטורה ממס ב־2026. החלק שלך יורד מהנטו המשוער.") {
+                                note: studyFundNote(s.currency)) {
                     NumberRow(title: "הפרשת עובד", value: rule(\.studyFundPercent), unit: "%")
                     Divider()
                     NumberRow(title: "הפרשת מעביד", value: rule(\.studyFundEmployerPercent), unit: "%")
@@ -501,6 +515,28 @@ struct WorkplacePage: View {
                 .foregroundStyle(.secondary)
         }
         .settingsRow()
+    }
+
+    /// What counting overtime by the day and the week does, at this employer's rates, as kolzchut.org.il has it.
+    private func overtimeNote(_ rules: EmployerRules) -> String {
+        guard rules.lawOvertime else {
+            return "כל משמרת נספרת כרגע לבדה מול שעות התקן של היום. הספירה לפי יום ושבוע היא הכלל של החוק: היא מחברת את שעות היום, מוסיפה את שעות השבוע, ומחשבת שעות נוספות בשבת ובחג."
+        }
+        let first = Format.percent(rules.holidayMult + rules.overtime1Mult - 1)
+        let second = Format.percent(rules.holidayMult + rules.overtime2Mult - 1)
+        return "כל שעות היום נספרות יחד, גם בכמה משמרות, וכל שעה מעבר לשעות השבוע היא נוספת: 42 במגזר הפרטי, 40 בציבורי. שעות נוספות בשבת ובחג הן \(first) ואז \(second), ומשמרת שמתחילה בהם מסומנת לבד. הכלל לא חל על תפקידי ניהול ואמון."
+    }
+
+    /// Holiday pay's conditions, and the start date it needs.
+    private func holidayPayNote(_ place: Workplace) -> String {
+        let rule = "עובד לפי שעה מקבל תשלום על עד 9 ימי חג בשנה שחלים ביום עבודה, מ־3 חודשי עבודה, אם לא נעדר ביום שלפני החג ואחריו. הסכום הוא ממוצע השעות ליום ב־3 החודשים שלפני החג, בלי שעות נוספות, כפול השכר לשעה."
+        return place.rules.holidayPay && place.startDate == nil ? "צריך תאריך תחילת עבודה, בראש הדף. " + rule : rule
+    }
+
+    /// The study fund's ceiling, at this year's rates.
+    private func studyFundNote(_ currency: String) -> String {
+        let rates = Calc.taxRates(year: LocalTime.parts(Date()).year)
+        return "משכר של עד " + Format.moneyShort(rates.studyFundWage, currency) + " בחודש, התקרה הפטורה ממס ב־\(rates.year). החלק שלך יורד מהנטו המשוער."
     }
 
     /// What the pay now does, under it.

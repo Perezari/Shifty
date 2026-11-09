@@ -32,6 +32,18 @@ struct Breakdown {
     /// day's standard it pays.
     var sickTier: Int? = nil
     var sickPct: Double? = nil
+    /// What it was counted after in its day and week, to count it again as it runs.
+    var before: WorkedBefore? = nil
+}
+
+/// What came before a shift in its day and its week at its workplace, where overtime is counted by them
+/// (Settings.lawOvertime, Calc.workedBefore).
+struct WorkedBefore: Hashable {
+    /// The day's regular hours and overtime so far: the day's standard and its first tier are of the whole day.
+    var dayRegular = 0.0
+    var dayOvertime = 0.0
+    /// The week's regular hours so far, a paid day off's standard among them: a week's overtime is past its hours.
+    var weekRegular = 0.0
 }
 
 /// The hours and wages of a range of shifts (calc.js aggregate).
@@ -56,6 +68,11 @@ struct Totals {
     var bonus = 0.0
     /// The recuperation pay due in it (Calc.recuperation).
     var recuperation = 0.0
+    /// The holiday pay due in it (Calc.holidayPays), and the sums once on its days: those added, and those taken off,
+    /// which the income is without and the tax takes no account of (Shift.amount).
+    var holidayPay = 0.0
+    var additions = 0.0
+    var deductions = 0.0
 }
 
 /// The hours missing ("שעות חוסר"): each day's net hours against the standard it is expected to meet.
@@ -102,16 +119,46 @@ enum Calc {
         return min(standard, 7)
     }
 
+    /// The regular hours a work shift can hold: its day's standard (shiftStandard); where overtime is counted as the
+    /// law does (Settings.lawOvertime), what its day and its week still have of theirs, so that the shifts of a day
+    /// count together, and hours past the week's are overtime though no day passed its standard. `s` is the shift's own
+    /// settings (effective(for:)).
+    static func regularRoom(_ startMs: Double, _ endMs: Double, _ s: Settings, before: WorkedBefore?) -> Double {
+        let standard = shiftStandard(startMs, endMs, s)
+        return s.lawOvertime ? lawRoom(standard, s, before: before) : standard
+    }
+
+    /// What is left of a day's standard and of the week's hours.
+    private static func lawRoom(_ standard: Double, _ s: Settings, before: WorkedBefore?) -> Double {
+        let done = before ?? WorkedBefore()
+        let week = s.weeklyHours > 0 ? s.weeklyHours : 42
+        return max(0, min(standard - done.dayRegular, week - done.weekRegular))
+    }
+
     /// The running shift's goal in hours: the standard of the day of `now`, as the web app's Now screen takes it; or
     /// a night shift's 7, where it is set, once its span up to now, or up to the goal at that standard, holds two
-    /// hours of night.
-    static func goalHours(_ shift: Shift, _ s: Settings, asOf now: Double) -> Double {
+    /// hours of night. Where overtime is counted as the law does, what its day and week still have of that.
+    static func goalHours(_ shift: Shift, _ s: Settings, asOf now: Double, before: WorkedBefore? = nil) -> Double {
         let s = s.effective(for: shift)
-        let day = standardHours(Date(ms: now), s)
-        guard s.nightShift else { return day }
-        let planned = shift.start.ms + day * hour + max(breaksMs(shift, asOf: now), s.autoBreakMinutes * 60000)
-        guard nightMs(shift.start.ms, max(now, planned), 22, 6) >= 2 * hour else { return day }
-        return min(day, 7)
+        var goal = standardHours(Date(ms: now), s)
+        if s.nightShift {
+            let planned = shift.start.ms + goal * hour + max(breaksMs(shift, asOf: now), s.autoBreakMinutes * 60000)
+            if nightMs(shift.start.ms, max(now, planned), 22, 6) >= 2 * hour { goal = min(goal, 7) }
+        }
+        return s.lawOvertime ? lawRoom(goal, s, before: before) : goal
+    }
+
+    /// Whether a shift starting at `date` is on Shabbat or a holiday, by the clock and not by the sun: from 18:00 on its
+    /// eve, up to 18:00 on its day. A new shift's mark, where overtime is counted as the law does; the editor can change it.
+    static func isRestDay(_ date: Date, _ s: Settings) -> Bool {
+        let p = LocalTime.parts(date)
+        if p.weekday == 6 && p.hour < 18 || p.weekday == 5 && p.hour >= 18 { return true }
+        guard s.holidaysEnabled else { return false }
+        switch Holidays.info(date).kind {
+        case .chag: return p.hour < 18
+        case .short: return p.hour >= 18
+        case nil: return false
+        }
     }
 
     /// The breaks of a shift, an open one up to `asOf`.
@@ -185,16 +232,18 @@ enum Calc {
     }
 
     /// A shift's hours and pay, an ongoing shift up to `asOf`. `sickDates` (sickDates(of:) of all the
-    /// shifts) gives a sick day its place in its run; without it, every sick day is the first.
-    static func breakdown(_ shift: Shift, _ s: Settings, asOf: Double? = nil, sickDates: Set<String>? = nil) -> Breakdown {
+    /// shifts) gives a sick day its place in its run; without it, every sick day is the first. `before` (workedBefore)
+    /// gives a shift its place in its day and week, where overtime is counted as the law does.
+    static func breakdown(_ shift: Shift, _ s: Settings, asOf: Double? = nil, sickDates: Set<String>? = nil,
+                          before: WorkedBefore? = nil) -> Breakdown {
         // its workplace's standard hours and the wage of its day's pay (Pay.swift)
         let s = s.effective(for: shift)
         let wage = s.hourlyWage
         let startMs = shift.start.ms
 
-        // a day of reserve duty, for the record: no hours and no pay
-        if shift.type == .reserve {
-            return Breakdown(id: shift.id, type: .reserve, startMs: startMs, endMs: startMs, ongoing: false,
+        // a day of reserve duty, for the record: no hours and no pay; and a sum once, which is the period's (periodTotals)
+        if shift.type == .reserve || shift.type == .adjustment {
+            return Breakdown(id: shift.id, type: shift.type, startMs: startMs, endMs: startMs, ongoing: false,
                              grossMs: 0, breakMs: 0, netMs: 0, netHours: 0, regularHours: 0, ot1Hours: 0, ot2Hours: 0,
                              overtimeHours: 0, nightHours: 0, isHoliday: false, basePay: 0, otPay: 0, nightPremium: 0, pay: 0)
         }
@@ -237,10 +286,11 @@ enum Calc {
         // the night's share of the span worked, breaks included
         let nightHours = s.nightEnabled ? nightMs(startMs, endMs, s.nightStart, s.nightEnd) / hour : 0
 
-        // the regular hours up to the day's standard (a night shift's, where it is set), then the overtime tiers
-        let regular = min(netHours, shiftStandard(startMs, endMs, s))
+        // the regular hours up to the day's standard (a night shift's, where it is set), then the overtime tiers: the
+        // first tier a day's, where the law's count is set
+        let regular = min(netHours, regularRoom(startMs, endMs, s, before: before))
         var rest = netHours - regular
-        let ot1 = min(rest, s.overtime1Hours)
+        let ot1 = min(rest, s.lawOvertime ? max(0, s.overtime1Hours - (before?.dayOvertime ?? 0)) : s.overtime1Hours)
         rest -= ot1
         let ot2 = max(0, rest)
 
@@ -249,11 +299,17 @@ enum Calc {
         var nightPremium: Double
         let pay: Double
         if shift.isHoliday {
-            // the whole shift at the holiday's multiplier
-            basePay = netHours * s.hourlyWage * s.holidayMult
-            otPay = 0
+            if s.lawOvertime {
+                // the regular hours at the holiday's multiplier, and the overtime's on top of it: 175%, then 200%
+                basePay = regular * s.hourlyWage * s.holidayMult
+                otPay = (ot1 * (s.holidayMult + s.overtime1Mult - 1) + ot2 * (s.holidayMult + s.overtime2Mult - 1)) * s.hourlyWage
+            } else {
+                // the whole shift at the holiday's multiplier
+                basePay = netHours * s.hourlyWage * s.holidayMult
+                otPay = 0
+            }
             nightPremium = 0
-            pay = basePay
+            pay = basePay + otPay
         } else {
             basePay = regular * s.hourlyWage
             otPay = (ot1 * s.overtime1Mult + ot2 * s.overtime2Mult) * s.hourlyWage
@@ -266,7 +322,65 @@ enum Calc {
                          grossMs: grossMs, breakMs: breakMs, netMs: netMs, netHours: netHours,
                          regularHours: regular, ot1Hours: ot1, ot2Hours: ot2, overtimeHours: ot1 + ot2,
                          nightHours: nightHours, isHoliday: shift.isHoliday,
-                         basePay: basePay, otPay: otPay, nightPremium: nightPremium, pay: pay)
+                         basePay: basePay, otPay: otPay, nightPremium: nightPremium, pay: pay, before: before)
+    }
+
+    /// What came before each work shift in its day and week, by id, at the workplaces whose overtime is counted as the
+    /// law does; empty where none is. Of the shifts of `range`, all of them without one; `shifts` are all of them. The
+    /// days go in order through each week from its first: a day's regular hours add up, as the week's do, and a paid
+    /// day off, and a holiday not worked on a day of work, count in the week's as a day worked in full, as
+    /// kolzchut.org.il's examples have them.
+    static func workedBefore(_ shifts: [Shift], _ s: Settings, range: TimeRange? = nil, asOf: Double? = nil) -> [String: WorkedBefore] {
+        guard s.lawOvertime || s.workplaces.contains(where: { $0.rules.lawOvertime }) else { return [:] }
+        let from = range.map { weekRange($0.start, weekStartsOn: s.weekStartsOn).start }
+        let list = shifts.filter { shift in
+            !shift.deleted && shift.type != .adjustment && (s.workplace(of: shift)?.rules.lawOvertime ?? s.lawOvertime)
+                && (from.map { shift.start >= $0 } ?? true) && (range.map { shift.start < $0.end } ?? true)
+        }.sorted { $0.start < $1.start }
+        struct Walk {
+            var week: Date
+            var day: Date?
+            var done = WorkedBefore()
+        }
+        var walks: [String: Walk] = [:]
+        var before: [String: WorkedBefore] = [:]
+        for shift in list {
+            let own = s.effective(for: shift)
+            let place = s.workplace(of: shift)?.id ?? ""
+            let day = LocalTime.startOfDay(shift.start)
+            let week = weekRange(shift.start, weekStartsOn: s.weekStartsOn).start
+            var walk = walks[place] ?? Walk(week: week)
+            if walk.week != week { walk = Walk(week: week) }
+            if walk.day != day {
+                // the days since the last shift here, for a holiday among them
+                var gap = walk.day.map { LocalTime.addingDays(1, to: $0) } ?? week
+                while gap < day {
+                    if own.holidaysEnabled, Holidays.info(gap).kind == .chag, let standard = expectedStandard(gap, own) {
+                        walk.done.weekRegular += standard
+                    }
+                    gap = LocalTime.addingDays(1, to: gap)
+                }
+                walk.day = day
+                walk.done.dayRegular = 0
+                walk.done.dayOvertime = 0
+            }
+            if shift.type == .work {
+                before[shift.id] = walk.done
+                let b = breakdown(shift, s, asOf: asOf, before: walk.done)
+                walk.done.dayRegular += b.regularHours
+                walk.done.dayOvertime += b.overtimeHours
+                walk.done.weekRegular += b.regularHours
+            } else {
+                walk.done.weekRegular += expectedStandard(shift.start, own) ?? 0
+            }
+            walks[place] = walk
+        }
+        return before
+    }
+
+    /// What came before one shift in its day and week.
+    static func workedBefore(of shift: Shift, in shifts: [Shift], _ s: Settings, asOf: Double? = nil) -> WorkedBefore? {
+        workedBefore(shifts, s, range: dayRange(shift.start), asOf: asOf)[shift.id]
     }
 
     // MARK: Ranges
@@ -312,6 +426,7 @@ enum Calc {
     /// shift paid by a month's fixed pay earns no wage of its own (periodTotals adds the month's).
     static func aggregate(_ shifts: [Shift], _ s: Settings, range: TimeRange?, asOf: Double? = nil) -> Totals {
         let sick = sickDates(of: shifts)
+        let before = workedBefore(shifts, s, range: range, asOf: asOf)
         let list = range.map { r in shifts.filter { inRange($0, r) } } ?? shifts
         var days = Set<String>()
         // the days worked at each workplace, for its travel (the settings' own under "")
@@ -319,7 +434,7 @@ enum Calc {
         var netHours = 0.0, overtimeHours = 0.0, nightHours = 0.0, pay = 0.0, holidayHours = 0.0
         var count = 0
         for shift in list {
-            let b = breakdown(shift, s, asOf: asOf, sickDates: sick)
+            let b = breakdown(shift, s, asOf: asOf, sickDates: sick, before: before[shift.id])
             if !s.isMonthly(shift) { pay += b.pay } // vacation and sick days are paid…
             if b.type != .work { continue } // …but not hours or days worked
             netHours += b.netHours

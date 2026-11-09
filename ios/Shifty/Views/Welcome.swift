@@ -359,6 +359,9 @@ struct Welcome: View {
             // a vacation day pays the regular day
             place.rules.vacationHours = hours
             place.monthStartDay = fromDay
+            // by the hour: overtime as the law counts it, and holiday pay
+            place.rules.lawOvertime = !global
+            place.rules.holidayPay = !global
             settings.setPlace(nil, place)
             settings.regularDailyHours = hours
         }

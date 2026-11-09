@@ -40,7 +40,7 @@ enum ShiftActions {
             return "המשמרת התחילה ב־" + Format.clock(shift.start) + "."
         case .end:
             guard let ended = store.endShift(at: date ?? ShiftStore.now()) else { return "אין משמרת פעילה." }
-            let b = Calc.breakdown(ended, store.settings)
+            let b = Calc.breakdown(ended, store.settings, before: Calc.workedBefore(of: ended, in: store.shifts, store.settings))
             // a month's fixed pay's shift has no pay of its own
             guard !store.settings.isMonthly(ended) else { return "המשמרת הסתיימה: " + Format.hoursToHM(b.netHours) + " שעות." }
             return "המשמרת הסתיימה: " + Format.hoursToHM(b.netHours) + " שעות, " + Format.money(b.pay, store.settings.currency) + "."
@@ -231,18 +231,22 @@ enum Alerts {
         let rules = s.effective(for: shift)
         let status = Calc.nowStatus(store.shifts, s, active: shift, at: now.ms)
         var planned: [Planned] = []
+        // its place in its day and week, where overtime is counted as the law does
+        let before = Calc.workedBefore(of: shift, in: store.shifts, s, asOf: now.ms)
         // the goal and the overtime move with a break: they are planned again when it ends
         if status.activeBreak == nil, let finish = status.finishMs {
-            let b = Calc.breakdown(shift, s, asOf: finish)
+            let b = Calc.breakdown(shift, s, asOf: finish, before: before)
             // a month's fixed pay's shift has no pay of its own
             let pay = s.isMonthly(shift) ? "" : Format.money(b.pay, s.currency) + " · "
             planned.append(Planned(id: "shifty.goal", date: Date(ms: finish), title: "🎯 הגעת ליעד היומי",
                                    body: Format.hoursToHM(b.netHours) + " שעות · " + pay + "מעכשיו שעות נוספות"))
-            if !shift.isHoliday && rules.overtime1Hours > 0 && rules.overtime2Mult != rules.overtime1Mult {
-                let percent = Int(jsRound(rules.overtime2Mult * 100))
-                planned.append(Planned(id: "shifty.overtime", date: Date(ms: finish + rules.overtime1Hours * Calc.hour),
-                                       title: "⏱️ " + Format.hoursToHM(rules.overtime1Hours) + " שעות נוספות",
-                                       body: "מעכשיו כל שעה ב־\(percent)%."))
+            // Shabbat and holidays have overtime too, where the law's count is set; the day's first tier may be part gone
+            let firstTier = rules.lawOvertime ? max(0, rules.overtime1Hours - (before?.dayOvertime ?? 0)) : rules.overtime1Hours
+            if (!shift.isHoliday || rules.lawOvertime) && firstTier > 0 && rules.overtime2Mult != rules.overtime1Mult {
+                let percent = Format.percent(shift.isHoliday ? rules.holidayMult + rules.overtime2Mult - 1 : rules.overtime2Mult)
+                planned.append(Planned(id: "shifty.overtime", date: Date(ms: finish + firstTier * Calc.hour),
+                                       title: "⏱️ " + Format.hoursToHM(firstTier) + " שעות נוספות",
+                                       body: "מעכשיו כל שעה ב־\(percent)."))
             }
         }
         // six hours on end without a break, from the start or from the last break's end; none where the workplace

@@ -196,6 +196,8 @@ final class ShiftStore {
         if let active { return active }
         var shift = Shift(id: Self.newID(), start: date)
         shift.workplaceId = nextWorkplace
+        // Shabbat or a holiday marked by itself, where overtime is counted as the law does
+        if settings.effective(for: shift).lawOvertime { shift.isHoliday = Calc.isRestDay(date, settings) }
         upsert(shift)
         return shift
     }
@@ -233,6 +235,17 @@ final class ShiftStore {
         let noon = LocalTime.date(p.year, p.month0, p.day, 12)
         var shift = Shift(id: Self.newID(), start: noon, end: noon, type: type)
         shift.workplaceId = nextWorkplace
+        upsert(shift)
+        return shift
+    }
+
+    /// A sum once on a day, added or, below zero, taken off, anchored at noon as a day off is. It goes with the shifts:
+    /// to iCloud, the backup, the strip that brings a deletion back and the recently deleted.
+    @discardableResult
+    func addAdjustment(_ date: Date, amount: Double, title: String, at place: String?) -> Shift {
+        let p = LocalTime.parts(date)
+        let noon = LocalTime.date(p.year, p.month0, p.day, 12)
+        let shift = Shift(id: Self.newID(), start: noon, end: noon, note: title, type: .adjustment, workplaceId: place, amount: amount)
         upsert(shift)
         return shift
     }

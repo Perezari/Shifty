@@ -51,6 +51,17 @@ enum Format {
         return symbol + " " + value.formatted(.number.precision(.fractionLength(2)).locale(hebrew))
     }
 
+    /// "+₪ 500.00" or "−₪ 200.00": a sum added or taken off. The mark holds the sign before the sum in a line laid out
+    /// right to left. The app's own.
+    static func signedMoney(_ amount: Double, _ symbol: String = "₪") -> String {
+        "\u{200E}" + (amount < 0 ? "−" : "+") + money(abs(amount), symbol)
+    }
+
+    /// "125%", of a multiplier. The app's own.
+    static func percent(_ multiplier: Double) -> String {
+        "\(Int(jsRound(multiplier * 100)))%"
+    }
+
     /// "₪ 1,235"
     static func moneyShort(_ amount: Double, _ symbol: String = "₪") -> String {
         symbol + " " + jsRound(amount).formatted(.number.precision(.fractionLength(0)).locale(hebrew))

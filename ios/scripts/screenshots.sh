@@ -65,4 +65,6 @@ shoot shifts 09-shifts-dark
 shoot calendar 10-calendar-dark
 xcrun simctl ui "$udid" appearance light
 shoot pro iap-pro 9
+# the hours report's page, not for the store
+shoot report report 9
 ls -la build/screenshots
