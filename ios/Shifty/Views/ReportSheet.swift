@@ -34,71 +34,10 @@ struct ReportSheet: View {
     }
 
     var body: some View {
-        let settings = store.settings
         NavigationStack {
             VStack(spacing: 12) {
-                VStack(spacing: 0) {
-                    Picker("סוג הדוח", selection: $yearly) {
-                        Text("תקופת שכר").tag(false)
-                        Text("שנה").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.vertical, 12)
-                    Divider()
-                    if yearly {
-                        HStack {
-                            Text("שנה")
-                            Spacer()
-                            Picker("שנה", selection: $year) {
-                                ForEach(years, id: \.self) { value in
-                                    Text(verbatim: String(value)).tag(value)
-                                }
-                            }
-                            .labelsHidden()
-                        }
-                        .settingsRow()
-                        Divider()
-                    }
-                    if !settings.workplaces.isEmpty {
-                        HStack {
-                            Text("מקום עבודה")
-                            Spacer()
-                            Picker("מקום עבודה", selection: $place) {
-                                Text(settings.workplaceName).tag(String?.none)
-                                ForEach(settings.workplaces) { place in
-                                    Text(place.name).tag(Optional(place.id))
-                                }
-                            }
-                            .labelsHidden()
-                        }
-                        .settingsRow()
-                        Divider()
-                    }
-                    HStack(spacing: 12) {
-                        Text("שם העובד")
-                        TextField("לא חובה", text: $name)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(.secondary)
-                            .submitLabel(.done)
-                    }
-                    .settingsRow()
-                    Divider()
-                    Toggle("כולל סכומים", isOn: $amounts)
-                        .settingsRow()
-                }
-                .padding(.horizontal, 16)
-                .card(padding: 0)
-                Group {
-                    if let file {
-                        ReportPreview(url: file)
-                            .id(made)
-                    } else {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                options
+                page
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -124,24 +63,122 @@ struct ReportSheet: View {
                 }
             }
             // made again as the choices change, a moment after the last letter of a name
-            .task(id: (place ?? "") + "|" + name + "|" + String(amounts) + "|" + (yearly ? String(year) : "")) {
-                if made > 0 {
-                    try? await Task.sleep(for: .milliseconds(300))
-                    guard !Task.isCancelled else { return }
-                }
-                let worker = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                if yearly {
-                    file = ReportPDF.file(Calc.yearReport(store.shifts, store.settings, place: place, year: year, asOf: Date().ms),
-                                          name: worker, amounts: amounts)
-                } else {
-                    file = ReportPDF.file(Calc.report(store.shifts, store.settings, place: place, around: around, asOf: Date().ms),
-                                          name: worker, amounts: amounts)
-                }
-                made += 1
+            .task(id: choices) {
+                await make()
             }
         }
         .environment(\.locale, Locale(identifier: "he_IL"))
         .presentationDetents([.large])
+    }
+
+    /// What the report is made of, all of it: when this changes, it is made again.
+    private var choices: String {
+        let chosen = place ?? ""
+        let of = yearly ? String(year) : ""
+        return "\(chosen)|\(name)|\(amounts)|\(of)"
+    }
+
+    private func make() async {
+        if made > 0 {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+        }
+        let worker = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let now = Date().ms
+        if yearly {
+            let report = Calc.yearReport(store.shifts, store.settings, place: place, year: year, asOf: now)
+            file = ReportPDF.file(report, name: worker, amounts: amounts)
+        } else {
+            let report = Calc.report(store.shifts, store.settings, place: place, around: around, asOf: now)
+            file = ReportPDF.file(report, name: worker, amounts: amounts)
+        }
+        made += 1
+    }
+
+    /// The report's kind, and what goes on it.
+    private var options: some View {
+        VStack(spacing: 0) {
+            kindRow
+            Divider()
+            if yearly {
+                yearRow
+                Divider()
+            }
+            if !store.settings.workplaces.isEmpty {
+                placeRow
+                Divider()
+            }
+            nameRow
+            Divider()
+            Toggle("כולל סכומים", isOn: $amounts)
+                .settingsRow()
+        }
+        .padding(.horizontal, 16)
+        .card(padding: 0)
+    }
+
+    private var kindRow: some View {
+        Picker("סוג הדוח", selection: $yearly) {
+            Text("תקופת שכר").tag(false)
+            Text("שנה").tag(true)
+        }
+        .pickerStyle(.segmented)
+        .padding(.vertical, 12)
+    }
+
+    private var yearRow: some View {
+        HStack {
+            Text("שנה")
+            Spacer()
+            Picker("שנה", selection: $year) {
+                ForEach(years, id: \.self) { value in
+                    Text(verbatim: String(value)).tag(value)
+                }
+            }
+            .labelsHidden()
+        }
+        .settingsRow()
+    }
+
+    private var placeRow: some View {
+        HStack {
+            Text("מקום עבודה")
+            Spacer()
+            Picker("מקום עבודה", selection: $place) {
+                Text(store.settings.workplaceName).tag(String?.none)
+                ForEach(store.settings.workplaces) { workplace in
+                    Text(workplace.name).tag(Optional(workplace.id))
+                }
+            }
+            .labelsHidden()
+        }
+        .settingsRow()
+    }
+
+    private var nameRow: some View {
+        HStack(spacing: 12) {
+            Text("שם העובד")
+            TextField("לא חובה", text: $name)
+                .multilineTextAlignment(.trailing)
+                .foregroundStyle(.secondary)
+                .submitLabel(.done)
+        }
+        .settingsRow()
+    }
+
+    /// The report as it will go.
+    private var page: some View {
+        Group {
+            if let file {
+                ReportPreview(url: file)
+                    .id(made)
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
@@ -432,7 +469,7 @@ private struct YearPage: View {
                 Text(verbatim: String(report.year))
                     .font(.system(size: 13, weight: .semibold))
             }
-            Text(name.isEmpty ? report.workplace : name + " · " + report.workplace)
+            Text(details)
                 .font(.system(size: 10.5))
                 .foregroundStyle(Color(white: 0.3))
                 .padding(.top, 3)
@@ -480,6 +517,11 @@ private struct YearPage: View {
         .foregroundStyle(Color.black)
         .environment(\.layoutDirection, .rightToLeft)
         .environment(\.colorScheme, .light)
+    }
+
+    /// The worker, when named, and the workplace.
+    private var details: String {
+        name.isEmpty ? report.workplace : name + " · " + report.workplace
     }
 
     private func rowLine(_ row: YearReport.Row) -> some View {
