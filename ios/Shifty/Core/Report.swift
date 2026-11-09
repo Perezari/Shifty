@@ -25,9 +25,15 @@ struct HoursReport {
 
     /// A line of the sum: what it is, its hours or days when it has them, and its amount when it is paid by itself.
     struct Line: Hashable {
+        /// Its kind, for the calendar's card to mark it.
+        enum Mark: Hashable {
+            case regular, overtime, rest, night, dayOff(ShiftType), holidayPay, money
+        }
+
         let title: String
         let detail: String
         let amount: Double?
+        var mark: Mark = .money
     }
 
     let range: TimeRange
@@ -112,60 +118,14 @@ extension Calc {
         let range = period(around: date, monthStartDay: one.monthStartDay)
         let sum = Calc.summary(there, one, range: range, asOf: now)
 
-        struct Tally {
-            var hours = 0.0
-            var pay = 0.0
-            var paid = false
-
-            mutating func add(_ hours: Double, _ pay: Double, paid: Bool) {
-                self.hours += hours
-                if paid {
-                    self.pay += pay
-                    self.paid = true
-                }
-            }
-        }
-        var regular = Tally(), first = Tally(), second = Tally(), night = Tally()
-        var restBase = Tally(), restFirst = Tally(), restSecond = Tally()
-        var vacation = Tally(), sick = Tally()
-        var reserveDays = 0
-        var once: [HoursReport.Line] = []
         var rows: [HoursReport.Row] = []
         var wages = Set<Double>()
-
-        for shift in sum.shifts.sorted(by: { $0.start < $1.start }) {
+        for shift in sum.shifts.sorted(by: { $0.start < $1.start }) where shift.type != .adjustment {
             guard let b = sum.breakdowns[shift.id] else { continue }
-            let own = one.effective(for: shift)
             let paid = !one.isMonthly(shift)
-            let wage = own.hourlyWage
-            switch shift.type {
-            case .adjustment:
-                let amount = shift.amount ?? 0
-                once.append(.init(title: shift.note.isEmpty ? (amount < 0 ? "ניכוי" : "תוספת") : shift.note, detail: "", amount: amount))
-                continue
-            case .vacation:
-                vacation.add(1, b.pay, paid: paid)
-            case .sick:
-                sick.add(1, b.pay, paid: paid)
-            case .reserve:
-                reserveDays += 1
-            case .work:
-                if paid { wages.insert(wage) }
-                if !shift.isHoliday {
-                    regular.add(b.regularHours, b.basePay, paid: paid)
-                    first.add(b.ot1Hours, b.ot1Hours * own.overtime1Mult * wage, paid: paid)
-                    second.add(b.ot2Hours, b.ot2Hours * own.overtime2Mult * wage, paid: paid)
-                    if b.nightPremium > 0.005 { night.add(b.nightHours, b.nightPremium, paid: paid) }
-                } else if own.lawOvertime {
-                    restBase.add(b.regularHours, b.basePay, paid: paid)
-                    restFirst.add(b.ot1Hours, b.ot1Hours * (own.holidayMult + own.overtime1Mult - 1) * wage, paid: paid)
-                    restSecond.add(b.ot2Hours, b.ot2Hours * (own.holidayMult + own.overtime2Mult - 1) * wage, paid: paid)
-                } else {
-                    restBase.add(b.netHours, b.basePay, paid: paid)
-                }
-            }
             let work = shift.type == .work
             let rest = work && shift.isHoliday
+            if work && paid { wages.insert(one.effective(for: shift).hourlyWage) }
             rows.append(.init(id: shift.id, date: shift.start,
                               start: work ? Format.clock(shift.start) : "", end: work ? shift.end.map { Format.clock($0) } ?? "" : "",
                               breakMinutes: Int(jsRound(b.breakMs / 60000)), net: work ? b.netHours : 0,
@@ -174,40 +134,108 @@ extension Calc {
                               pay: paid && shift.type != .reserve ? b.pay : nil,
                               note: [work ? "" : shift.type.reportTitle, shift.note].filter { !$0.isEmpty }.joined(separator: " · ")))
         }
+        let totals = sum.totals
+        return HoursReport(range: range, workplace: one.workplaceName, rows: rows, lines: lines(sum, one), netHours: totals.netHours,
+                           overtimeHours: totals.overtimeHours, workedDays: totals.workedDays, total: totals.total,
+                           hourlyWage: wages.count == 1 ? wages.first : nil, firstTier: Format.percent(one.overtime1Mult),
+                           secondTier: Format.percent(one.overtime2Mult), currency: one.currency)
+    }
 
-        var lines: [HoursReport.Line] = []
-        func hours(_ title: String, _ tally: Tally) {
-            if tally.hours > 0.001 { lines.append(.init(title: title, detail: Format.hoursShort(tally.hours), amount: tally.paid ? tally.pay : nil)) }
+    /// How a period comes to its income, line by line as a payslip has them: its hours by rate, each workplace's rates
+    /// its own, what its days off pay, its travel and the rest. The report's sum, and the calendar's first card. Their
+    /// amounts add up to the income; hours paid by a month's fixed pay have none.
+    static func lines(_ sum: PeriodSummary, _ s: Settings) -> [HoursReport.Line] {
+        struct Tally {
+            let title: String
+            let mark: HoursReport.Line.Mark
+            /// Its place among the hours': regular, overtime, Shabbat and holidays, night; by rate within them.
+            let order: Double
+            var hours = 0.0
+            var pay = 0.0
+            var paid = false
         }
-        func days(_ title: String, _ count: Int, _ amount: Double?) {
-            if count > 0 { lines.append(.init(title: title, detail: count == 1 ? "יום אחד" : count == 2 ? "יומיים" : "\(count) ימים", amount: amount)) }
+        var tallies: [Tally] = []
+        func add(_ title: String, _ mark: HoursReport.Line.Mark, order: Double, hours: Double, pay: Double, paid: Bool) {
+            guard hours > 0 else { return }
+            let i = tallies.firstIndex { $0.title == title } ?? {
+                tallies.append(Tally(title: title, mark: mark, order: order))
+                return tallies.count - 1
+            }()
+            tallies[i].hours += hours
+            if paid {
+                tallies[i].pay += pay
+                tallies[i].paid = true
+            }
+        }
+        var vacation = (days: 0, pay: 0.0, paid: false)
+        var sick = (days: 0, pay: 0.0, paid: false)
+        var reserveDays = 0
+        var once: [HoursReport.Line] = []
+        for shift in sum.shifts.sorted(by: { $0.start < $1.start }) {
+            guard let b = sum.breakdowns[shift.id] else { continue }
+            let own = s.effective(for: shift)
+            let paid = !s.isMonthly(shift)
+            let wage = own.hourlyWage
+            switch shift.type {
+            case .adjustment:
+                let amount = shift.amount ?? 0
+                once.append(.init(title: shift.note.isEmpty ? (amount < 0 ? "ניכוי" : "תוספת") : shift.note, detail: "", amount: amount))
+            case .vacation:
+                vacation.days += 1
+                if paid {
+                    vacation.pay += b.pay
+                    vacation.paid = true
+                }
+            case .sick:
+                sick.days += 1
+                if paid {
+                    sick.pay += b.pay
+                    sick.paid = true
+                }
+            case .reserve:
+                reserveDays += 1
+            case .work:
+                if !shift.isHoliday {
+                    add("שעות רגילות", .regular, order: 0, hours: b.regularHours, pay: b.basePay, paid: paid)
+                    add("נוספות " + Format.percent(own.overtime1Mult), .overtime, order: 1 + own.overtime1Mult, hours: b.ot1Hours,
+                        pay: b.ot1Hours * own.overtime1Mult * wage, paid: paid)
+                    add("נוספות " + Format.percent(own.overtime2Mult), .overtime, order: 1 + own.overtime2Mult, hours: b.ot2Hours,
+                        pay: b.ot2Hours * own.overtime2Mult * wage, paid: paid)
+                    if b.nightPremium > 0.005 { add("תוספת לילה", .night, order: 100, hours: b.nightHours, pay: b.nightPremium, paid: paid) }
+                } else if own.lawOvertime {
+                    let first = own.holidayMult + own.overtime1Mult - 1
+                    let second = own.holidayMult + own.overtime2Mult - 1
+                    add("שבת וחג " + Format.percent(own.holidayMult), .rest, order: 10 + own.holidayMult, hours: b.regularHours, pay: b.basePay, paid: paid)
+                    add("שבת וחג " + Format.percent(first), .rest, order: 10 + first, hours: b.ot1Hours, pay: b.ot1Hours * first * wage, paid: paid)
+                    add("שבת וחג " + Format.percent(second), .rest, order: 10 + second, hours: b.ot2Hours, pay: b.ot2Hours * second * wage, paid: paid)
+                } else {
+                    add("שבת וחג " + Format.percent(own.holidayMult), .rest, order: 10 + own.holidayMult, hours: b.netHours, pay: b.basePay, paid: paid)
+                }
+            }
+        }
+
+        var lines: [HoursReport.Line] = tallies
+            .filter { $0.hours > 0.001 }
+            .sorted { $0.order < $1.order }
+            .map { .init(title: $0.title, detail: Format.hoursShort($0.hours), amount: $0.paid ? $0.pay : nil, mark: $0.mark) }
+        func days(_ title: String, _ count: Int, _ amount: Double?, _ mark: HoursReport.Line.Mark) {
+            guard count > 0 else { return }
+            lines.append(.init(title: title, detail: count == 1 ? "יום אחד" : count == 2 ? "יומיים" : "\(count) ימים", amount: amount, mark: mark))
         }
         func money(_ title: String, _ amount: Double) {
             if abs(amount) > 0.005 { lines.append(.init(title: title, detail: "", amount: amount)) }
         }
         let totals = sum.totals
-        hours("שעות רגילות", regular)
-        hours("נוספות " + Format.percent(one.overtime1Mult), first)
-        hours("נוספות " + Format.percent(one.overtime2Mult), second)
-        hours("שבת וחג " + Format.percent(one.holidayMult), restBase)
-        hours("שבת וחג " + Format.percent(one.holidayMult + one.overtime1Mult - 1), restFirst)
-        hours("שבת וחג " + Format.percent(one.holidayMult + one.overtime2Mult - 1), restSecond)
-        hours("תוספת לילה", night)
-        days("חופשה", Int(vacation.hours), vacation.paid ? vacation.pay : nil)
-        days("מחלה", Int(sick.hours), sick.paid ? sick.pay : nil)
-        days("מילואים", reserveDays, nil)
-        days("דמי חג", sum.holidayPays.count, totals.holidayPay)
+        days("חופשה", vacation.days, vacation.paid ? vacation.pay : nil, .dayOff(.vacation))
+        days("מחלה", sick.days, sick.paid ? sick.pay : nil, .dayOff(.sick))
+        days("מילואים", reserveDays, nil, .dayOff(.reserve))
+        days("דמי חג", sum.holidayPays.count, totals.holidayPay, .holidayPay)
         money("נסיעות", totals.travel)
         money("שכר חודשי", totals.salary)
         money("שעות נוספות מעבר לכלולות", totals.extraOvertime)
         money("בונוס שנתי", totals.bonus)
         money("דמי הבראה", totals.recuperation)
-        lines += once
-
-        return HoursReport(range: range, workplace: one.workplaceName, rows: rows, lines: lines, netHours: totals.netHours,
-                           overtimeHours: totals.overtimeHours, workedDays: totals.workedDays, total: totals.total,
-                           hourlyWage: wages.count == 1 ? wages.first : nil, firstTier: Format.percent(one.overtime1Mult),
-                           secondTier: Format.percent(one.overtime2Mult), currency: one.currency)
+        return lines + once
     }
 }
 

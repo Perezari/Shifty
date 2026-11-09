@@ -311,8 +311,7 @@ struct NowView: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
-            Image(systemName: type.dayOffSymbol)
-                .font(.system(size: 54, weight: .semibold))
+            DayOffSymbol(type: type, size: 54)
                 .foregroundStyle(type.dayOffColor)
                 .padding(.vertical, 4)
             Text(type.dayOffTitle)
@@ -1269,8 +1268,7 @@ private struct WeekColumn: View {
                 if let off = day.dayOff {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(off.dayOffColor.gradient)
-                    Image(systemName: off.dayOffSymbol)
-                        .font(.system(size: 12, weight: .semibold))
+                    DayOffSymbol(type: off, size: 12)
                         .foregroundStyle(.white)
                         .frame(maxHeight: .infinity)
                 }
@@ -1682,21 +1680,20 @@ private struct LeaveCard: View {
                     .foregroundStyle(.secondary)
             }
             HStack(spacing: 0) {
-                column(ShiftType.vacation.dayOffSymbol, balance.vacation, "ימי חופשה", ShiftType.vacation.dayOffColor)
+                column(.vacation, balance.vacation, "ימי חופשה")
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 36)
-                column("cross.case.fill", balance.sick, "ימי מחלה", .pink)
+                column(.sick, balance.sick, "ימי מחלה")
             }
         }
         .card()
     }
 
-    private func column(_ symbol: String, _ days: Double, _ title: String, _ color: Color) -> some View {
+    private func column(_ type: ShiftType, _ days: Double, _ title: String) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(color)
+            DayOffSymbol(type: type, size: 15)
+                .foregroundStyle(type.dayOffColor)
                 .frame(width: 34, height: 34)
-                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(color.opacity(0.16)))
+                .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(type.dayOffColor.opacity(0.16)))
             VStack(alignment: .leading, spacing: 1) {
                 Text(Format.days(days))
                     .font(.system(size: 20, weight: .bold, design: .rounded))

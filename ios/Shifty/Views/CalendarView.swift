@@ -123,17 +123,8 @@ struct CalendarView: View {
                     }
                 }
                 .card(padding: 8)
-                if !unrecorded.isEmpty {
-                    HStack(spacing: 6) {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .strokeBorder(Color.secondary.opacity(0.75), style: StrokeStyle(lineWidth: 1.2, dash: [2.5, 2.5]))
-                            .frame(width: 13, height: 13)
-                        Text(unrecorded.count == 1 ? "יום עבודה אחד בלי רישום" : "\(unrecorded.count) ימי עבודה בלי רישום")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
                 SummaryCard(cells: cells)
+                PeriodCards(summary: summary, shifts: store.shifts, settings: settings, date: date)
             }
             .padding(.horizontal, 10)
             .padding(.bottom, 24)
@@ -168,9 +159,9 @@ struct DayRef: Identifiable {
     var id: String { LocalTime.dayKey(date) }
 }
 
-/// A day of the calendar, square. Every day has the same lines at the same heights, so that the numbers of a week stay on
-/// one line: the number, and under it what the day holds: the hours worked, a sum once or the holiday's name; a day off
-/// fills the whole day with its color, with its symbol under the number. The Hebrew day is in its corner when it is on.
+/// A day of the calendar, square, its number in the very middle of every day, and at its bottom what the day holds: the
+/// hours worked, a sum once or the holiday's name. A day off fills the whole day with its color, its word at the bottom
+/// and its symbol in the top left corner. The Hebrew day is in the top right one when it is on.
 private struct DayCell: View {
     let date: Date
     let inPeriod: Bool
@@ -185,18 +176,15 @@ private struct DayCell: View {
         let _ = Perf.drew("יום")
         let holiday = holidayInfo
         let off = sum?.dayOff
-        VStack(spacing: 0) {
+        ZStack {
             Text(verbatim: String(LocalTime.parts(date).day))
-                .font(.system(size: 16.5, weight: numberWeight))
+                .font(.system(size: 17, weight: numberWeight))
                 .monospacedDigit()
                 .foregroundStyle(numberColor(holiday))
-                .frame(height: 20)
-            Spacer(minLength: 0)
             under(off, holiday)
-                .frame(height: 18)
+                .padding(.bottom, 4)
+                .frame(maxHeight: .infinity, alignment: .bottom)
         }
-        .padding(.top, 8)
-        .padding(.bottom, 4)
         .padding(.horizontal, 2)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .aspectRatio(1, contentMode: .fit)
@@ -206,7 +194,15 @@ private struct DayCell: View {
                     .font(.system(size: 8.5, weight: .medium))
                     .foregroundStyle(off != nil ? Color.white.opacity(0.85) : Color.secondary)
                     .padding(.top, 3)
-                    .padding(.leading, 4)
+                    .padding(.leading, 5)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if let off {
+                DayOffSymbol(type: off, size: 11)
+                    .foregroundStyle(.white)
+                    .padding(.top, 4)
+                    .padding(.trailing, 4)
             }
         }
         .background {
@@ -242,13 +238,15 @@ private struct DayCell: View {
     @ViewBuilder
     private func under(_ off: ShiftType?, _ holiday: Holidays.Info?) -> some View {
         if let off {
-            Image(systemName: off.dayOffSymbol)
-                .font(.system(size: 16, weight: .semibold))
+            Text(off.dayOffWord)
+                .font(.system(size: 9.5, weight: .bold))
                 .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .accessibilityLabel(off.dayOffTitle)
         } else if let sum, sum.count > 0 {
             Text(Format.hoursToHM(sum.netHours))
-                .font(.system(size: 10.5, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
                 .foregroundStyle(sum.short ? Color.red : Color.secondary)
         } else if let sum, sum.adjustment != 0 {
@@ -260,7 +258,7 @@ private struct DayCell: View {
                 .minimumScaleFactor(0.7)
         } else if let name = holiday?.name {
             Text(name)
-                .font(.system(size: 8.5, weight: .medium))
+                .font(.system(size: 8, weight: .medium))
                 .foregroundStyle(Color("Holiday"))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

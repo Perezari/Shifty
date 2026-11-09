@@ -698,7 +698,18 @@ extension ShiftType: Identifiable {
         }
     }
 
-    /// A day off's symbol and color, the same wherever it shows: on the calendar, in a list, on the week's card.
+    /// A day off's word, in the calendar's day.
+    var dayOffWord: String {
+        switch self {
+        case .vacation: "חופש"
+        case .sick: "מחלה"
+        case .reserve: "מילואים"
+        case .work, .adjustment: ""
+        }
+    }
+
+    /// A day off's symbol and color, the same wherever it shows: on the calendar, in a list, on the week's card. The
+    /// beach umbrella is drawn on its way to the screen (DayOffSymbol); its name here is for what takes a name.
     var dayOffSymbol: String {
         switch self {
         case .vacation: "beach.umbrella.fill"

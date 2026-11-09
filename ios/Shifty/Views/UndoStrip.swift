@@ -35,8 +35,7 @@ struct UndoStrip: View {
             } else if let added = store.addedDayOff, Date().timeIntervalSince(added.at) < Self.seconds, let text = left(added) {
                 capsule {
                     HStack(spacing: 12) {
-                        Image(systemName: added.type.dayOffSymbol)
-                            .font(.subheadline)
+                        DayOffSymbol(type: added.type, size: 15)
                             .foregroundStyle(added.type.dayOffColor)
                         Text(text)
                             .font(.body.weight(.semibold))

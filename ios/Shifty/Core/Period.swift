@@ -103,6 +103,12 @@ extension Calc {
     }
 }
 
+/// A week of a pay period, on the calendar's card: its first day in the period, and its hours there.
+struct PeriodWeek: Hashable {
+    var start: Date
+    var hours: Double
+}
+
 /// A day of the week on the Now screen: the net hours worked on it and the standard it is expected to meet.
 struct WeekDay: Hashable {
     var date: Date
@@ -147,6 +153,19 @@ extension Calc {
             day = LocalTime.addingDays(1, to: day)
         }
         return fixed + variable + variable / Double(totals.workedDays) * Double(left)
+    }
+
+    /// A period's weeks, each as far as it lies in the period, their hours adding up to the period's.
+    static func periodWeeks(_ shifts: [Shift], _ s: Settings, range: TimeRange, asOf now: Double) -> [PeriodWeek] {
+        var weeks: [PeriodWeek] = []
+        var from = range.start
+        while from < range.end {
+            let week = weekRange(from, weekStartsOn: s.weekStartsOn)
+            let part = TimeRange(start: from, end: min(week.end, range.end))
+            weeks.append(PeriodWeek(start: from, hours: aggregate(shifts, s, range: part, asOf: now).netHours))
+            from = part.end
+        }
+        return weeks
     }
 
     /// The days of a period, by day key, that were days of work and passed with nothing recorded: the calendar's dashed

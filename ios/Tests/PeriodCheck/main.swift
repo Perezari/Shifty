@@ -939,5 +939,46 @@ func yearChecksReport() {
 }
 yearChecksReport()
 
+// the calendar's cards: the period's lines, each workplace's rates its own, and its weeks
+func cardChecks() {
+    var settings = Settings()
+    settings.standardByDay = [8, 8, 8, 8, 8, nil, nil]
+    settings.regularDailyHours = 8
+    let range = Calc.period(around: LocalTime.date(2026, 10, 15), monthStartDay: 1)
+    let asOf = LocalTime.date(2026, 10, 20, 9).ms
+    let list = [work(2, 8, 18), work(9, 8, 16), off(3, .vacation), off(4, .sick)].sorted { $0.start > $1.start }
+    let sum = Calc.summary(list, settings, range: range, asOf: asOf)
+    let lines = Calc.lines(sum, settings)
+    expect(lines.map(\.title) == ["שעות רגילות", "נוספות 125%", "חופשה", "מחלה"], "regular first: \(lines.map(\.title))")
+    expect(lines[0].mark == .regular && lines[1].mark == .overtime && lines[2].mark == .dayOff(.vacation) && lines[3].mark == .dayOff(.sick), "their marks")
+    expect(lines[0].detail == "16:00 שע׳" && lines[2].detail == "יום אחד", "their details")
+    expect(abs(lines.compactMap(\.amount).reduce(0, +) - sum.totals.total) < 1e-6, "adding up to the income")
+
+    // another workplace's overtime at its own rate
+    var two = settings
+    var rules = settings.rules
+    rules.overtime1Mult = 1.3
+    two.workplaces = [Workplace(id: "x", name: "שני", pay: [PayTerms(id: "p", from: PayTerms.start, hourlyWage: 60)], standardByDay: settings.standardByDay, rules: rules)]
+    var there = work(10, 8, 18)
+    there.workplaceId = "x"
+    let both = (list + [there]).sorted { $0.start > $1.start }
+    let sumBoth = Calc.summary(both, two, range: range, asOf: asOf)
+    let linesBoth = Calc.lines(sumBoth, two)
+    expect(linesBoth.map(\.title) == ["שעות רגילות", "נוספות 125%", "נוספות 130%", "חופשה", "מחלה"], "both rates, in order: \(linesBoth.map(\.title))")
+    expect(abs(linesBoth.compactMap(\.amount).reduce(0, +) - sumBoth.totals.total) < 1e-6, "and adding up")
+
+    // the weeks: November 2026 from Sunday the 1st, and a period from a Wednesday
+    let weeks = Calc.periodWeeks(list, settings, range: range, asOf: asOf)
+    expect(weeks.count == 5 && weeks.map { LocalTime.parts($0.start).day } == [1, 8, 15, 22, 29], "five weeks from Sundays")
+    expect(near(weeks[0].hours, 10) && near(weeks[1].hours, 8) && weeks[2].hours == 0, "their hours")
+    expect(near(weeks.reduce(0) { $0 + $1.hours }, sum.totals.netHours), "adding up to the period's")
+    let fromWednesday = Calc.period(around: LocalTime.date(2026, 10, 15), monthStartDay: 4)
+    let partWeeks = Calc.periodWeeks(list, settings, range: fromWednesday, asOf: asOf)
+    expect(LocalTime.parts(partWeeks[0].start).day == 4 && LocalTime.parts(partWeeks[1].start).day == 8 && partWeeks.last.map { $0.start < fromWednesday.end } == true,
+           "a first week from the period's first day")
+    expect(near(partWeeks[0].hours, 0) && near(partWeeks[1].hours, 8), "and only its days in it")
+}
+cardChecks()
+
 print(failures == 0 ? "Period: all checks passed" : "Period: \(failures) checks failed")
 exit(failures == 0 ? 0 : 1)
