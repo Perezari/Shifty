@@ -26,6 +26,13 @@ struct ReportSheet: View {
         _year = State(initialValue: LocalTime.parts(around).year)
     }
 
+    /// The years to choose from: those with a record, and the one chosen.
+    private var years: [Int] {
+        var all = Set(Calc.reportYears(store.shifts, store.settings, place: place))
+        all.insert(year)
+        return all.sorted(by: >)
+    }
+
     var body: some View {
         let settings = store.settings
         NavigationStack {
@@ -43,7 +50,7 @@ struct ReportSheet: View {
                             Text("שנה")
                             Spacer()
                             Picker("שנה", selection: $year) {
-                                ForEach(Array(Set(Calc.reportYears(store.shifts, settings, place: place) + [year])).sorted(by: >), id: \.self) { value in
+                                ForEach(years, id: \.self) { value in
                                     Text(verbatim: String(value)).tag(value)
                                 }
                             }
