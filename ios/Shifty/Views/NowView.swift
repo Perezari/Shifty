@@ -38,6 +38,10 @@ struct NowView: View {
     /// The dial's middle shows the time left to the goal, not the time worked: a tap on it changes that.
     @AppStorage("dialShowsLeft") private var showsLeft = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The goal just reached: when its wave of light set off round the ticks.
+    @State private var wave: Date?
+    /// The buttons turning into each other as a shift starts and ends (actions).
+    @Namespace private var buttonSpace
 
     var body: some View {
         let running = store.active != nil
@@ -285,7 +289,7 @@ struct NowView: View {
                           plan = Calc.dialTime(degrees, start: active.start, now: Date())
                       },
                       moveStart: plan == nil ? moveStart(to:) : nil,
-                      movingStart: draftStart != nil, drawn: drawn) {
+                      movingStart: draftStart != nil, drawn: drawn, wave: wave, second: Int(status.netMs / 1000)) {
                 if let leave = plan {
                     planCenter(active, leave: leave, settings, at: date, global: overtime != nil)
                 } else {
@@ -507,13 +511,26 @@ struct NowView: View {
         return name + " · " + day
     }
 
-    /// The goal reached: the iPhone taps, and the ring glows a moment.
+    /// The goal reached: the iPhone taps, the ring glows a moment, and a wave of light runs round the ticks from the
+    /// goal, the iPhone tapping lightly as it goes.
     private func celebrate() {
         celebrations += 1
         Task {
             withAnimation(.easeIn(duration: 0.3)) { glow = true }
             try? await Task.sleep(for: .seconds(0.9))
             withAnimation(.easeOut(duration: 1.2)) { glow = false }
+        }
+        if !reduceMotion { wave = Date() }
+        Task {
+            let tap = UIImpactFeedbackGenerator(style: .light)
+            tap.prepare()
+            try? await Task.sleep(for: .milliseconds(120))
+            for k in 0..<12 {
+                tap.impactOccurred(intensity: 0.8 - 0.05 * CGFloat(k))
+                try? await Task.sleep(for: .milliseconds(62))
+            }
+            try? await Task.sleep(for: .milliseconds(300))
+            wave = nil
         }
     }
 
@@ -563,6 +580,15 @@ struct NowView: View {
         actionButtons()
             .controlSize(.large)
             .buttonBorderShape(.roundedRectangle(radius: 24))
+            // they turn into each other as a shift starts, goes on a break and ends: the start into the break, the plus
+            // into the end, and back
+            .animation(reduceMotion ? .easeInOut(duration: 0.2) : .spring(duration: 0.45, bounce: 0.2), value: buttonsState)
+    }
+
+    /// Which buttons are shown: none running, working, or on a break.
+    private var buttonsState: Int {
+        guard let active = store.active else { return 0 }
+        return store.activeBreak(of: active) == nil ? 1 : 2
     }
 
     @ViewBuilder
@@ -573,6 +599,7 @@ struct NowView: View {
                     lifting(ShiftButton(title: "חזרה לעבודה", systemImage: "play.fill", prominent: true, action: endBreak)) {
                         late("חזרתי מההפסקה", .endBreak, minutes: [5, 10])
                     }
+                    .matchedGeometryEffect(id: "first", in: buttonSpace)
                     endButton()
                 }
                 .controlSize(.large)
@@ -583,6 +610,7 @@ struct NowView: View {
                         lifting(ShiftButton(title: "הפסקה", systemImage: "pause.fill", color: .orange, action: startBreak)) {
                             late("יצאתי להפסקה", .startBreak, minutes: [10, 20, 30])
                         }
+                        .matchedGeometryEffect(id: "first", in: buttonSpace)
                     }
                     endButton()
                 }
@@ -593,6 +621,7 @@ struct NowView: View {
                 lifting(ShiftButton(title: "התחל משמרת", systemImage: "play.fill", prominent: true, action: start)) {
                     late("התחלתי כבר", .start, minutes: [15, 30, 60], other: true)
                 }
+                .matchedGeometryEffect(id: "first", in: buttonSpace)
                 Button {
                     if lifter?.isShowing != true { adding = true }
                 } label: {
@@ -612,6 +641,7 @@ struct NowView: View {
                 } sections: {
                     [.adding(shift: { adding = true }, dayOff: { dayOff = $0 }, adjustment: { adjusting = true })]
                 }
+                .matchedGeometryEffect(id: "second", in: buttonSpace)
             }
             .controlSize(.large)
         }
@@ -626,6 +656,7 @@ struct NowView: View {
             // with taps of its own as it fills, and when it is full (HoldToEnd)
             withAnimation { _ = store.endShift() }
         })
+        .matchedGeometryEffect(id: "second", in: buttonSpace)
     }
 
     /// A button of the shift that a long press lifts as it is, with its menu.
@@ -1041,7 +1072,13 @@ private struct ShiftDial<Center: View>: View {
     var movingStart = false
     /// How much of the arc is drawn, from 0 to 1.
     var drawn = 1.0
+    /// The goal just reached: when a wave of light set off round the ticks.
+    var wave: Date? = nil
+    /// The time worked in whole seconds, its tick lit as a second hand's; nil with none running.
+    var second: Int? = nil
     @ViewBuilder var center: Center
+    /// The goal's flag held under the finger: the ticks by it grow.
+    @GestureState private var draggingFlag = false
 
     var body: some View {
         GeometryReader { geo in
@@ -1092,6 +1129,7 @@ private struct ShiftDial<Center: View>: View {
             if Opening.shared.over {
                 DialFace(size: size)
                 arc(size, r, w)
+                motion(size)
             } else {
                 DialOpening(size: size, layout: layout, time: t)
                 DialHours(size: size)
@@ -1126,6 +1164,24 @@ private struct ShiftDial<Center: View>: View {
                 .rotationEffect(.degrees(layout.startDeg - 90))
         }
         .shadow(color: Color.accentColor.opacity(glow ? 0.6 : 0), radius: glow ? 18 : 0)
+    }
+
+    /// What moves on the ticks (DialMotion.swift): the seconds worked, the ticks by the flag held, and the goal's wave.
+    private func motion(_ size: CGFloat) -> some View {
+        ZStack {
+            if let second {
+                SecondTicks(size: size, second: second)
+            }
+            if draggingFlag, let goal = layout.goalDeg {
+                FlagTicks(size: size, angle: layout.startDeg + (layout.leaveDeg ?? goal))
+                    .transition(.opacity)
+            }
+            if let wave, let goal = layout.goalDeg {
+                DialWave(size: size, from: layout.startDeg + goal, began: wave)
+            }
+        }
+        .frame(width: size, height: size)
+        .animation(.easeOut(duration: 0.18), value: draggingFlag)
     }
 
     /// The start, now and the goal's flag, popping up one after another in the opening.
@@ -1166,6 +1222,7 @@ private struct ShiftDial<Center: View>: View {
                 .opacity(drawn)
                 .position(Self.point(layout.startDeg + (layout.leaveDeg ?? goal), r, c))
                 .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .named("dial"))
+                    .updating($draggingFlag) { _, held, _ in held = true }
                     .onChanged { value in
                         var degrees = atan2(value.location.x - c, -(value.location.y - c)) * 180 / .pi
                         if degrees < 0 { degrees += 360 }
@@ -1322,6 +1379,8 @@ private struct WeekCard: View {
     /// The hours missing on the days before today.
     let missing: Double
     let today: Date
+    /// The bars up; at a launch with the opening, down until they grow.
+    @State private var grown = true
 
     var body: some View {
         let total = days.reduce(0) { $0 + $1.hours }
@@ -1343,12 +1402,22 @@ private struct WeekCard: View {
                 }
             }
             HStack(alignment: .bottom, spacing: 6) {
-                ForEach(days, id: \.date) { day in
-                    WeekColumn(day: day, isToday: LocalTime.dayKey(day.date) == todayKey, past: day.date < LocalTime.startOfDay(today))
+                ForEach(Array(days.enumerated()), id: \.offset) { index, day in
+                    WeekColumn(day: day, isToday: LocalTime.dayKey(day.date) == todayKey, past: day.date < LocalTime.startOfDay(today),
+                               grown: grown, index: index)
                 }
             }
         }
         .card()
+        .task {
+            // with the opening, down until its cards come up (at its 0.9), then up one after another
+            guard !Opening.shared.over else { return }
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { grown = false }
+            await Opening.shared.reach(1.05)
+            grown = true
+        }
     }
 }
 
@@ -1356,6 +1425,9 @@ private struct WeekColumn: View {
     let day: WeekDay
     let isToday: Bool
     let past: Bool
+    var grown = true
+    /// Its place in the week, from its first day: each grows a moment after the one before it.
+    var index = 0
 
     var body: some View {
         VStack(spacing: 7) {
@@ -1365,6 +1437,8 @@ private struct WeekColumn: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+                .opacity(grown ? 1 : 0)
+                .animation(growth, value: grown)
             ZStack(alignment: .bottom) {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(day.standard == nil ? Color.clear : Color.primary.opacity(0.06))
@@ -1376,14 +1450,19 @@ private struct WeekColumn: View {
                     }
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(color)
-                    .frame(height: 66 * share)
+                    .frame(height: 66 * share * (grown ? 1 : 0))
+                    .animation(growth, value: grown)
                 // a day off fills its column in its color, as on the calendar
                 if let off = day.dayOff {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(off.dayOffColor.gradient)
+                        .frame(height: grown ? 66 : 0)
+                        .animation(growth, value: grown)
                     DayOffSymbol(type: off, size: 12)
                         .foregroundStyle(.white)
                         .frame(maxHeight: .infinity)
+                        .opacity(grown ? 1 : 0)
+                        .animation(growth, value: grown)
                 }
             }
             .frame(width: 24, height: 66)
@@ -1392,6 +1471,11 @@ private struct WeekColumn: View {
                 .foregroundStyle(isToday ? Color.accentColor : Color.secondary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    /// A column's growing, a moment after the one before it.
+    private var growth: Animation {
+        .timingCurve(0.33, 1, 0.68, 1, duration: 0.5).delay(0.07 * Double(index))
     }
 
     private var share: CGFloat {

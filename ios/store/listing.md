@@ -163,3 +163,17 @@ submitted, this version holds its list too, so both lists go in the one field.
 • Shifty Pro: דוח שעות ב־PDF לכל תקופת שכר, עם סכומים או בלי, לשליחה למעסיק, ודוח שנתי להשוואה מול טופס 106.
 • Shifty Pro: בסימון יום חופש או מחלה רואים כמה ימים נשארו.
 ```
+
+## Version 1.4
+
+Submitted as 1.3 was: the rest of the page carries over; the build is the newest 1.4 in TestFlight.
+
+**What's New in This Version** (what was built after 1.3's build, 90ac01c):
+
+```
+• כשמגיעים ליעד, גל אור עובר על השנתות מסביב לשעון.
+• כפתור התחלת המשמרת מתפצל להפסקה ולסיום, ובסוף המשמרת הם מתאחדים בחזרה.
+• עמודות השבוע צומחות אחת אחרי השנייה כשהאפליקציה נפתחת.
+• בזמן משמרת נדלקת על השעון שנתה בכל שנייה.
+• כשגוררים את הדגל, השנתות שלידו גדלות מתחת לאצבע.
+```

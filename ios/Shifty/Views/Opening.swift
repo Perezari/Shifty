@@ -44,6 +44,16 @@ final class Opening {
         return date.timeIntervalSince(began) / Self.stretch
     }
 
+    /// Waits until the moment `t` of the opening, in the design's seconds; at once when there is none or it is over.
+    func reach(_ t: Double) async {
+        while !over, began == nil, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        guard !over, let began else { return }
+        let wait = began.addingTimeInterval(t * Self.stretch).timeIntervalSinceNow
+        if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+    }
+
     /// From the dial's place to the screen's middle.
     var travel: CGFloat {
         guard let screenMiddle, let dialMiddle else { return 0 }
@@ -105,6 +115,11 @@ enum OpeningCurve {
 
     static func out5(_ t: Double, _ a: Double, _ b: Double) -> Double {
         1 - pow(1 - line(t, a, b), 5)
+    }
+
+    static func inOut2(_ t: Double, _ a: Double, _ b: Double) -> Double {
+        let x = line(t, a, b)
+        return x < 0.5 ? 2 * x * x : 1 - pow(2 - 2 * x, 2) / 2
     }
 
     static func inOut3(_ t: Double, _ a: Double, _ b: Double) -> Double {
