@@ -12,7 +12,6 @@ import UIKit
 /// minute; out of sight, the dial waits.
 struct NowView: View {
     @Environment(ShiftStore.self) private var store
-    @Environment(Pro.self) private var pro
     @Environment(\.lifter) private var lifter
     @State private var adding = false
     @State private var adjusting = false
@@ -153,8 +152,7 @@ struct NowView: View {
         }
     }
 
-    /// The week, the pay period, a holiday coming and, with Shifty Pro, the days off left at each workplace keeping
-    /// them.
+    /// The week, the pay period, a holiday coming, and the days off left at each workplace keeping them.
     private func cards(at date: Date) -> some View {
         Perf.drew("כרטיסים")
         let settings = store.settings
@@ -180,16 +178,14 @@ struct NowView: View {
             if settings.holidaysEnabled, let coming = Calc.nextHoliday(after: date, within: 14) {
                 HolidayBanner(date: coming.date, info: coming.info, settings: settings, today: date)
             }
-            if pro.unlocked {
-                ForEach(leaves(shifts, settings, at: date)) { leave in
-                    LeaveCard(balance: leave.balance, since: leave.since, place: leave.place)
-                }
-                ForEach(Calc.accruedBonuses(settings, at: date)) { bonus in
-                    BonusCard(bonus: bonus, named: !settings.workplaces.isEmpty, currency: settings.currency)
-                }
-                ForEach(Calc.upcomingRecuperation(settings, at: date)) { due in
-                    RecuperationCard(due: due, named: !settings.workplaces.isEmpty, currency: settings.currency)
-                }
+            ForEach(leaves(shifts, settings, at: date)) { leave in
+                LeaveCard(balance: leave.balance, since: leave.since, place: leave.place)
+            }
+            ForEach(Calc.accruedBonuses(settings, at: date)) { bonus in
+                BonusCard(bonus: bonus, named: !settings.workplaces.isEmpty, currency: settings.currency)
+            }
+            ForEach(Calc.upcomingRecuperation(settings, at: date)) { due in
+                RecuperationCard(due: due, named: !settings.workplaces.isEmpty, currency: settings.currency)
             }
         }
     }
@@ -206,11 +202,11 @@ struct NowView: View {
         }
     }
 
-    /// The arrival at the running shift's workplace, as its place's reminder saw it (Shifty Pro), 5 minutes to 4 hours
+    /// The arrival at the running shift's workplace, as its place's reminder saw it, 5 minutes to 4 hours
     /// before the shift started and after any other shift's end: offered as the start, until taken or closed.
     @ViewBuilder
     private func arrival() -> some View {
-        if pro.unlocked, let active = store.active, arrivalTipShift != active.id {
+        if let active = store.active, arrivalTipShift != active.id {
             let place = store.settings.workplace(of: active)?.id
             if Place.enabled(place), let arrived = Place.arrival(place),
                arrived <= active.start.addingTimeInterval(-5 * 60), arrived > active.start.addingTimeInterval(-4 * 3600),
@@ -1513,8 +1509,7 @@ private struct PlaceLeave: Identifiable {
 }
 
 /// The pay period: its dates and the days left, its income so far and where it is heading, each over its name,
-/// its shifts, overtime and hours missing, and the net pay it is heading to, which opens line by line; without
-/// Shifty Pro, the net's line marked Pro opens Pro.
+/// its shifts, overtime and hours missing, and the net pay it is heading to, which opens line by line.
 private struct PeriodCard: View {
     let range: TimeRange
     let totals: Totals
@@ -1528,7 +1523,6 @@ private struct PeriodCard: View {
     let hourValue: Double?
     let settings: Settings
     let now: Date
-    @Environment(Pro.self) private var pro
     @State private var showsNet = false
 
     var body: some View {
@@ -1578,21 +1572,17 @@ private struct PeriodCard: View {
             if net.gross > 0 {
                 Divider()
                 Button {
-                    if pro.unlocked { showsNet = true } else { pro.offer() }
+                    showsNet = true
                 } label: {
                     HStack(spacing: 6) {
                         Text("נטו משוער")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        if pro.unlocked {
-                            Text(Format.moneyShort(net.net, settings.currency))
-                                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                                .monospacedDigit()
-                                .foregroundStyle(Color.accentColor)
-                        } else {
-                            ProBadge()
-                        }
+                        Text(Format.moneyShort(net.net, settings.currency))
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.accentColor)
                         Image(systemName: "chevron.forward")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.tertiary)

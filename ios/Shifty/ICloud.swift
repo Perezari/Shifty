@@ -21,8 +21,7 @@ final class ICloudStore: CloudStore {
 /// for a new iPhone or a new install: on launch, on coming back to the app and on leaving it, when another
 /// device changes iCloud's copy, and a moment after each change here, so that a run of changes goes up
 /// once. Without iCloud everything stays on the device, as before. iCloud drops writes made before a new
-/// install's first download, and then tells of the download, which merges them in again. With Shifty Pro
-/// alone (ProFlag): without it, nothing goes up or comes down.
+/// install's first download, and then tells of the download, which merges them in again.
 @MainActor
 enum ICloud {
     private static var mirror: CloudMirror?
@@ -30,7 +29,7 @@ enum ICloud {
     private static var pending: Task<Void, Never>?
 
     static func start(_ store: ShiftStore) {
-        guard mirror == nil, ProFlag.on else { return }
+        guard mirror == nil else { return }
         mirror = CloudMirror(cloud: ICloudStore(), store: store)
         store.onChange = { schedule() }
         observer = NotificationCenter.default.addObserver(forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
@@ -39,15 +38,6 @@ enum ICloud {
         }
         NSUbiquitousKeyValueStore.default.synchronize()
         syncNow()
-    }
-
-    /// Shifty Pro given back (a refund): the shifts stay on the device, and iCloud's copy as it was.
-    static func stop() {
-        pending?.cancel()
-        pending = nil
-        if let observer { NotificationCenter.default.removeObserver(observer) }
-        observer = nil
-        mirror = nil
     }
 
     static func syncNow() {

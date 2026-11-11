@@ -1,7 +1,7 @@
 import PDFKit
 import SwiftUI
 
-/// A pay period's hours report at one workplace, or its year on one page, to check Form 106 (Shifty Pro): a PDF to send
+/// A pay period's hours report at one workplace, or its year on one page, to check Form 106: a PDF to send
 /// to the employer, a manpower company or an accountant, seen as it will go. The worker's name on it stays on this
 /// iPhone; nothing leaves it but by the share.
 struct ReportSheet: View {

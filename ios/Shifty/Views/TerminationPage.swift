@@ -2,7 +2,7 @@ import SwiftUI
 
 /// What ending the work at a workplace comes to (Calc.termination), on a dismissal or a resignation and a last day
 /// picked: the seniority, the severance or the pension fund's severance money, the vacation days left paid out, the
-/// recuperation pay due and their total; and the notice, in days and in pay. From a workplace's page, with Shifty Pro.
+/// recuperation pay due and their total; and the notice, in days and in pay. From a workplace's page.
 struct TerminationPage: View {
     /// nil for the settings' own workplace.
     let placeID: String?

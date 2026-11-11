@@ -6,7 +6,7 @@ import UserNotifications
 /// leaving it whether to end the one running there, in notifications whose buttons do it without opening the app.
 /// iOS watches the places and wakes the app when one is crossed, also when the app is closed, once the location is
 /// allowed "always". The places are this iPhone's (UserDefaults), as the lock is: the own workplace's under the
-/// keys below, another's under them and its id. With Shifty Pro alone.
+/// keys below, another's under them and its id.
 final class Place: NSObject, CLLocationManagerDelegate {
     static let shared = Place()
     static let enabledKey = "placeEnabled"
@@ -74,7 +74,7 @@ final class Place: NSObject, CLLocationManagerDelegate {
         for region in manager.monitoredRegions where Self.place(of: region) != nil {
             manager.stopMonitoring(for: region)
         }
-        guard ProFlag.on, CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
+        guard CLLocationManager.isMonitoringAvailable(for: CLCircularRegion.self) else { return }
         // the workplaces from the files, as the app may be woken in the background for this; not one whose work ended
         let settings = ShiftStore.snapshot().settings
         let places: [String?] = [nil] + settings.workplaces.map { Optional($0.id) }
@@ -162,7 +162,7 @@ final class Place: NSObject, CLLocationManagerDelegate {
     @MainActor
     static func arrived(at place: String?) async {
         let store = ShiftStore.shared
-        guard ProFlag.on, !store.settings.place(place).ended(by: Date()) else { return }
+        guard !store.settings.place(place).ended(by: Date()) else { return }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: key(arrivedKey, place))
         guard store.active == nil else {
             UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [leaveCategory])
@@ -180,7 +180,7 @@ final class Place: NSObject, CLLocationManagerDelegate {
     @MainActor
     static func left(_ place: String?) async {
         let store = ShiftStore.shared
-        guard ProFlag.on, let active = store.active, store.settings.workplace(of: active)?.id == place else { return }
+        guard let active = store.active, store.settings.workplace(of: active)?.id == place else { return }
         let now = Date()
         await ask(leaveCategory, title: "יצאת מ" + name(place) + " ב־" + Format.clock(now),
                   body: "המשמרת פתוחה מ־" + Format.clock(active.start) + ". לסיים אותה בשעה שיצאת?",

@@ -5,11 +5,10 @@ import UIKit
 /// each shift's hours and pay, a running one's going up each second (app.js renderShifts). A shift opens in the
 /// editor, a swipe deletes it (offered back for a few seconds at the bottom, UndoStrip), and a long press lifts it with
 /// its menu; the plus adds a shift, and on a long press a day off or a sum once. The period's hours report goes out from
-/// the bar, with Shifty Pro. The list is drawn again each minute while it is on screen, and of the running shift only its pay
+/// the bar. The list is drawn again each minute while it is on screen, and of the running shift only its pay
 /// each second (ShiftRow.live); out of sight, neither.
 struct ShiftsView: View {
     @Environment(ShiftStore.self) private var store
-    @Environment(Pro.self) private var pro
     @Environment(\.lifter) private var lifter
     @State private var offset = 0
     @State private var adding = false
@@ -47,7 +46,7 @@ struct ShiftsView: View {
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
-                        if pro.unlocked { reporting = true } else { pro.offer() }
+                        reporting = true
                     } label: {
                         Image(systemName: "doc.text")
                     }

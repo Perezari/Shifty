@@ -137,7 +137,7 @@ struct Settings: Hashable {
     var recuperationMonth = 6
 
     /// The own workplace's pay from each date, the oldest first (Pay.swift); empty: by the hour at
-    /// `hourlyWage`, from the start. And the other workplaces, with Shifty Pro. The app's alone.
+    /// `hourlyWage`, from the start. And the other workplaces. The app's alone.
     var payTerms: [PayTerms] = []
     var workplaces: [Workplace] = []
 

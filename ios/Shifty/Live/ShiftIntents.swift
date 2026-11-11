@@ -9,13 +9,11 @@ enum ShiftAction {
 
 /// Runs an action on the app's store and answers in a sentence, for Siri. The intents are compiled into the
 /// widget extension too, for its buttons; as Live Activity intents the system always performs them in the
-/// app, which alone is built with SHIFTY_APP (project.yml). With Shifty Pro alone; without it, they say where
-/// to get it, and the free notifications' buttons (ShiftActions) still work.
+/// app, which alone is built with SHIFTY_APP (project.yml).
 @MainActor
 enum ShiftIntents {
     static func run(_ action: ShiftAction) async -> String {
         #if SHIFTY_APP
-        guard ProFlag.on else { return ProFlag.lockedAnswer }
         return await ShiftActions.run(action)
         #else
         return ""

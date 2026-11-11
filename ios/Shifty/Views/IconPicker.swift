@@ -46,7 +46,7 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
     }
 }
 
-/// The icons side by side in Settings › אייקון (Shifty Pro), the one on the Home Screen ringed in the accent; a tap
+/// The icons side by side in Settings › אייקון, the one on the Home Screen ringed in the accent; a tap
 /// sets another, and iOS says that the icon has changed.
 struct IconPicker: View {
     @State private var chosen = AppIconChoice.standard

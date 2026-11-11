@@ -1,6 +1,6 @@
 import Foundation
 
-/// A pay period's hours at one workplace, for its report (Views/ReportSheet.swift, Shifty Pro): each day's, and what they
+/// A pay period's hours at one workplace, for its report (Views/ReportSheet.swift): each day's, and what they
 /// come to, line by line as a payslip has them.
 struct HoursReport {
     /// A shift or a day off.
@@ -56,7 +56,7 @@ struct HoursReport {
     var title: String { Calc.periodTitle(range) }
 }
 
-/// A year's pay periods at one workplace, on one page (Views/ReportSheet.swift, Shifty Pro): to check against the
+/// A year's pay periods at one workplace, on one page (Views/ReportSheet.swift): to check against the
 /// employer's Form 106. The year of a period is the one its net counts in, its last day's (Calc.taxYear).
 struct YearReport {
     struct Row: Hashable, Identifiable {

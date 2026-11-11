@@ -27,10 +27,10 @@ Shifty - משמרות ושכר
 
 ## Pricing and availability
 
-Free, in Israel only: its holidays, overtime rules and tax estimate are Israel's. Shifty Pro is the
-in-app purchase `com.perezari.shifty.pro.lifetime`, a non-consumable at ₪24.90. (The first,
-`com.perezari.shifty.pro`, was created as a consumable by mistake, and so was never kept as owned; App Store
-Connect can't change a product's type, nor give its ID again.)
+Free, in Israel only: its holidays, overtime rules and tax estimate are Israel's. Free in full since 1.4, with no
+in-app purchase: until then Shifty Pro was the in-app purchase `com.perezari.shifty.pro.lifetime`, a non-consumable
+at ₪24.90, removed from sale in App Store Connect once 1.4 went in (whoever bought it keeps it, and loses nothing).
+(The first, `com.perezari.shifty.pro`, was created as a consumable by mistake, and so was never kept as owned.)
 
 ## App privacy
 
@@ -49,7 +49,7 @@ there are no accounts, analytics, ads or servers.
 לוחצים כשנכנסים לעבודה, ורואים את השכר עולה בכל שנייה. שעות נוספות, שבתות, חגים ושעות לילה מחושבים לבד, וכל תקופת השכר מסוכמת בשבילך.
 ```
 
-**Description** (4000 at most):
+**Description** (4000 at most; as it was until 1.4, which takes the one under "Version 1.4" instead):
 
 ```
 Shifty מראה כמה הרווחת, בזמן אמת. לוחצים כשנכנסים לעבודה ולוחצים כשיוצאים, והשעות, השעות הנוספות והשכר מחושבים לבד.
@@ -91,12 +91,12 @@ Shifty Pro: תשלום אחד, בלי מנוי, ושלך לתמיד.
 
 **Screenshots:** from the "Shifty · screenshots" workflow on Codemagic, 1206 by 2622, App Store
 Connect's first iPhone slot, in their numbered order (the first run, 30 October 2026). The app is for the
-iPhone alone, so there are no iPad screenshots. The same run's `iap-pro.png`, Pro's sheet, is the in-app
-purchase's review screenshot (the purchase's page, Review Information).
+iPhone alone, so there are no iPad screenshots. Until 1.4 the same run's `iap-pro.png`, Pro's sheet, was
+the in-app purchase's review screenshot; 1.4 has no purchase, and the workflow takes it no more.
 
 **App Review notes** (App Review asked for them on 2 November 2026, with a screen recording; the same
 text is the reply to its message and the Notes field of App Review Information, under that field's 4000
-characters):
+characters; until 1.4, which takes the one under "Version 1.4"):
 
 ```
 1. Screen recording: attached, made on an iPhone with the latest iOS. It begins at the app's launch and shows a shift from its start to its end, its Live Activity, the net pay and each tab. The app has no account, login or user-generated content. The iPhone's Apple ID bought Shifty Pro in TestFlight, so the recording shows Pro as active (its card in Settings: "Shifty Pro, פעיל. תודה!") and its features in use. Pro's purchase sheet is the in-app purchase's review screenshot.
@@ -166,14 +166,65 @@ submitted, this version holds its list too, so both lists go in the one field.
 
 ## Version 1.4
 
-Submitted as 1.3 was: the rest of the page carries over; the build is the newest 1.4 in TestFlight.
+The app free in full: no in-app purchase, everything that was Shifty Pro open to all. 1.3 was submitted on 9
+November 2026 with Pro; if it was taken back from review before its approval, 1.4 holds its list too.
 
-**What's New in This Version** (what was built after 1.3's build, 90ac01c):
+**What's New in This Version** (what was built after 1.3's build, 90ac01c; 1.3's list before it if 1.3 never went
+out, with its two "Shifty Pro:" lines without those words):
 
 ```
+• Shifty עכשיו בחינם לגמרי: נטו משוער, יתרות חופשה ומחלה, המשמרת במסך הנעילה ובווידג׳טים, Siri, סנכרון ב-iCloud, תזכורת לפי מיקום, דוח שעות ועוד, לכולם ובלי רכישה.
 • כשמגיעים ליעד, גל אור עובר על השנתות מסביב לשעון.
 • כפתור התחלת המשמרת מתפצל להפסקה ולסיום, ובסוף המשמרת הם מתאחדים בחזרה.
 • עמודות השבוע צומחות אחת אחרי השנייה כשהאפליקציה נפתחת.
 • בזמן משמרת נדלקת על השעון שנתה בכל שנייה.
 • כשגוררים את הדגל, השנתות שלידו גדלות מתחת לאצבע.
+```
+
+**Description** (4000 at most; the Pro paragraph gone, its features among the rest):
+
+```
+Shifty מראה כמה הרווחת, בזמן אמת. לוחצים כשנכנסים לעבודה ולוחצים כשיוצאים, והשעות, השעות הנוספות והשכר מחושבים לבד.
+
+• משמרת רצה: שעון עם הזמן שעבר והשכר שעולה בכל שנייה, הפסקות, ודגל שמראה מתי תשלים את שעות היום.
+• שכחת ללחוץ? לחיצה ארוכה על הכפתור מתחילה או מסיימת משמרת לפני כמה דקות, או בשעה שתבחר.
+• שעות נוספות של 125% ו-150%, שבתות וחגים, שעות לילה ודמי נסיעה, לפי ההגדרות שלך.
+• חגי ישראל מזוהים לבד, וגם ערבי חג עם יום עבודה מקוצר.
+• המשמרות של כל תקופת שכר: שעות, שעות חוסר, מספר משמרות וסך הכול, מכל יום בחודש שתבחר.
+• לוח חודשי שמראה במבט אחד אילו ימים השלמת ואילו לא.
+• ימי חופש, מחלה ומילואים, והוספת משמרת שנשכחה.
+• נטו משוער: מס הכנסה עם נקודות הזיכוי, ביטוח לאומי, מס בריאות ופנסיה.
+• יתרות של ימי חופש ומחלה, דמי הבראה, ודף "סיום העבודה" עם פיצויים והודעה מוקדמת לפי החוק.
+• כמה מקומות עבודה, כל אחד עם השכר והכללים שלו, גם בשכר גלובלי.
+• דוח שעות ב-PDF לכל תקופת שכר, ודוח שנתי להשוואה מול טופס 106.
+• המשמרת על מסך הנעילה, ב-Dynamic Island ובווידג׳טים.
+• Siri, מרכז הבקרה וכפתור הפעולה: מתחילים ומסיימים משמרת בלי לפתוח את האפליקציה.
+• תזכורת לפי מיקום, כשמגיעים לעבודה וכשיוצאים ממנה.
+• התראות כשמשלימים את היום, תזכורת להפסקה אחרי 6 שעות, וסיכום בסוף כל תקופה.
+• סנכרון ב-iCloud בין המכשירים שלך, נעילה עם Face ID, מצב כהה וגיבוי לקובץ.
+
+הכול בחינם, בלי רכישות בתוך האפליקציה. הכול נשמר באייפון שלך וב-iCloud שלך: בלי חשבון, בלי פרסומות ובלי מעקב.
+```
+
+**App Review notes** (the Notes field of App Review Information; 1.1's, without the purchase):
+
+```
+1. The app is free in full from this version: its one in-app purchase, Shifty Pro, is gone from the app and has been removed from sale; everything it opened is open to all. The app has no account, login or user-generated content.
+
+2. Purpose and audience: Shifty is a Hebrew app for hourly and shift workers in Israel, at any employer; it is not a business's internal app. It records the hours worked and shows the wage they earn. A shift is started and ended with a tap, and the app computes the regular hours, overtime at 125% and 150%, Shabbat and holiday hours, night hours and travel, as Israeli payslips do, and adds them up by pay period. Workers see what they have earned before the payslip comes, and check the payslip against it.
+
+3. Setup and main features: no account, login or sample files. A first setup asks for the workplace and the wage; it can be skipped. The tabs, right to left:
+- Now (עכשיו): "התחל משמרת" starts a shift; the dial shows the time worked and the pay rising each second; "הפסקה" takes a break; holding "סיום משמרת" until the button fills ends the shift. A long press on start or break, or a tap on end, sets it some minutes earlier or at another time.
+- Shifts (משמרות): the pay period's shifts and totals, and the hours report as a PDF. Tap a shift to edit it, swipe to delete it, long press for its menu; the plus adds a shift, or a day off on a long press.
+- Calendar (לוח): the period's days, each filled by its hours; tap a day for its shifts.
+- Settings (הגדרות): the workplaces (מקומות עבודה), each with its pay (by the hour or monthly), pay period, hours, overtime, vacation, pension, travel and location reminder; then holidays, the net pay's credit points, notifications, the lock, iCloud and a backup to a file.
+Permissions, all optional and asked only when a feature needs them: notifications (the day's hours done, a break reminder, the period's summary); location, When In Use then Always, only for a workplace's reminder (on arriving and on leaving, a notification asks whether to start or end the shift; the location never leaves the device); Face ID for the lock.
+
+4. External services: none: no server, account, analytics, advertising or AI. Only Apple's: iCloud key-value storage to sync the user's own devices, Live Activities and widgets, App Intents for Siri, the Control Center and the Action button, region monitoring and local notifications.
+
+5. Regional differences: none. The app is offered in Israel only, in Hebrew, and its holidays, overtime rules and tax estimate are Israel's.
+
+6. Regulated industry or third-party material: neither. The app computes the user's own wage from the hours they record; it moves no money and gives no financial advice, and it shows the net pay as an estimate.
+
+7. In-App Purchase: none.
 ```

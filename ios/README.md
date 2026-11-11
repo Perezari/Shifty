@@ -33,7 +33,7 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   place's reminder; and the sheet of a pay: by the hour or global, what a global pay does with the overtime, all
   of it covered, some hours, none, or a bonus at each target of hours a month, and an annual bonus) and
   `ShiftEditor` (a shift by hand), `AdjustmentSheet` (a sum once on a day, added or taken off) and `ReportSheet` (the
-  pay period's hours report, or the year's on one page for Form 106, as a PDF, Shifty Pro, on `Core/Report.swift`). `Components` holds what they share: the period's bar and picker, the
+  pay period's hours report, or the year's on one page for Form 106, as a PDF, on `Core/Report.swift`). `Components` holds what they share: the period's bar and picker, the
   summary card, a shift's row, the settings' cards and the wheel of hours and minutes.
 - `Shifty/Live/`: the shift outside the app. `ShiftIntents` holds what its buttons do (start, end, a
   break, as App Intents that the system performs in the app, woken in the background if need be),
@@ -47,14 +47,10 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   the shifts from the App Group: the shift's widget for the home screen and the lock screen, the Live
   Activity on the Lock Screen and in the Dynamic Island, and the shift's switch for the Control Center
   and the Action button.
-- `Shifty/Pro.swift`: Shifty Pro, the one in-app purchase (`com.perezari.shifty.pro.lifetime`, a non-consumable
-  paid once): StoreKit 2's transactions followed from launch, the purchase, and restoring it. It opens the
-  net pay estimate, the vacation and sick days left, the Live Activity and the widgets, Siri and the
-  Control Center, iCloud and the place's reminder; everything else is free. What it finds is kept in
-  `Core/ProFlag.swift`, in the App Group's defaults, where the widgets and the app's launches in the
-  background read it. `Views/ProSheet.swift` holds its sheet, its card at the top of the settings and the
-  "Pro" badge; without it, its settings are dimmed and marked, the widgets show a lock, Siri says where to
-  get it, and a tap on any of them opens the sheet.
+- The app is free in full, with no in-app purchase (since 1.4). Until then Shifty Pro, a non-consumable
+  (`com.perezari.shifty.pro.lifetime`), opened the net pay, the days off left, the Live Activity and the widgets,
+  Siri, iCloud and the place's reminder; its code (`Pro.swift`, `Core/ProFlag.swift`, `Views/ProSheet.swift`) is in
+  git's history.
 - `Shifty/ICloud.swift`: the shifts and the settings in iCloud's key-value store, on the user's other
   devices and back after a reinstall. The merging is `Core/CloudMirror.swift`: each shift by its
   `updatedAt`, the settings as the web app's cloud.js merges them. (The web app and the desktop widget
@@ -65,7 +61,7 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   period as the Shifts and Calendar screens add it up) and `ShiftStore` (store.js: two JSON files in the
   App Group's container; restoring a backup replaces the shifts in iCloud too). `LocalTime` makes dates
   the way JavaScript's `Date` does, so the engine gives the web app's results to the last bit. `Pay` is the
-  app's own: the workplaces besides the settings' (Shifty Pro), each with its employer's rules
+  app's own: the workplaces besides the settings', each with its employer's rules
   (`EmployerRules`: overtime, breaks, Shabbat and night, a holiday's eve, vacation and sick days, the
   pension) and its pay from each date, by the hour or a month's fixed pay (global: its hour is the month
   over 182; its overtime covered, paid beyond some hours or all, or a bonus at each target of hours
@@ -130,8 +126,7 @@ a failed step's errors, and the screenshots downloaded into `build/screenshots`.
 - "Shifty · screenshots" builds for the simulator and photographs the App Store's screens with made-up
   shifts (`Shifty/Demo.swift`), 1206 × 2622, numbered in the store's order: the running shift, the
   shifts, the calendar, a shift's menu on a long press, a day, a new shift, the settings, and three of
-  them in dark, Shifty Pro bought; then `iap-pro.png`, Pro's sheet over the free settings, the in-app
-  purchase's screenshot for its review. The app runs on Israel's clock, and the status bar shows the same
+  them in dark. The app runs on Israel's clock, and the status bar shows the same
   minute.
 
 `scripts/testflight.sh` archives without signing (the team has no registered devices, so there is no

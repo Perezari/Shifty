@@ -6,19 +6,15 @@ struct ShiftyApp: App {
     /// The icon's quick actions reach the app through its delegate (Live/QuickActions.swift).
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var store: ShiftStore
-    @State private var pro: Pro
 
     init() {
         #if DEBUG
         if let screen = Screenshot.current {
             _store = State(initialValue: ShiftStore.demo(screen))
-            _pro = State(initialValue: Pro(screenshot: screen))
             return
         }
         #endif
         _store = State(initialValue: ShiftStore.shared)
-        // the purchase followed from launch, also in the background, where the App Store tells of it
-        _pro = State(initialValue: Pro.shared)
         // the notifications' buttons, and the workplace watched: here, as the app may be launched in the
         // background for them
         UNUserNotificationCenter.current().delegate = Notifications.shared
@@ -31,7 +27,6 @@ struct ShiftyApp: App {
         WindowGroup {
             RootView()
                 .environment(store)
-                .environment(pro)
                 .environment(\.layoutDirection, .rightToLeft)
                 .environment(\.locale, Locale(identifier: "he_IL"))
         }
@@ -57,7 +52,6 @@ enum AppTab: Hashable {
 /// the iOS 26 SDK, the tab bar is Liquid Glass and floats over the content.
 struct RootView: View {
     @Environment(ShiftStore.self) private var store
-    @Environment(Pro.self) private var pro
     @Environment(\.scenePhase) private var phase
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(CardLook.key) private var glassCards = false
@@ -75,7 +69,7 @@ struct RootView: View {
         }
     }
 
-    /// iCloud and the Live Activity, but not for the screenshots' made-up shifts; each with Shifty Pro alone.
+    /// iCloud and the Live Activity, but not for the screenshots' made-up shifts.
     private var syncs: Bool {
         #if DEBUG
         return Screenshot.current == nil
@@ -122,11 +116,6 @@ struct RootView: View {
         .overlay {
             OpeningCover()
         }
-        // Shifty Pro, from anything marked Pro
-        .sheet(isPresented: Bindable(pro).offering) {
-            ProSheet()
-                .environment(pro)
-        }
         // a shift or a vacation day to add, from the icon's quick actions
         .sheet(item: Bindable(QuickActions.shared).adding) { adding in
             switch adding {
@@ -156,7 +145,6 @@ struct RootView: View {
                 }
             }
             .environment(store)
-            .environment(pro)
         }
         // shifts from iCloud, of an earlier install: the app is set up already
         .onChange(of: store.records.isEmpty) { _, empty in
@@ -207,27 +195,15 @@ struct RootView: View {
         .onChange(of: colorScheme) { _, _ in
             if syncs { LiveShift.refresh(store) }
         }
-        // Shifty Pro bought, or given back: iCloud, the Live Activity, the widgets and the place with it
-        .onChange(of: pro.unlocked) { _, unlocked in
-            guard syncs else { return }
-            if unlocked { ICloud.start(store) } else { ICloud.stop() }
-            LiveShift.refresh(store)
-            Place.shared.start()
-        }
-        // a widget or the Live Activity opens the app on the running shift; a widget without Pro, on Pro
-        .onOpenURL { url in
+        // a widget or the Live Activity opens the app on the running shift
+        .onOpenURL { _ in
             Opening.shared.skip()
-            if url.host == "pro" {
-                pro.offer()
-            } else {
-                tab = .now
-            }
+            tab = .now
         }
         .onAppear {
             #if DEBUG
             if let screen = Screenshot.current {
                 tab = screen.tab
-                if screen == .pro { pro.offer() }
             }
             #endif
         }

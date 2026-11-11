@@ -100,7 +100,7 @@ struct EmployerRules: Hashable {
     var holidayPay = false
 }
 
-/// A workplace besides the settings' own (Shifty Pro): its name, its pay from each date, the standard hours of
+/// A workplace besides the settings' own: its name, its pay from each date, the standard hours of
 /// each weekday, its travel, its employer's rules and the day its pay month starts. The settings' own workplace
 /// keeps them in the settings, as the web app does.
 struct Workplace: Hashable, Identifiable {

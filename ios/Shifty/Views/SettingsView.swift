@@ -4,11 +4,9 @@ import UIKit
 
 /// The settings (app.js renderSettings): the workplaces, each on its page with what its employer sets
 /// (WorkplaceViews.swift); then the user's own: the holidays, the pay period, the net pay's credit points, the look,
-/// the notifications, the lock, iCloud and the backup; Shifty Pro on top, and its sections marked without it. Each
-/// change is saved as it is made, and goes to iCloud.
+/// the notifications, the lock, iCloud and the backup. Each change is saved as it is made, and goes to iCloud.
 struct SettingsView: View {
     @Environment(ShiftStore.self) private var store
-    @Environment(Pro.self) private var pro
     @AppStorage(AppLock.key) private var lockOn = false
     @AppStorage(Alerts.key) private var alerts = true
     @AppStorage(Alerts.breakKey) private var breakReminder = true
@@ -31,8 +29,6 @@ struct SettingsView: View {
         let _ = Perf.drew("הגדרות")
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                ProCard()
-
                 // each workplace on its page: its pay from each date, standard hours, travel and employer's rules
                 WorkplacesSection()
 
@@ -49,8 +45,7 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(title: "נטו משוער",
-                                note: "לכל תושב 2.25 נקודות זיכוי, ולאישה 2.75. ההפרשות לפנסיה ולקרן השתלמות נקבעות בדף של כל מקום עבודה. החישוב לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, ולכן התלוש יכול להיות שונה מעט.",
-                                pro: true) {
+                                note: "לכל תושב 2.25 נקודות זיכוי, ולאישה 2.75. ההפרשות לפנסיה ולקרן השתלמות נקבעות בדף של כל מקום עבודה. החישוב לפי מדרגות המס, ביטוח לאומי ומס בריאות של 2026, ולכן התלוש יכול להיות שונה מעט.") {
                     NumberRow(title: "נקודות זיכוי", value: setting(\.creditPoints), unit: "נק׳")
                 }
 
@@ -77,11 +72,11 @@ struct SettingsView: View {
                         .settingsRow()
                 }
 
-                SettingsSection(title: "אייקון", pro: true) {
+                SettingsSection(title: "אייקון") {
                     IconPicker()
                 }
 
-                SettingsSection(title: pro.unlocked ? "מסך הנעילה והתראות" : "התראות", note: alertsNote) {
+                SettingsSection(title: "מסך הנעילה והתראות", note: alertsNote) {
                     Toggle("התראות על המשמרת", isOn: $alerts)
                         .settingsRow()
                     Divider()
@@ -99,7 +94,7 @@ struct SettingsView: View {
                         .settingsRow()
                 }
 
-                SettingsSection(title: "iCloud", note: cloudNote, pro: true) {
+                SettingsSection(title: "iCloud", note: cloudNote) {
                     HStack {
                         Text("גיבוי ב-iCloud")
                         Spacer()
@@ -243,10 +238,9 @@ struct SettingsView: View {
 
     // MARK: The notifications
 
-    /// The notifications, and the Lock Screen's shift with Shifty Pro.
+    /// The notifications, and the Lock Screen's shift.
     private var alertsNote: String {
         let alerts = "ההתראות: כשמגיעים ליעד היומי, כשמתחילות השעות הנוספות של 150%, אחרי 6 שעות ברצף בלי הפסקה, ואחרי 12 שעות של משמרת פתוחה. הסיכום מגיע בבוקר שאחרי סוף התקופה."
-        guard pro.unlocked else { return alerts + " המשמרת במסך הנעילה וב-Dynamic Island: ב-Shifty Pro." }
         return "המשמרת שרצה מופיעה במסך הנעילה וב-Dynamic Island, עם כפתורים להפסקה ולסיום. " + alerts
     }
 
@@ -257,13 +251,10 @@ struct SettingsView: View {
     }
 
     private var cloudStatus: String {
-        pro.unlocked && cloudSignedIn ? "פעיל" : "כבוי"
+        cloudSignedIn ? "פעיל" : "כבוי"
     }
 
     private var cloudNote: String {
-        guard pro.unlocked else {
-            return "המשמרות וההגדרות נשמרות גם ב-iCloud, כמו שהן בכל המכשירים שלך, וחוזרות באייפון חדש או בהתקנה מחדש."
-        }
         if cloudSignedIn {
             return "המשמרות וההגדרות נשמרות באייפון וב-iCloud, וחוזרות באייפון חדש או בהתקנה מחדש."
         }

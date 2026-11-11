@@ -65,7 +65,7 @@ targets:
         # iPad) outweighs the project's setting, and App Store Connect then asks for iPad screenshots.
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        # The icons to pick in Settings › אייקון (Views/IconPicker.swift), with Shifty Pro.
+        # The icons to pick in Settings › אייקון (Views/IconPicker.swift).
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-White AppIcon-Dark AppIcon-Mono"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
@@ -87,7 +87,6 @@ targets:
       - path: Shifty/Core/Models.swift
       - path: Shifty/Core/Now.swift
       - path: Shifty/Core/Pay.swift
-      - path: Shifty/Core/ProFlag.swift
       - path: Shifty/Core/ShiftStore.swift
       - path: Shifty/Live/ShiftActivity.swift
       - path: Shifty/Live/ShiftIntents.swift

@@ -5,8 +5,8 @@ enum Leaving: String {
     case dismissal, resignation
 }
 
-/// What ending the work at a workplace on a last day comes to by the law, at the pay of that day (TerminationPage,
-/// Shifty Pro): the severance, the notice, the vacation days left paid out and the recuperation pay not yet paid. An
+/// What ending the work at a workplace on a last day comes to by the law, at the pay of that day (TerminationPage):
+/// the severance, the notice, the vacation days left paid out and the recuperation pay not yet paid. An
 /// estimate: a contract or a collective agreement can give more.
 struct Termination: Equatable {
     /// The whole years and months of work to the end of the last day.

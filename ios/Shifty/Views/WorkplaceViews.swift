@@ -1,10 +1,9 @@
 import SwiftUI
 
 /// The workplaces at the top of the settings: each a row with its pay now, opening its page (WorkplacePage); and
-/// another one, with Shifty Pro. Designed in ios/preview first.
+/// another one. Designed in ios/preview first.
 struct WorkplacesSection: View {
     @Environment(ShiftStore.self) private var store
-    @Environment(Pro.self) private var pro
     /// A workplace just added, its page opened.
     @State private var added: String?
 
@@ -33,9 +32,6 @@ struct WorkplacesSection: View {
                     Image(systemName: "plus")
                     Text("הוספת מקום עבודה")
                     Spacer()
-                    if !pro.unlocked {
-                        ProBadge()
-                    }
                 }
                 .foregroundStyle(.tint)
                 .settingsRow()
@@ -68,12 +64,8 @@ struct WorkplacesSection: View {
     }
 
     /// Another workplace, by the hour at the own one's wage, with its standard hours and its employer's rules, on its
-    /// page; with Shifty Pro.
+    /// page.
     private func add() {
-        guard pro.unlocked else {
-            pro.offer()
-            return
-        }
         let id = ShiftStore.newID()
         let own = store.settings
         let place = Workplace(id: id, name: "מקום עבודה \(own.workplaces.count + 2)",
@@ -93,7 +85,6 @@ struct WorkplacePage: View {
     /// nil for the settings' own workplace.
     let placeID: String?
     @Environment(ShiftStore.self) private var store
-    @Environment(Pro.self) private var pro
     @Environment(\.dismiss) private var dismiss
     @State private var editing: PayEdit?
     @State private var hoursEdit: HoursEdit?
@@ -283,7 +274,7 @@ struct WorkplacePage: View {
                     PercentRow(title: "מחלה, יום 4 והלאה", value: rule(\.sickDay4Pct), range: 0...100)
                 }
 
-                SettingsSection(title: "יתרת חופשה ומחלה", note: leaveNote(place), pro: true) {
+                SettingsSection(title: "יתרת חופשה ומחלה", note: leaveNote(place)) {
                     Toggle("מעקב יתרות", isOn: keepsBalance)
                         .settingsRow()
                     if place.rules.balanceDate != nil {
@@ -305,7 +296,7 @@ struct WorkplacePage: View {
                     }
                 }
 
-                SettingsSection(title: "דמי הבראה", note: recuperationNote(place), pro: true) {
+                SettingsSection(title: "דמי הבראה", note: recuperationNote(place)) {
                     Toggle("חישוב דמי הבראה", isOn: rule(\.recuperationOn))
                         .settingsRow()
                     if place.rules.recuperationOn {
@@ -369,7 +360,7 @@ struct WorkplacePage: View {
                     }
                 }
 
-                SettingsSection(title: "תזכורת לפי מיקום", note: placeNote, pro: true) {
+                SettingsSection(title: "תזכורת לפי מיקום", note: placeNote) {
                     Toggle("כשמגיעים ל" + place.name + " ויוצאים", isOn: $placeOn)
                         .settingsRow()
                     if placeOn {
@@ -406,7 +397,7 @@ struct WorkplacePage: View {
                     }
                 }
 
-                SettingsSection(title: "סיום העבודה", note: "פיצויים, הודעה מוקדמת, פדיון ימי החופשה ודמי הבראה, לפי החוק.", pro: true) {
+                SettingsSection(title: "סיום העבודה", note: "פיצויים, הודעה מוקדמת, פדיון ימי החופשה ודמי הבראה, לפי החוק.") {
                     NavigationLink {
                         TerminationPage(placeID: placeID)
                     } label: {
@@ -845,7 +836,7 @@ struct WorkplacePage: View {
 
     /// What the place's reminder does, and what it still needs.
     private var placeNote: String {
-        guard placeOn && pro.unlocked else {
+        guard placeOn else {
             return "האייפון ישאל אם להתחיל משמרת כשמגיעים לעבודה, ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה. מקום העבודה נשמר רק באייפון הזה."
         }
         if !placeSet { return "עמוד במקום העבודה ולחץ על הכפתור." }

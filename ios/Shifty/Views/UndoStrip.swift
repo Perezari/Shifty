@@ -4,7 +4,7 @@ import UIKit
 /// The last deletion, for six seconds at the bottom of a screen that deletes (the Shifts list, the calendar, a day's
 /// sheet), above its tab bar: what was deleted, and ביטול to bring it back. After it, the deletion is still in
 /// Settings › נמחקו לאחרונה. Set as the screen's bottom safe area, so that its last row scrolls above it. Also what is
-/// left after a day off is added, with Shifty Pro where the days left are kept (there and on the Now screen).
+/// left after a day off is added, where the days left are kept (there and on the Now screen).
 ///
 /// It has to be seen: a solid capsule in the other look's colors (dark on a light screen, light on a dark one) with
 /// a shadow, rising with a bounce and a tap of the iPhone. Glass, as at first, sank into the cards and the tab bar.
@@ -57,10 +57,10 @@ struct UndoStrip: View {
         .animation(.spring(duration: 0.4, bounce: 0.3), value: store.addedDayOff)
     }
 
-    /// "נשארו 11.5 ימי חופש", as of the day added when it is still ahead; nil without Shifty Pro, for a day of reserve
-    /// duty, and where the workplace does not keep its days left.
+    /// "נשארו 11.5 ימי חופש", as of the day added when it is still ahead; nil for a day of reserve duty, and where the
+    /// workplace does not keep its days left.
     private func left(_ added: AddedDayOff) -> String? {
-        guard ProFlag.on, added.type == .vacation || added.type == .sick, let shift = store.shift(added.id),
+        guard added.type == .vacation || added.type == .sick, let shift = store.shift(added.id),
               let balance = Calc.leave(store.shifts, store.settings, asOf: max(Date(), shift.start),
                                        at: store.settings.workplace(of: shift)?.id) else { return nil }
         let days = added.type == .vacation ? balance.vacation : balance.sick

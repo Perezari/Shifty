@@ -89,9 +89,9 @@ struct PeriodCards: View {
         PeriodDayTile(type: type, count: summary.shifts.filter { $0.type == type }.count, left: left(type))
     }
 
-    /// What is left of a day off's kind, at the workplaces keeping it, with Shifty Pro.
+    /// What is left of a day off's kind, at the workplaces keeping it.
     private func left(_ type: ShiftType) -> Double? {
-        guard ProFlag.on, type != .reserve else { return nil }
+        guard type != .reserve else { return nil }
         let places: [String?] = [nil] + settings.workplaces.map { Optional($0.id) }
         let balances = places.compactMap { Calc.leave(shifts, settings, asOf: date, at: $0) }
         guard !balances.isEmpty else { return nil }
@@ -247,7 +247,7 @@ private struct PeriodWeekBar: View {
     }
 }
 
-/// A kind of day off in the period: how many, and with Shifty Pro how many are left.
+/// A kind of day off in the period: how many, and how many are left.
 private struct PeriodDayTile: View {
     let type: ShiftType
     let count: Int

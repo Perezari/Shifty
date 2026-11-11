@@ -95,7 +95,7 @@ struct Welcome: View {
             VStack(alignment: .leading, spacing: 22) {
                 feature("timer", "משמרת בלחיצה", "התחלה, הפסקה וסיום, והשכר עולה תוך כדי.")
                 feature("calendar", "כל החודש במבט", "שעות נוספות, חוסר מול התקן, חגים וימי חופש.")
-                feature("banknote", "כמה ייכנס", "צפי לסוף התקופה, ונטו משוער ב-Shifty Pro.")
+                feature("banknote", "כמה ייכנס", "צפי לסוף התקופה, ונטו משוער אחרי מס.")
             }
             .padding(.top, 26)
             .padding(.horizontal, 8)
