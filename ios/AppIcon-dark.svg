@@ -1,21 +1,40 @@
-<!-- The icon in the iPhone's dark look (ios/Shifty/Assets.xcassets/AppIcon.appiconset/AppIcon-dark.png,
-     1024 px): AppIcon.svg's ring and start mark in the app's color, on the near black of iOS's own dark
-     icons. -->
+<!-- The icon in the iPhone's dark look (AppIcon.appiconset/AppIcon-dark.png, 1024 px), and the alternate
+     "כהה" (AppIcon-Dark.appiconset, Settings › אייקון): AppIcon.svg's ticks and sign in the app's
+     color, brighter, on the near black of iOS's own dark icons. -->
 <svg width="1024" height="1024" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#202427"/>
-      <stop offset="1" stop-color="#0b0c0d"/>
-    </linearGradient>
-    <linearGradient id="fg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#34d6c4"/>
-      <stop offset="1" stop-color="#14a898"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#bg)"/>
-  <!-- progress ring -->
-  <circle cx="256" cy="256" r="138" fill="none" stroke="#1bb3a3" stroke-opacity="0.26" stroke-width="34"/>
-  <path d="M256 118 a138 138 0 0 1 119.5 207" fill="none" stroke="#25c4b3" stroke-width="34" stroke-linecap="round"/>
-  <!-- play / start mark -->
-  <path d="M228 206 l78 50 -78 50 z" fill="url(#fg)"/>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#262b2e"/>
+<stop offset="1" stop-color="#0b0c0d"/>
+</linearGradient>
+<linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#fff" stop-opacity="0.16"/>
+<stop offset="0.55" stop-color="#fff" stop-opacity="0"/>
+</linearGradient>
+<filter id="sh" x="-40%" y="-40%" width="180%" height="180%">
+<feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#000" flood-opacity="0.24"/>
+</filter>
+<linearGradient id="fg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#4be8d4"/>
+<stop offset="1" stop-color="#11a393"/>
+</linearGradient>
+</defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<rect width="512" height="512" fill="url(#sheen)"/>
+<line x1="256" y1="88" x2="256" y2="52" stroke="#3fdcc8" stroke-opacity="0.9" stroke-width="15" stroke-linecap="round"/>
+<line x1="346" y1="100.12" x2="358" y2="79.33" stroke="#3fdcc8" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round"/>
+<line x1="411.88" y1="166" x2="432.67" y2="154" stroke="#3fdcc8" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round"/>
+<line x1="424" y1="256" x2="460" y2="256" stroke="#3fdcc8" stroke-opacity="0.9" stroke-width="15" stroke-linecap="round"/>
+<line x1="411.88" y1="346" x2="432.67" y2="358" stroke="#3fdcc8" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round"/>
+<line x1="346" y1="411.88" x2="358" y2="432.67" stroke="#3fdcc8" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round"/>
+<line x1="256" y1="424" x2="256" y2="460" stroke="#3fdcc8" stroke-opacity="0.9" stroke-width="15" stroke-linecap="round"/>
+<line x1="166" y1="411.88" x2="154" y2="432.67" stroke="#3fdcc8" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round"/>
+<line x1="100.12" y1="346" x2="79.33" y2="358" stroke="#3fdcc8" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round"/>
+<line x1="88" y1="256" x2="52" y2="256" stroke="#3fdcc8" stroke-opacity="0.9" stroke-width="15" stroke-linecap="round"/>
+<line x1="100.12" y1="166" x2="79.33" y2="154" stroke="#3fdcc8" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round"/>
+<line x1="166" y1="100.12" x2="154" y2="79.33" stroke="#3fdcc8" stroke-opacity="0.4" stroke-width="10" stroke-linecap="round"/>
+<g fill="none" stroke="url(#fg)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" filter="url(#sh)">
+<path d="M166 346V216A50 50 0 0 1 216 166H236A50 50 0 0 1 286 216V290"/>
+<path d="M226 222V296A50 50 0 0 0 276 346H296A50 50 0 0 0 346 296V166"/>
+</g>
 </svg>

@@ -2,11 +2,13 @@ import SwiftUI
 import UIKit
 
 /// The app's icon on the Home Screen: its own, or one of the alternates in Assets.xcassets (project.yml's
-/// ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES, drawn from AppIcon-white.svg, AppIcon-dark.svg and
+/// ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES, drawn from AppIcon-teal.svg, AppIcon-dark.svg and
 /// AppIcon-mono.svg), each with its picture for the picker (IconChoice-…). An alternate keeps its look in the
-/// iPhone's dark look; the app's own turns dark with it.
+/// iPhone's dark look; the app's own turns dark with it. Until 1.5 the app's own was teal and an alternate,
+/// "AppIcon-White", white: that one is still in the app for whoever picked it, now the app's own kept white in the
+/// dark look, and the picker rings the app's own for it.
 enum AppIconChoice: String, CaseIterable, Identifiable {
-    case standard, white, dark, mono
+    case standard, teal, dark, mono
 
     var id: String { rawValue }
 
@@ -14,7 +16,7 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
     var iconName: String? {
         switch self {
         case .standard: nil
-        case .white: "AppIcon-White"
+        case .teal: "AppIcon-Teal"
         case .dark: "AppIcon-Dark"
         case .mono: "AppIcon-Mono"
         }
@@ -23,7 +25,7 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .standard: "רגיל"
-        case .white: "לבן"
+        case .teal: "טורקיז"
         case .dark: "כהה"
         case .mono: "שחור־לבן"
         }
@@ -33,7 +35,7 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
     var picture: String {
         switch self {
         case .standard: "IconChoice-Standard"
-        case .white: "IconChoice-White"
+        case .teal: "IconChoice-Teal"
         case .dark: "IconChoice-Dark"
         case .mono: "IconChoice-Mono"
         }
@@ -92,9 +94,10 @@ struct IconPicker: View {
             .accessibilityHidden(true)
     }
 
-    /// Another icon on the Home Screen; the ring goes back if iOS refuses it.
+    /// Another icon on the Home Screen; the ring goes back if iOS refuses it. By the icon iOS has, not by the ring: the
+    /// white one of before 1.5 is ringed as the app's own, and a tap on the app's own sets it.
     private func choose(_ choice: AppIconChoice) {
-        guard choice != chosen, UIApplication.shared.supportsAlternateIcons else { return }
+        guard UIApplication.shared.alternateIconName != choice.iconName, UIApplication.shared.supportsAlternateIcons else { return }
         let before = chosen
         withAnimation(.snappy(duration: 0.2)) { chosen = choice }
         Task { @MainActor in

@@ -9,7 +9,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    MARKETING_VERSION: "1.4"
+    MARKETING_VERSION: "1.5"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
@@ -37,7 +37,7 @@ targets:
         # The workplace watched, to ask about the shift on arriving and on leaving (Live/Place.swift).
         NSLocationWhenInUseUsageDescription: Shifty שומרת את מקום העבודה שלך כדי לשאול על המשמרת כשמגיעים וכשיוצאים.
         NSLocationAlwaysAndWhenInUseUsageDescription: כדי לשאול אם להתחיל משמרת כשמגיעים לעבודה ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה.
-        # The icon, the opening's first picture (Views/Opening.swift).
+        # The icon, light or dark with the iPhone, the opening's first picture (Views/Opening.swift).
         UILaunchScreen:
           UIColorName: Background
           UIImageName: LaunchIcon
@@ -65,8 +65,9 @@ targets:
         # iPad) outweighs the project's setting, and App Store Connect then asks for iPad screenshots.
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        # The icons to pick in Settings › אייקון (Views/IconPicker.swift).
-        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-White AppIcon-Dark AppIcon-Mono"
+        # The icons to pick in Settings › אייקון (Views/IconPicker.swift), and AppIcon-White, the white one of
+        # before 1.5, kept for whoever picked it.
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-Teal AppIcon-Dark AppIcon-Mono AppIcon-White"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
         # The intents' work in the app alone (Live/ShiftIntents.swift); the widget extension has them too.

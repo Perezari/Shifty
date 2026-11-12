@@ -497,15 +497,18 @@ struct SettingsSection<Content: View>: View {
     }
 }
 
-/// The app's icon, light or dark with the iPhone (Assets.xcassets' Icon, from AppIcon), in its rounded square.
+/// The app's icon, light or dark with the iPhone (Assets.xcassets' Icon, from AppIcon), in its rounded square, with a
+/// hairline edge: white, it would melt into the app's near white.
 struct AppIconImage: View {
     let size: CGFloat
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous)
         Image("Icon")
             .resizable()
             .frame(width: size, height: size)
-            .clipShape(RoundedRectangle(cornerRadius: size * 0.2237, style: .continuous))
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5))
             .accessibilityHidden(true)
     }
 }

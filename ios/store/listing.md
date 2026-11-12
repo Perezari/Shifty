@@ -228,3 +228,15 @@ Permissions, all optional and asked only when a feature needs them: notification
 
 7. In-App Purchase: none.
 ```
+
+## Version 1.5
+
+A new icon (the user's pick, 12 November 2026): the shekel sign inside a clock's twelve ticks, in the app's color on
+white; teal, the icon's colors until then, among the alternates in Settings.
+
+**What's New in This Version** (what was built after 1.4's build, 06263bf):
+
+```
+• אייקון חדש: סימן השקל בתוך שנתות של שעון.
+• בהגדרות › אייקון אפשר לבחור גם אייקון בטורקיז, כהה או שחור־לבן.
+```

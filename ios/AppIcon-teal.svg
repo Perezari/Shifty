@@ -1,0 +1,35 @@
+<!-- An alternate icon, "טורקיז" (Settings › אייקון; AppIcon-Teal.appiconset, 1024 px): AppIcon.svg's
+     ticks and sign in white on the app's color, the icon's colors until 1.5. It stays so in the dark look. -->
+<svg width="1024" height="1024" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#1cbcab"/>
+<stop offset="1" stop-color="#0a6a60"/>
+</linearGradient>
+<linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#fff" stop-opacity="0.16"/>
+<stop offset="0.55" stop-color="#fff" stop-opacity="0"/>
+</linearGradient>
+<filter id="sh" x="-40%" y="-40%" width="180%" height="180%">
+<feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#000" flood-opacity="0.24"/>
+</filter>
+</defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<rect width="512" height="512" fill="url(#sheen)"/>
+<line x1="256" y1="88" x2="256" y2="52" stroke="#fff" stroke-opacity="0.95" stroke-width="15" stroke-linecap="round"/>
+<line x1="346" y1="100.12" x2="358" y2="79.33" stroke="#fff" stroke-opacity="0.5" stroke-width="10" stroke-linecap="round"/>
+<line x1="411.88" y1="166" x2="432.67" y2="154" stroke="#fff" stroke-opacity="0.5" stroke-width="10" stroke-linecap="round"/>
+<line x1="424" y1="256" x2="460" y2="256" stroke="#fff" stroke-opacity="0.95" stroke-width="15" stroke-linecap="round"/>
+<line x1="411.88" y1="346" x2="432.67" y2="358" stroke="#fff" stroke-opacity="0.5" stroke-width="10" stroke-linecap="round"/>
+<line x1="346" y1="411.88" x2="358" y2="432.67" stroke="#fff" stroke-opacity="0.5" stroke-width="10" stroke-linecap="round"/>
+<line x1="256" y1="424" x2="256" y2="460" stroke="#fff" stroke-opacity="0.95" stroke-width="15" stroke-linecap="round"/>
+<line x1="166" y1="411.88" x2="154" y2="432.67" stroke="#fff" stroke-opacity="0.5" stroke-width="10" stroke-linecap="round"/>
+<line x1="100.12" y1="346" x2="79.33" y2="358" stroke="#fff" stroke-opacity="0.5" stroke-width="10" stroke-linecap="round"/>
+<line x1="88" y1="256" x2="52" y2="256" stroke="#fff" stroke-opacity="0.95" stroke-width="15" stroke-linecap="round"/>
+<line x1="100.12" y1="166" x2="79.33" y2="154" stroke="#fff" stroke-opacity="0.5" stroke-width="10" stroke-linecap="round"/>
+<line x1="166" y1="100.12" x2="154" y2="79.33" stroke="#fff" stroke-opacity="0.5" stroke-width="10" stroke-linecap="round"/>
+<g fill="none" stroke="#fff" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" filter="url(#sh)">
+<path d="M166 346V216A50 50 0 0 1 216 166H236A50 50 0 0 1 286 216V290"/>
+<path d="M226 222V296A50 50 0 0 0 276 346H296A50 50 0 0 0 346 296V166"/>
+</g>
+</svg>
