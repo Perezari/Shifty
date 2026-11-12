@@ -91,8 +91,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   `AppIcon-dark.svg` and `AppIcon-mono.svg`, each with a small picture `IconChoice-…` for the picker, and
   `AppIcon-White`, the white one of before 1.5, kept for whoever picked it), the accent color and the
   background, in light and dark.
-- `scripts/`: the builds (`testflight.sh`, `screenshots.sh`, and `codemagic.py` to run them from the
-  computer) and the check of the Swift without a Mac (`check-swift.sh`).
+- `scripts/`: the builds (`testflight.sh`, `screenshots.sh`, `review.py`, and `codemagic.py` to run
+  them from the computer) and the check of the Swift without a Mac (`check-swift.sh`).
 - `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).
 
 ## Checking the Swift without a Mac
@@ -120,7 +120,7 @@ bash ios/scripts/check-calc.sh
 Builds run on Codemagic, only when started there by hand (Start new build) or from the computer; a
 personal account has 500 free Mac minutes a month. `scripts/codemagic.py` reaches them through
 Codemagic's API, with the token in `~/.codemagic-token`: the latest builds, starting one, following it,
-a failed step's errors, and the screenshots downloaded into `build/screenshots`.
+a failed step's errors, a step's log, and the screenshots downloaded into `build/screenshots`.
 
 - "Shifty · TestFlight" signs the app and uploads it to TestFlight. It reads the variable group
   `app_store`: `APPLE_API_ISSUER`, `APPLE_API_KEY` (the Key ID), `APPLE_API_KEY_P8` (the text of the
@@ -130,6 +130,11 @@ a failed step's errors, and the screenshots downloaded into `build/screenshots`.
   shifts, the calendar, a shift's menu on a long press, a day, a new shift, the settings, and three of
   them in dark. The app runs on Israel's clock, and the status bar shows the same
   minute.
+- "Shifty · App Review" submits the newest build of `MARKETING_VERSION` to App Review through the App
+  Store Connect API (`scripts/review.py`, with the same key): it makes the version if it isn't there, puts
+  the build on it, writes its What's New from `store/listing.md` and submits it; the rest of the page
+  carries over from the version before. Started without `SUBMIT=yes` it only looks and says what it
+  would do (`codemagic.py start review`, then `codemagic.py log <id> "App Review"`).
 
 `scripts/testflight.sh` archives without signing (the team has no registered devices, so there is no
 development profile), signs the archive for no one with the app's entitlements (an unsigned archive

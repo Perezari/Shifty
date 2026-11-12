@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """The app's builds on Codemagic, from the computer (codemagic.yaml): the latest builds, starting one,
-following it to the end, the errors of a failed one, and its screenshots. The API token is read from
-~/.codemagic-token, outside the repository (Codemagic: Account settings, API token).
+following it to the end, the errors of a failed one, a step's log, and its screenshots. The API token is
+read from ~/.codemagic-token, outside the repository (Codemagic: Account settings, API token).
 
 A build takes some of the month's free minutes, so one is started only when the user asks for it.
 
     python ios/scripts/codemagic.py builds
-    python ios/scripts/codemagic.py start testflight      # or: screenshots
+    python ios/scripts/codemagic.py start testflight      # or: screenshots, review [SUBMIT=yes]
     python ios/scripts/codemagic.py wait <build id>
     python ios/scripts/codemagic.py errors <build id>
+    python ios/scripts/codemagic.py log <build id> [words of the step's name]   # else the last step
     python ios/scripts/codemagic.py artifacts <build id> [folder]   # into ios/build/screenshots
     python ios/scripts/codemagic.py cancel <build id>
 """
@@ -76,6 +77,17 @@ def errors(build):
                 print("  " + entry.strip())
 
 
+def log(build, words=None):
+    """A step's whole log: those whose name holds the words, or else the last step."""
+    actions = build.get("buildActions", [])
+    chosen = [a for a in actions if words.lower() in (a.get("name") or "").lower()] if words else actions[-1:]
+    for action in chosen:
+        print(f"== {action.get('name')} ({action.get('status')})")
+        for sub in action.get("subactions") or [action]:
+            if sub.get("logUrl"):
+                print(get(sub["logUrl"]))
+
+
 def artifacts(build, folder):
     """The build's files into the folder, each by its name: the screenshots' PNGs, which Codemagic gives in
     one zip."""
@@ -103,7 +115,11 @@ if command == "builds":
         print(line(item))
 elif command == "start":
     workflow = sys.argv[2]
-    started = call("POST", "/builds", {"appId": APP, "workflowId": workflow, "branch": "main"})
+    body = {"appId": APP, "workflowId": workflow, "branch": "main"}
+    variables = dict(arg.split("=", 1) for arg in sys.argv[3:])
+    if variables:
+        body["environment"] = {"variables": variables}
+    started = call("POST", "/builds", body)
     print(started.get("buildId"))
 elif command == "wait":
     while True:
@@ -117,6 +133,8 @@ elif command == "wait":
         errors(current)
 elif command == "errors":
     errors(build(sys.argv[2]))
+elif command == "log":
+    log(build(sys.argv[2]), sys.argv[3] if len(sys.argv) > 3 else None)
 elif command == "cancel":
     call("POST", f"/builds/{sys.argv[2]}/cancel")
     print(line(build(sys.argv[2])))

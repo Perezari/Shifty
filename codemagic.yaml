@@ -2,10 +2,11 @@
 # minutes a month on them. Nothing starts on its own: a build runs when it is started in Codemagic
 # (Start new build) or through its API (ios/scripts/codemagic.py).
 #
-# The TestFlight workflow reads the variable group "app_store", set in the app's Environment
-# variables, each variable Secret: APPLE_API_ISSUER, APPLE_API_KEY (the Key ID), APPLE_API_KEY_P8 (the
-# text of the .p8 file) and APPLE_DEVELOPMENT_TEAM. The screenshots workflow needs none: it photographs
-# the app in the simulator, with made-up shifts.
+# The TestFlight and App Review workflows read the variable group "app_store", set in the app's
+# Environment variables, each variable Secret: APPLE_API_ISSUER, APPLE_API_KEY (the Key ID),
+# APPLE_API_KEY_P8 (the text of the .p8 file) and APPLE_DEVELOPMENT_TEAM. The screenshots workflow needs
+# none: it photographs the app in the simulator, with made-up shifts. App Review only looks unless it is
+# started with the variable SUBMIT=yes (ios/scripts/review.py).
 definitions:
   scripts:
     - &prepare
@@ -42,3 +43,14 @@ workflows:
         script: bash ios/scripts/screenshots.sh
     artifacts:
       - ios/build/screenshots/*.png
+
+  review:
+    name: Shifty · App Review
+    instance_type: mac_mini_m2
+    max_build_duration: 10
+    environment:
+      groups:
+        - app_store
+    scripts:
+      - name: The newest build to App Review
+        script: python3 ios/scripts/review.py
