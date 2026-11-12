@@ -66,8 +66,15 @@ final class QuickActions {
     }
 }
 
-/// The app's delegate, for its scene's: the icon's quick actions reach the app through them.
+/// The app's delegate, for its scene's: the icon's quick actions reach the app through them. At a launch it also has
+/// iOS's kept picture of the launch screen drawn again once a version (LaunchScreenCache).
 final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        LaunchScreenCache.clearOncePerVersion()
+        return true
+    }
+
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession,
                      options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         // launched by a quick action: done as the app comes up

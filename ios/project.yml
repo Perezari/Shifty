@@ -37,10 +37,11 @@ targets:
         # The workplace watched, to ask about the shift on arriving and on leaving (Live/Place.swift).
         NSLocationWhenInUseUsageDescription: Shifty שומרת את מקום העבודה שלך כדי לשאול על המשמרת כשמגיעים וכשיוצאים.
         NSLocationAlwaysAndWhenInUseUsageDescription: כדי לשאול אם להתחיל משמרת כשמגיעים לעבודה ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה.
-        # The icon, light or dark with the iPhone, the opening's first picture (Views/Opening.swift).
+        # The icon, light or dark with the iPhone, the opening's first picture (Views/Opening.swift). A new name
+        # with each new design, for iOS to draw its launch screen again rather than keep the old (LaunchScreenCache).
         UILaunchScreen:
           UIColorName: Background
-          UIImageName: LaunchIcon
+          UIImageName: LaunchShekel
         UIRequiresFullScreen: true
         # Animations at the screen's own rate, up to 120 frames a second: without this key Core Animation holds an
         # iPhone app's own animations to 60, while iOS's scrolling runs at 120.

@@ -15,7 +15,7 @@
       "scale": "1x"
     },
     {
-      "filename": "LaunchIcon@2x.png",
+      "filename": "LaunchShekel@2x.png",
       "idiom": "universal",
       "scale": "2x"
     },
@@ -26,12 +26,12 @@
           "value": "dark"
         }
       ],
-      "filename": "LaunchIcon-dark@2x.png",
+      "filename": "LaunchShekel-dark@2x.png",
       "idiom": "universal",
       "scale": "2x"
     },
     {
-      "filename": "LaunchIcon@3x.png",
+      "filename": "LaunchShekel@3x.png",
       "idiom": "universal",
       "scale": "3x"
     },
@@ -42,7 +42,7 @@
           "value": "dark"
         }
       ],
-      "filename": "LaunchIcon-dark@3x.png",
+      "filename": "LaunchShekel-dark@3x.png",
       "idiom": "universal",
       "scale": "3x"
     }

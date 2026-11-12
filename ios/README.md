@@ -87,7 +87,7 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   period (`PeriodCheck`).
 - `Shifty/Assets.xcassets`: the icon (`AppIcon.svg` at 1024 px, the shekel sign inside a clock's twelve ticks,
   and `AppIcon-dark.svg` and `AppIcon-tinted.svg` for the iPhone's dark and tinted home screen; the same
-  picture is `Icon` and, light and dark, `LaunchIcon`), the alternates picked in Settings (`AppIcon-teal.svg`,
+  picture is `Icon` and, light and dark, `LaunchShekel`), the alternates picked in Settings (`AppIcon-teal.svg`,
   `AppIcon-dark.svg` and `AppIcon-mono.svg`, each with a small picture `IconChoice-…` for the picker, and
   `AppIcon-White`, the white one of before 1.5, kept for whoever picked it), the accent color and the
   background, in light and dark.

@@ -1,7 +1,7 @@
 <!-- The iPhone app's icon (ios/Shifty/Assets.xcassets/AppIcon.appiconset/AppIcon.png, 1024 px), since 1.5:
      the shekel sign, two interlocking strokes, inside a clock's twelve ticks, in the app's color on white.
      iOS draws its rounded corners. Drawn by the scratch script that also renders the PNGs; the same
-     picture, without the sign's shadow, is LaunchIcon and Views/Opening.swift's first frame. -->
+     picture, without the sign's shadow, is LaunchShekel and Views/Opening.swift's first frame. -->
 <svg width="1024" height="1024" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
 <defs>
 <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">

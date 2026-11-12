@@ -173,7 +173,7 @@ struct OpeningCover: View {
                 ZStack {
                     if opening.began == nil {
                         Color.appBackground
-                        Image("LaunchIcon")
+                        Image("LaunchShekel")
                     } else {
                         OpeningCurtain()
                     }
@@ -300,7 +300,7 @@ private enum OpeningDrawing {
     }
 
     /// The icon: a rounded square growing into the dial's circle in the accent, its mark fading and a hole opening in
-    /// its middle, until it is the ring. It begins as LaunchIcon, the picture iOS's launch screen leaves: white, with a
+    /// its middle, until it is the ring. It begins as LaunchShekel, the picture iOS's launch screen leaves: white, with a
     /// hairline inside its edge, or AppIcon-dark.svg's in the dark look.
     private static func icon(_ context: GraphicsContext, _ c: CGFloat, _ r: CGFloat, _ w: CGFloat, at t: Double) {
         let p = OpeningCurve.inOut3(t, 0.03, 0.36)
@@ -410,5 +410,23 @@ private enum OpeningDrawing {
         path.addArc(center: CGPoint(x: c, y: c), radius: radius, startAngle: .degrees(from - 90),
                     endAngle: .degrees(to - 90), clockwise: false)
         return path
+    }
+}
+
+/// iOS keeps its own picture of the launch screen, and after an update may go on showing the old one: 1.5's first
+/// launches showed the old icon fading into the new. So the launch picture takes a new name with a new design
+/// (LaunchShekel; LaunchIcon until 1.5), and once a version, a few seconds into the launch, the kept picture is thrown
+/// away for iOS to draw it again at the next launch.
+enum LaunchScreenCache {
+    private static let key = "launchScreenClearedFor"
+
+    static func clearOncePerVersion() {
+        let info = Bundle.main.infoDictionary
+        let version = (info?["CFBundleShortVersionString"] as? String ?? "") + "-" + (info?["CFBundleVersion"] as? String ?? "")
+        guard UserDefaults.standard.string(forKey: key) != version else { return }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 5) {
+            try? FileManager.default.removeItem(at: URL.libraryDirectory.appending(path: "SplashBoard", directoryHint: .isDirectory))
+            UserDefaults.standard.set(version, forKey: key)
+        }
     }
 }
