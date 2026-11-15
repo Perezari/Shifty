@@ -3,6 +3,16 @@
     {
       "filename": "IconChoice-Navy.png",
       "idiom": "universal"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "filename": "IconChoice-Navy-dark.png",
+      "idiom": "universal"
     }
   ],
   "info": {

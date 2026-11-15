@@ -33,7 +33,7 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Its picture in the picker: the icon in the light look.
+    /// Its picture in the picker: the icon as the Home Screen has it, light or dark with the iPhone.
     var picture: String {
         switch self {
         case .standard: "IconChoice-Standard"

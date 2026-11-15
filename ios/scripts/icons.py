@@ -182,16 +182,20 @@ def main():
         icon = "AppIcon" if name == "Standard" else "AppIcon-" + name
         folder = os.path.join(ASSETS, icon + ".appiconset")
         shown = compose(light, man, ticks, SIZE, with_ticks)
+        shown_dark = compose(dark, man, ticks, SIZE, with_ticks)
         save(shown, folder, icon + ".png")
-        save(compose(dark, man, ticks, SIZE, with_ticks), folder, icon + "-dark.png")
+        save(shown_dark, folder, icon + "-dark.png")
         save(compose(TINTED, man, ticks, SIZE, with_ticks, tinted=True), folder, icon + "-tinted.png")
         size = {"idiom": "universal", "platform": "ios", "size": "1024x1024"}
         contents(folder, [{"filename": icon + ".png", **size},
                           {"appearances": DARK, "filename": icon + "-dark.png", **size},
                           {"appearances": TINT, "filename": icon + "-tinted.png", **size}])
+        # The picker's picture, light and dark as the icon is on the Home Screen
         choice = os.path.join(ASSETS, "IconChoice-" + name + ".imageset")
         save(shown.resize((192, 192), Image.LANCZOS), choice, "IconChoice-" + name + ".png")
-        contents(choice, [{"filename": "IconChoice-" + name + ".png", "idiom": "universal"}])
+        save(shown_dark.resize((192, 192), Image.LANCZOS), choice, "IconChoice-" + name + "-dark.png")
+        contents(choice, [{"filename": "IconChoice-" + name + ".png", "idiom": "universal"},
+                          {"appearances": DARK, "filename": "IconChoice-" + name + "-dark.png", "idiom": "universal"}])
 
     light, dark = ICONS["Standard"]
     # The app's own icon inside the app (AppIconImage), light and dark

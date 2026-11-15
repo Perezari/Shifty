@@ -3,6 +3,16 @@
     {
       "filename": "IconChoice-Yellow.png",
       "idiom": "universal"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "filename": "IconChoice-Yellow-dark.png",
+      "idiom": "universal"
     }
   ],
   "info": {

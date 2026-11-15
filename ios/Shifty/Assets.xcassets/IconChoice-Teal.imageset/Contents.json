@@ -3,6 +3,16 @@
     {
       "filename": "IconChoice-Teal.png",
       "idiom": "universal"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "filename": "IconChoice-Teal-dark.png",
+      "idiom": "universal"
     }
   ],
   "info": {
