@@ -53,7 +53,9 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
 }
 
 /// The icons in Settings › אייקון, three to a row, the one on the Home Screen ringed in the accent; a tap sets another,
-/// the ring moving to it with a light tap of the iPhone, without iOS's own alert (IconChangeAlert).
+/// the ring moving to it with a light tap of the iPhone, and iOS says that the icon has changed. (Its alert comes out
+/// wrong in Hebrew, but iOS 26 shows it beyond the app's reach: 1.6's TestFlight builds tried to hold it back from the
+/// app's side, before it is presented and as it appears, and it showed all the same.)
 struct IconPicker: View {
     @State private var chosen = AppIconChoice.standard
     private static let size: CGFloat = 54
@@ -106,83 +108,12 @@ struct IconPicker: View {
         let before = chosen
         withAnimation(.snappy(duration: 0.2)) { chosen = choice }
         UISelectionFeedbackGenerator().selectionChanged()
-        IconChangeAlert.skipNext()
         Task { @MainActor in
             do {
                 try await UIApplication.shared.setAlternateIconName(choice.iconName)
             } catch {
                 withAnimation(.snappy(duration: 0.2)) { chosen = before }
             }
-        }
-    }
-}
-
-/// iOS's own alert after an icon change ("שינית את האייקון של…") comes out wrong in Hebrew: its text to the left, away
-/// from the icon, under it an empty band. The picker's ring says the same, so it is let go: for ten seconds after the
-/// picker asks for a change (iOS takes a moment to change it), the first alert with one button is not shown. Two ways,
-/// as iOS may bring it up either: a screen about to present it does not; and should it be presented all the same, it is
-/// hidden as it appears and taken away when it is in. Every other alert and screen goes on as always.
-@MainActor
-enum IconChangeAlert {
-    private static var until = Date.distantPast
-    private static var installed = false
-
-    static func skipNext() {
-        install()
-        until = Date().addingTimeInterval(10)
-    }
-
-    fileprivate static func skips(_ controller: UIViewController) -> Bool {
-        guard Date() < until, let alert = controller as? UIAlertController, alert.actions.count <= 1 else { return false }
-        until = .distantPast
-        return true
-    }
-
-    /// From the first change on, UIKit's present goes by way of `iconChangePresent`, and an alert's viewWillAppear by
-    /// way of `iconChangeWillAppear`: the alert's own, added to it first if it has none, for no other screen to change.
-    private static func install() {
-        guard !installed else { return }
-        installed = true
-        if let original = class_getInstanceMethod(UIViewController.self, #selector(UIViewController.present(_:animated:completion:))),
-           let replacement = class_getInstanceMethod(UIViewController.self, #selector(UIViewController.iconChangePresent(_:animated:completion:))) {
-            method_exchangeImplementations(original, replacement)
-        }
-        let alert = UIAlertController.self
-        let appear = #selector(UIViewController.viewWillAppear(_:))
-        let ours = #selector(UIAlertController.iconChangeWillAppear(_:))
-        guard let original = class_getInstanceMethod(alert, appear), let replacement = class_getInstanceMethod(alert, ours) else { return }
-        if class_addMethod(alert, appear, method_getImplementation(replacement), method_getTypeEncoding(replacement)) {
-            class_replaceMethod(alert, ours, method_getImplementation(original), method_getTypeEncoding(original))
-        } else {
-            method_exchangeImplementations(original, replacement)
-        }
-    }
-}
-
-extension UIViewController {
-    /// UIKit's present, exchanged with it by IconChangeAlert: under this name, after the exchange, is the original.
-    /// Dynamic, for the call below to go by the exchange and not straight to this.
-    @objc dynamic fileprivate func iconChangePresent(_ controller: UIViewController, animated: Bool, completion: (() -> Void)?) {
-        if IconChangeAlert.skips(controller) {
-            completion?()
-            return
-        }
-        iconChangePresent(controller, animated: animated, completion: completion)
-    }
-}
-
-extension UIAlertController {
-    /// An alert's viewWillAppear, exchanged with it by IconChangeAlert: the icon's alert, if it got this far, unseen and
-    /// gone once its coming in is over.
-    @objc dynamic fileprivate func iconChangeWillAppear(_ animated: Bool) {
-        iconChangeWillAppear(animated)
-        guard IconChangeAlert.skips(self) else { return }
-        view.alpha = 0
-        presentationController?.containerView?.alpha = 0
-        if let coordinator = transitionCoordinator {
-            coordinator.animate(alongsideTransition: nil) { [weak self] _ in self?.dismiss(animated: false) }
-        } else {
-            DispatchQueue.main.async { [weak self] in self?.dismiss(animated: false) }
         }
     }
 }

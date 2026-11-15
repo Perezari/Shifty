@@ -54,6 +54,26 @@ xcodebuild -project Shifty.xcodeproj -scheme Shifty -configuration Release \
 # Group; the app alone has iCloud's key-value store (ICloud.swift). The export then signs it again for
 # the App Store.
 app=build/Shifty.xcarchive/Products/Applications/Shifty.app
+
+# The icons as built, for the log: the alternates iOS is told of, and each icon set's looks in the app's
+# Assets.car (a set without a dark look stays light on a dark Home Screen). Only printed; never fails the build.
+python3 - "$app" <<'PY' || true
+import collections, json, plistlib, subprocess, sys
+app = sys.argv[1]
+with open(app + "/Info.plist", "rb") as f:
+    icons = plistlib.load(f).get("CFBundleIcons", {})
+print("Primary icon:", icons.get("CFBundlePrimaryIcon", {}).get("CFBundleIconName"))
+print("Alternate icons:", ", ".join(sorted(icons.get("CFBundleAlternateIcons", {}))))
+out = subprocess.run(["xcrun", "assetutil", "--info", app + "/Assets.car"], capture_output=True, text=True).stdout
+looks = collections.defaultdict(set)
+for item in json.loads(out or "[]"):
+    name = item.get("Name") or ""
+    if name.startswith("AppIcon"):
+        looks[name].add(item.get("Appearance") or "any")
+for name in sorted(looks):
+    print(" ", name, sorted(looks[name]))
+PY
+
 entitlements() {
   cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
