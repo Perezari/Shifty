@@ -9,7 +9,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    MARKETING_VERSION: "1.5"
+    MARKETING_VERSION: "1.6"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
@@ -22,7 +22,8 @@ targets:
     info:
       path: Shifty/Info.plist
       properties:
-        CFBundleDisplayName: Shifty
+        # The name under the icon, since 1.6 (Shifty until then; the project, its targets and the bundle IDs keep it)
+        CFBundleDisplayName: מר משמרת
         # XcodeGen would write "1.0" and "1"; the TestFlight build sets the build number to its time.
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
@@ -31,17 +32,17 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.productivity
         # The lock (Lock.swift).
-        NSFaceIDUsageDescription: Shifty משתמשת ב-Face ID כדי להיפתח כשהנעילה פועלת.
+        NSFaceIDUsageDescription: מר משמרת משתמש ב-Face ID כדי להיפתח כשהנעילה פועלת.
         # The running shift on the Lock Screen and in the Dynamic Island (Live/LiveShift.swift).
         NSSupportsLiveActivities: true
         # The workplace watched, to ask about the shift on arriving and on leaving (Live/Place.swift).
-        NSLocationWhenInUseUsageDescription: Shifty שומרת את מקום העבודה שלך כדי לשאול על המשמרת כשמגיעים וכשיוצאים.
+        NSLocationWhenInUseUsageDescription: מר משמרת שומר את מקום העבודה שלך כדי לשאול על המשמרת כשמגיעים וכשיוצאים.
         NSLocationAlwaysAndWhenInUseUsageDescription: כדי לשאול אם להתחיל משמרת כשמגיעים לעבודה ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה.
         # The icon, light or dark with the iPhone, the opening's first picture (Views/Opening.swift). A new name
         # with each new design, for iOS to draw its launch screen again rather than keep the old (LaunchScreenCache).
         UILaunchScreen:
           UIColorName: Background
-          UIImageName: LaunchShekel
+          UIImageName: LaunchMister
         UIRequiresFullScreen: true
         # Animations at the screen's own rate, up to 120 frames a second: without this key Core Animation holds an
         # iPhone app's own animations to 60, while iOS's scrolling runs at 120.
@@ -66,9 +67,8 @@ targets:
         # iPad) outweighs the project's setting, and App Store Connect then asks for iPad screenshots.
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        # The icons to pick in Settings › אייקון (Views/IconPicker.swift), and AppIcon-White, the white one of
-        # before 1.5, kept for whoever picked it.
-        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-Teal AppIcon-Dark AppIcon-Mono AppIcon-White"
+        # The icons to pick in Settings › אייקון (Views/IconPicker.swift), made by scripts/icons.py.
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-Yellow AppIcon-Navy AppIcon-Purple AppIcon-Teal AppIcon-Plain"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
         # The intents' work in the app alone (Live/ShiftIntents.swift); the widget extension has them too.
@@ -95,7 +95,7 @@ targets:
     info:
       path: Widget/Info.plist
       properties:
-        CFBundleDisplayName: Shifty
+        CFBundleDisplayName: מר משמרת
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: he

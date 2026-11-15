@@ -1,8 +1,8 @@
 import AppIntents
 
-/// What Siri, the Shortcuts app and the Action button know Shifty does, without setting anything up:
-/// "התחל משמרת בShifty", "Shifty הפסקה", "סיים משמרת בShifty", and the questions of Questions.swift,
-/// "כמה הרווחתי היום בShifty".
+/// What Siri, the Shortcuts app and the Action button know the app does, without setting anything up, by its name
+/// under the icon: "התחל משמרת במר משמרת", "מר משמרת הפסקה", "סיים משמרת במר משמרת", and the questions of
+/// Questions.swift, "כמה הרווחתי היום במר משמרת".
 struct ShiftyShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: StartShiftIntent(),

@@ -226,8 +226,8 @@ enum AppInfo {
         mail.scheme = "mailto"
         mail.path = email
         mail.queryItems = [
-            URLQueryItem(name: "subject", value: "משוב על Shifty"),
-            URLQueryItem(name: "body", value: "\n\n\n—\nShifty \(version)\niOS \(UIDevice.current.systemVersion)\n\(model)"),
+            URLQueryItem(name: "subject", value: "משוב על מר משמרת"),
+            URLQueryItem(name: "body", value: "\n\n\n—\nמר משמרת \(version)\niOS \(UIDevice.current.systemVersion)\n\(model)"),
         ]
         return mail.url ?? URL(string: "mailto:" + email)!
     }

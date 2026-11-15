@@ -1,14 +1,12 @@
 import SwiftUI
 import UIKit
 
-/// The app's icon on the Home Screen: its own, or one of the alternates in Assets.xcassets (project.yml's
-/// ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES, drawn from AppIcon-teal.svg, AppIcon-dark.svg and
-/// AppIcon-mono.svg), each with its picture for the picker (IconChoice-…). An alternate keeps its look in the
-/// iPhone's dark look; the app's own turns dark with it. Until 1.5 the app's own was teal and an alternate,
-/// "AppIcon-White", white: that one is still in the app for whoever picked it, now the app's own kept white in the
-/// dark look, and the picker rings the app's own for it.
+/// The app's icon on the Home Screen: its own, white, or one of the alternates in Assets.xcassets (project.yml's
+/// ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES), all made from the logo by scripts/icons.py, each with its picture
+/// for the picker (IconChoice-…) and its own dark and tinted looks. The shekel's icons of before 1.6 are gone: whoever
+/// had picked one has the app's own again, and the picker rings it.
 enum AppIconChoice: String, CaseIterable, Identifiable {
-    case standard, teal, dark, mono
+    case standard, yellow, navy, purple, teal, plain
 
     var id: String { rawValue }
 
@@ -16,18 +14,22 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
     var iconName: String? {
         switch self {
         case .standard: nil
+        case .yellow: "AppIcon-Yellow"
+        case .navy: "AppIcon-Navy"
+        case .purple: "AppIcon-Purple"
         case .teal: "AppIcon-Teal"
-        case .dark: "AppIcon-Dark"
-        case .mono: "AppIcon-Mono"
+        case .plain: "AppIcon-Plain"
         }
     }
 
     var title: String {
         switch self {
-        case .standard: "רגיל"
+        case .standard: "לבן"
+        case .yellow: "צהוב"
+        case .navy: "כחול כהה"
+        case .purple: "סגול"
         case .teal: "טורקיז"
-        case .dark: "כהה"
-        case .mono: "שחור־לבן"
+        case .plain: "בלי שנתות"
         }
     }
 
@@ -35,27 +37,30 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
     var picture: String {
         switch self {
         case .standard: "IconChoice-Standard"
+        case .yellow: "IconChoice-Yellow"
+        case .navy: "IconChoice-Navy"
+        case .purple: "IconChoice-Purple"
         case .teal: "IconChoice-Teal"
-        case .dark: "IconChoice-Dark"
-        case .mono: "IconChoice-Mono"
+        case .plain: "IconChoice-Plain"
         }
     }
 
-    /// The icon on the Home Screen now.
+    /// The icon on the Home Screen now: the app's own also for a name this version no longer has.
     @MainActor static var current: AppIconChoice {
         let name = UIApplication.shared.alternateIconName
         return allCases.first { $0.iconName == name } ?? .standard
     }
 }
 
-/// The icons side by side in Settings › אייקון, the one on the Home Screen ringed in the accent; a tap
-/// sets another, and iOS says that the icon has changed.
+/// The icons in Settings › אייקון, three to a row, the one on the Home Screen ringed in the accent; a tap sets another,
+/// and iOS says that the icon has changed.
 struct IconPicker: View {
     @State private var chosen = AppIconChoice.standard
     private static let size: CGFloat = 54
+    private static let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 3)
 
     var body: some View {
-        HStack(spacing: 0) {
+        LazyVGrid(columns: Self.columns, spacing: 16) {
             ForEach(AppIconChoice.allCases) { choice in
                 Button {
                     choose(choice)
@@ -94,8 +99,8 @@ struct IconPicker: View {
             .accessibilityHidden(true)
     }
 
-    /// Another icon on the Home Screen; the ring goes back if iOS refuses it. By the icon iOS has, not by the ring: the
-    /// white one of before 1.5 is ringed as the app's own, and a tap on the app's own sets it.
+    /// Another icon on the Home Screen; the ring goes back if iOS refuses it. By the icon iOS has, not by the ring: with
+    /// an icon of before 1.6 the app's own is ringed, and a tap on it sets it.
     private func choose(_ choice: AppIconChoice) {
         guard UIApplication.shared.alternateIconName != choice.iconName, UIApplication.shared.supportsAlternateIcons else { return }
         let before = chosen

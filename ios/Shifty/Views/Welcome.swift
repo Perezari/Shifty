@@ -86,7 +86,7 @@ struct Welcome: View {
             AppIconImage(size: 92)
                 .shadow(color: .black.opacity(0.18), radius: 11, y: 8)
                 .padding(.bottom, 10)
-            Text("ברוכים הבאים ל-Shifty")
+            Text("ברוכים הבאים למר משמרת")
                 .font(.largeTitle.weight(.bold))
                 .multilineTextAlignment(.center)
             Text("השעות והשכר שלך, משמרת אחרי משמרת.")

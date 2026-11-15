@@ -254,7 +254,7 @@ enum Alerts {
                                    body: "זה זמן טוב לעצור להפסקה.", category: Place.breakCategory))
         }
         planned.append(Planned(id: "shifty.open", date: shift.start.addingTimeInterval(12 * 3600), title: "המשמרת עדיין פתוחה",
-                               body: "התחלת ב־" + Format.clock(shift.start) + ". אם סיימת, אפשר לסיים אותה מהמסך הנעול או ב-Shifty."))
+                               body: "התחלת ב־" + Format.clock(shift.start) + ". אם סיימת, אפשר לסיים אותה מהמסך הנעול או במר משמרת."))
         return planned.filter { $0.date > now }
     }
 

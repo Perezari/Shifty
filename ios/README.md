@@ -1,8 +1,9 @@
 # Shifty for iPhone
 
 A native SwiftUI app of Shifty (iOS 26 or later, iPhone, Hebrew, right to left): the hours of each
-shift and the wage they earn, kept on the device. It is built only on a Mac, which this project does
-not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagic's Macs.
+shift and the wage they earn, kept on the device. Its name on the iPhone is "מר משמרת" since 1.6, after its
+logo; the project, its targets and the bundle IDs keep Shifty. It is built only on a Mac, which this project
+does not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagic's Macs.
 
 ## Layout
 
@@ -33,7 +34,8 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
   place's reminder; and the sheet of a pay: by the hour or global, what a global pay does with the overtime, all
   of it covered, some hours, none, or a bonus at each target of hours a month, and an annual bonus) and
   `ShiftEditor` (a shift by hand), `AdjustmentSheet` (a sum once on a day, added or taken off) and `ReportSheet` (the
-  pay period's hours report, or the year's on one page for Form 106, as a PDF, on `Core/Report.swift`). `Components` holds what they share: the period's bar and picker, the
+  pay period's hours report, or the year's on one page for Form 106, as a PDF with the app's banner at the top
+  left of its first page, on `Core/Report.swift`). `Components` holds what they share: the period's bar and picker, the
   summary card, a shift's row, the settings' cards and the wheel of hours and minutes.
 - `Shifty/Live/`: the shift outside the app. `ShiftIntents` holds what its buttons do (start, end, a
   break, as App Intents that the system performs in the app, woken in the background if need be),
@@ -85,14 +87,16 @@ not have: `codemagic.yaml`, at the root of the repository, builds it on Codemagi
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
   `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay
   period (`PeriodCheck`).
-- `Shifty/Assets.xcassets`: the icon (`AppIcon.svg` at 1024 px, the shekel sign inside a clock's twelve ticks,
-  and `AppIcon-dark.svg` and `AppIcon-tinted.svg` for the iPhone's dark and tinted home screen; the same
-  picture is `Icon` and, light and dark, `LaunchShekel`), the alternates picked in Settings (`AppIcon-teal.svg`,
-  `AppIcon-dark.svg` and `AppIcon-mono.svg`, each with a small picture `IconChoice-…` for the picker, and
-  `AppIcon-White`, the white one of before 1.5, kept for whoever picked it), the accent color and the
-  background, in light and dark.
+- `brand/MrShift.webp`: the logo since 1.6, the user's own picture: the man on flat yellow inside nine clock
+  ticks, his shirt running off the bottom and both sides, for iOS's own rounded corners to cut it.
+- `Shifty/Assets.xcassets`: the icons, all made from the logo by `scripts/icons.py`: the app's own, white with
+  navy ticks (`AppIcon`), and the alternates picked in Settings (`AppIcon-Yellow`, the logo as drawn, `-Navy`,
+  `-Purple`, `-Teal` and `-Plain`, yellow without the ticks), each light, dark and tinted, with a small picture
+  `IconChoice-…` for the picker. The app's own again as `Icon` inside the app and, light and dark, as
+  `LaunchMister`, the launch screen's picture; `OpeningMark`, its ticks and man, for the opening; `BannerMark`,
+  the man in white lines, for the reports' banner. Then the accent color and the background, light and dark.
 - `scripts/`: the builds (`testflight.sh`, `screenshots.sh`, `review.py`, and `codemagic.py` to run
-  them from the computer) and the check of the Swift without a Mac (`check-swift.sh`).
+  them from the computer), the icons (`icons.py`) and the check of the Swift without a Mac (`check-swift.sh`).
 - `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).
 
 ## Checking the Swift without a Mac

@@ -137,8 +137,7 @@ struct SettingsView: View {
                     Link(destination: AppInfo.privacy) { actionRow("מדיניות פרטיות") }
                 }
 
-                // a right-to-left mark first: iOS lays out a line by its first letter, and Shifty's is English
-                Text("\u{200F}Shifty · גרסה \(AppInfo.version)")
+                Text("מר משמרת · גרסה \(AppInfo.version)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
@@ -168,7 +167,7 @@ struct SettingsView: View {
         .alert("אין קוד באייפון", isPresented: $lockProblem) {
             Button("אישור", role: .cancel) {}
         } message: {
-            Text("כדי לנעול את Shifty צריך להגדיר קוד לאייפון, בהגדרות של האייפון.")
+            Text("כדי לנעול את מר משמרת צריך להגדיר קוד לאייפון, בהגדרות של האייפון.")
         }
         .onChange(of: alerts) { _, _ in
             LiveShift.refresh(store)
@@ -214,7 +213,7 @@ struct SettingsView: View {
     /// be turned off.
     private func setLock(_ on: Bool) async {
         if AppLock.available {
-            let reason = on ? "הפעלת הנעילה של Shifty" : "ביטול הנעילה של Shifty"
+            let reason = on ? "הפעלת הנעילה של מר משמרת" : "ביטול הנעילה של מר משמרת"
             if await AppLock.authenticate(reason) { lockOn = on }
         } else if on {
             lockProblem = true
@@ -292,7 +291,7 @@ struct SettingsView: View {
             try store.importBackup(data)
             message = "הנתונים שוחזרו."
         } catch {
-            message = "הקובץ אינו גיבוי של Shifty."
+            message = "הקובץ אינו גיבוי של מר משמרת."
         }
     }
 

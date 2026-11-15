@@ -841,7 +841,7 @@ struct WorkplacePage: View {
         }
         if !placeSet { return "עמוד במקום העבודה ולחץ על הכפתור." }
         if !Place.shared.always {
-            return "כדי שזה יעבוד גם כשהאפליקציה סגורה, צריך לאפשר מיקום תמיד: בהגדרות האייפון, Shifty, מיקום."
+            return "כדי שזה יעבוד גם כשהאפליקציה סגורה, צריך לאפשר מיקום תמיד: בהגדרות האייפון, מר משמרת, מיקום."
         }
         return "מקום העבודה נקבע. ההתראות יגיעו גם כשהאפליקציה סגורה."
     }
@@ -853,7 +853,7 @@ struct WorkplacePage: View {
             Task { @MainActor in
                 placeBusy = false
                 placeSet = Place.coordinate(id) != nil
-                if !found { message = "לא הצלחתי למצוא את המיקום. בדוק שהמיקום מאופשר ל-Shifty." }
+                if !found { message = "לא הצלחתי למצוא את המיקום. בדוק שהמיקום מאופשר למר משמרת." }
             }
         }
     }

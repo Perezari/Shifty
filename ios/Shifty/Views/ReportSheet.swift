@@ -207,7 +207,7 @@ enum ReportPDF {
     static let rowHeight: CGFloat = 17
     static let lineHeight: CGFloat = 15
     /// What a page has for its rows: under its margins, its table's head and its foot, and on the first its title.
-    private static let firstRows = 37
+    private static let firstRows = 36
     private static let nextRows = 42
 
     /// In the temporary folder, named by its period; nil if it can't be written.
@@ -312,18 +312,20 @@ private struct ReportPage: View {
         .environment(\.colorScheme, .light)
     }
 
+    /// The report's name, its period and its details on the right, the app's banner on the left.
     private var title: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text("דוח שעות")
                     .font(.system(size: 20, weight: .bold))
-                Spacer()
                 Text(report.title)
                     .font(.system(size: 13, weight: .semibold))
+                Text(details)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Color(white: 0.3))
             }
-            Text(details)
-                .font(.system(size: 10.5))
-                .foregroundStyle(Color(white: 0.3))
+            Spacer(minLength: 0)
+            ReportBanner()
         }
         .padding(.bottom, 14)
     }
@@ -443,7 +445,7 @@ private struct ReportPage: View {
 
     private var foot: some View {
         HStack {
-            Text(amounts ? "הופק ב־Shifty. הסכומים הם חישוב של האפליקציה, לא תלוש שכר." : "הופק ב־Shifty.")
+            Text(amounts ? "הופק במר משמרת. הסכומים הם חישוב של האפליקציה, לא תלוש שכר." : "הופק במר משמרת.")
             Spacer()
             if count > 1 {
                 Text(verbatim: "עמוד \(number) מתוך \(count)")
@@ -451,6 +453,29 @@ private struct ReportPage: View {
         }
         .font(.system(size: 8))
         .foregroundStyle(Color(white: 0.4))
+    }
+}
+
+/// Where a report was made, at the top left of its first page: the app's name and, past a thin line, the man of its
+/// icon in white lines (BannerMark, scripts/icons.py), on the logo's navy.
+private struct ReportBanner: View {
+    var body: some View {
+        HStack(spacing: 9) {
+            Text("מר משמרת")
+                .font(.system(size: 15, weight: .heavy))
+                .foregroundStyle(Color.white)
+                .fixedSize()
+            Rectangle()
+                .fill(Color.white.opacity(0.55))
+                .frame(width: 1, height: 22)
+            Image("BannerMark")
+                .resizable()
+                .frame(width: 34, height: 34)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
+            .fill(Color(red: 10 / 255, green: 20 / 255, blue: 53 / 255)))
     }
 }
 
@@ -462,18 +487,20 @@ private struct YearPage: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("דוח שנתי")
-                    .font(.system(size: 20, weight: .bold))
-                Spacer()
-                Text(verbatim: String(report.year))
-                    .font(.system(size: 13, weight: .semibold))
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("דוח שנתי")
+                        .font(.system(size: 20, weight: .bold))
+                    Text(verbatim: String(report.year))
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(details)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Color(white: 0.3))
+                }
+                Spacer(minLength: 0)
+                ReportBanner()
             }
-            Text(details)
-                .font(.system(size: 10.5))
-                .foregroundStyle(Color(white: 0.3))
-                .padding(.top, 3)
-                .padding(.bottom, 14)
+            .padding(.bottom, 14)
             cells(title: "תקופה", days: "ימים", hours: "שעות", overtime: "נוספות", vacation: "חופש", sick: "מחלה",
                   gross: "ברוטו", tax: "מס הכנסה", insurance: "ב״ל ובריאות", saved: "פנסיה", net: "נטו")
                 .font(.system(size: 8.5, weight: .semibold))
@@ -506,7 +533,7 @@ private struct YearPage: View {
                     .padding(.top, 12)
             }
             Spacer(minLength: 0)
-            Text("הופק ב־Shifty.")
+            Text("הופק במר משמרת.")
                 .font(.system(size: 8))
                 .foregroundStyle(Color(white: 0.4))
         }

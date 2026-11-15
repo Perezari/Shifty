@@ -80,7 +80,7 @@ struct LockGate: ViewModifier {
         guard locked, !asking else { return }
         asking = true
         Task {
-            let ok = await AppLock.authenticate("פתיחת Shifty")
+            let ok = await AppLock.authenticate("פתיחת מר משמרת")
             asking = false
             if ok {
                 withAnimation(.easeOut(duration: 0.25)) { locked = false }
@@ -102,7 +102,7 @@ private struct LockScreen: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 34, weight: .semibold))
                     .foregroundStyle(.tint)
-                Text("Shifty")
+                Text("מר משמרת")
                     .font(.title.bold())
                 if locked {
                     Button(action: unlock) {

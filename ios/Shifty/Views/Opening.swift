@@ -173,7 +173,7 @@ struct OpeningCover: View {
                 ZStack {
                     if opening.began == nil {
                         Color.appBackground
-                        Image("LaunchShekel")
+                        Image("LaunchMister")
                     } else {
                         OpeningCurtain()
                     }
@@ -228,9 +228,9 @@ struct DialOpening: View {
 }
 
 private enum OpeningDrawing {
-    /// The icon's ground, top and bottom, as ios/AppIcon.svg paints it (AppIcon-dark.svg in the dark look), 0...255.
-    private static let lightGround: (top: [Double], bottom: [Double]) = ([255, 255, 255], [227, 237, 235])
-    private static let darkGround: (top: [Double], bottom: [Double]) = ([38, 43, 46], [11, 12, 13])
+    /// The app's own icon's ground, top and bottom, as scripts/icons.py paints it (its dark look's in the dark), 0...255.
+    private static let lightGround: (top: [Double], bottom: [Double]) = ([255, 255, 255], [236, 239, 246])
+    private static let darkGround: (top: [Double], bottom: [Double]) = ([34, 37, 46], [11, 12, 16])
 
     static func draw(_ context: GraphicsContext, size: CGFloat, layout: DialLayout, at t: Double) {
         let c = size / 2
@@ -299,9 +299,9 @@ private enum OpeningDrawing {
         }
     }
 
-    /// The icon: a rounded square growing into the dial's circle in the accent, its mark fading and a hole opening in
-    /// its middle, until it is the ring. It begins as LaunchShekel, the picture iOS's launch screen leaves: white, with a
-    /// hairline inside its edge, or AppIcon-dark.svg's in the dark look.
+    /// The icon: a rounded square growing into the dial's circle in the accent, its mark (the ticks and the man,
+    /// OpeningMark) fading and a hole opening in its middle, until it is the ring. It begins as LaunchMister, the picture
+    /// iOS's launch screen leaves: the app's own icon, white with a hairline inside its edge, or its dark look.
     private static func icon(_ context: GraphicsContext, _ c: CGFloat, _ r: CGFloat, _ w: CGFloat, at t: Double) {
         let p = OpeningCurve.inOut3(t, 0.03, 0.36)
         guard p < 1 else { return }
@@ -314,88 +314,36 @@ private enum OpeningDrawing {
         if hole > 0 {
             shape.addPath(circle(c, hole))
         }
-        let stops = [0, 0.1375, 0.275, 0.4125, 0.55, 1].map { y in
+        let stops = [0.0, 1].map { y in
             Gradient.Stop(color: ground(y, dark: dark).mix(with: Color.accentColor, by: p), location: y)
         }
         let shading = GraphicsContext.Shading.linearGradient(Gradient(stops: stops), startPoint: CGPoint(x: box.midX, y: box.minY),
                                                              endPoint: CGPoint(x: box.midX, y: box.maxY))
         context.fill(shape, with: shading, style: FillStyle(eoFill: true))
+        // the ticks and the man, inside the square, as the icon has them, fading as it opens
+        let alpha = 1 - OpeningCurve.out3(t, 0.04, 0.17)
+        if alpha > 0 {
+            var g = context
+            g.clip(to: Path(roundedRect: box, cornerRadius: corner, style: .circular))
+            g.opacity = alpha
+            g.draw(g.resolve(Image("OpeningMark")), in: box)
+        }
+        // over them, as over the launch picture, the hairline
         let k = half / 256
         if !dark {
             let inset = 1.1 * k
             let edge = Path(roundedRect: box.insetBy(dx: inset, dy: inset), cornerRadius: corner - inset, style: .circular)
             context.stroke(edge, with: .color(Color.black.opacity(0.07 * (1 - p))), lineWidth: 2.2 * k)
         }
-        let alpha = 1 - OpeningCurve.out3(t, 0.04, 0.17)
-        if alpha > 0 {
-            mark(context, c, k, dark: dark, alpha: alpha)
-        }
     }
 
-    /// The icon's ground at `y`, 0 at its top and 1 at its bottom: its gradient under a white sheen, 16% at the top
-    /// and gone by 55%, as the SVG lays them.
+    /// The icon's ground at `y`, 0 at its top and 1 at its bottom.
     private static func ground(_ y: Double, dark: Bool) -> Color {
         let (top, bottom) = dark ? darkGround : lightGround
-        let sheen = 0.16 * max(0, 1 - y / 0.55)
         func channel(_ i: Int) -> Double {
-            let base = (top[i] + (bottom[i] - top[i]) * y) / 255
-            return base + (1 - base) * sheen
+            (top[i] + (bottom[i] - top[i]) * y) / 255
         }
         return Color(red: channel(0), green: channel(1), blue: channel(2))
-    }
-
-    /// The icon's mark, as ios/AppIcon.svg draws it, by `k` from its 512 points: a clock's twelve ticks, the four at
-    /// 12, 3, 6 and 9 longer, and the shekel sign, in the app's color, brighter in the dark look.
-    private static func mark(_ context: GraphicsContext, _ c: CGFloat, _ k: CGFloat, dark: Bool, alpha: Double) {
-        let tick = dark ? Color(red: 63 / 255, green: 220 / 255, blue: 200 / 255)
-                        : Color(red: 15 / 255, green: 157 / 255, blue: 143 / 255)
-        for i in 0..<12 {
-            let big = i % 3 == 0
-            let inner: CGFloat = big ? 168 : 180
-            var line = Path()
-            line.move(to: CGPoint(x: 0, y: -inner * k))
-            line.addLine(to: CGPoint(x: 0, y: -204 * k))
-            var g = context
-            g.translateBy(x: c, y: c)
-            g.rotate(by: .degrees(Double(i) * 30))
-            g.stroke(line, with: .color(tick.opacity((big ? 0.9 : 0.4) * alpha)),
-                     style: StrokeStyle(lineWidth: (big ? 15 : 10) * k, lineCap: .round))
-        }
-        let from = dark ? Color(red: 75 / 255, green: 232 / 255, blue: 212 / 255)
-                        : Color(red: 30 / 255, green: 198 / 255, blue: 180 / 255)
-        let to = dark ? Color(red: 17 / 255, green: 163 / 255, blue: 147 / 255)
-                      : Color(red: 10 / 255, green: 120 / 255, blue: 109 / 255)
-        let gradient = Gradient(colors: [from.opacity(alpha), to.opacity(alpha)])
-        let style = StrokeStyle(lineWidth: 32 * k, lineCap: .round, lineJoin: .round)
-        for part in shekel(c, k) {
-            let box = part.boundingRect
-            context.stroke(part, with: .linearGradient(gradient, startPoint: box.origin,
-                                                      endPoint: CGPoint(x: box.maxX, y: box.maxY)), style: style)
-        }
-    }
-
-    /// The shekel sign's two strokes, by `k` from AppIcon.svg's 512 points about its middle: an arch whose left leg
-    /// reaches down, and interlocked with it a cup whose right leg reaches up.
-    private static func shekel(_ c: CGFloat, _ k: CGFloat) -> [Path] {
-        func at(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: c + (x - 256) * k, y: c + (y - 256) * k)
-        }
-        let radius = 50 * k
-        var arch = Path()
-        arch.move(to: at(166, 346))
-        arch.addLine(to: at(166, 216))
-        arch.addArc(center: at(216, 216), radius: radius, startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
-        arch.addLine(to: at(236, 166))
-        arch.addArc(center: at(236, 216), radius: radius, startAngle: .degrees(270), endAngle: .degrees(360), clockwise: false)
-        arch.addLine(to: at(286, 290))
-        var cup = Path()
-        cup.move(to: at(226, 222))
-        cup.addLine(to: at(226, 296))
-        cup.addArc(center: at(276, 296), radius: radius, startAngle: .degrees(180), endAngle: .degrees(90), clockwise: true)
-        cup.addLine(to: at(296, 346))
-        cup.addArc(center: at(296, 296), radius: radius, startAngle: .degrees(90), endAngle: .degrees(0), clockwise: true)
-        cup.addLine(to: at(346, 166))
-        return [arch, cup]
     }
 
     private static func circle(_ c: CGFloat, _ radius: CGFloat) -> Path {
@@ -415,8 +363,8 @@ private enum OpeningDrawing {
 
 /// iOS keeps its own picture of the launch screen, and after an update may go on showing the old one: 1.5's first
 /// launches showed the old icon fading into the new. So the launch picture takes a new name with a new design
-/// (LaunchShekel; LaunchIcon until 1.5), and once a version, a few seconds into the launch, the kept picture is thrown
-/// away for iOS to draw it again at the next launch.
+/// (LaunchMister since 1.6; LaunchShekel in 1.5, LaunchIcon until it), and once a version, a few seconds into the
+/// launch, the kept picture is thrown away for iOS to draw it again at the next launch.
 enum LaunchScreenCache {
     private static let key = "launchScreenClearedFor"
 
