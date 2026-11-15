@@ -136,9 +136,10 @@ a failed step's errors, a step's log, and the screenshots downloaded into `build
   minute.
 - "Shifty · App Review" submits the newest build of `MARKETING_VERSION` to App Review through the App
   Store Connect API (`scripts/review.py`, with the same key): it makes the version if it isn't there, puts
-  the build on it, writes its What's New from `store/listing.md` and submits it; the rest of the page
-  carries over from the version before. Started without `SUBMIT=yes` it only looks and says what it
-  would do (`codemagic.py start review`, then `codemagic.py log <id> "App Review"`).
+  the build on it, writes its texts from `store/listing.md` (What's New, and the app's name, the
+  description and the App Review notes when the version's section has them) and submits it; the rest of
+  the page carries over from the version before. Started without `SUBMIT=yes` it only looks and says what
+  it would do (`codemagic.py start review`, then `codemagic.py log <id> "App Review"`).
 
 `scripts/testflight.sh` archives without signing (the team has no registered devices, so there is no
 development profile), signs the archive for no one with the app's entitlements (an unsigned archive

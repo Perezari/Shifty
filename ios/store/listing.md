@@ -5,7 +5,8 @@ in them are the app's own (README, ios/Shifty): change them here first when the 
 
 ## App Information
 
-**Name** (30 characters at most; the app record's name, already reserved):
+**Name** (30 characters at most; the app record's name, already reserved; until 1.6, which takes the one under
+"Version 1.6"):
 
 ```
 Shifty - משמרות ושכר
@@ -245,7 +246,9 @@ white; teal, the icon's colors until then, among the alternates in Settings.
 
 The new name and logo (the user's own, 15 November 2026): "מר משמרת", a smiling man with a curled mustache and a bow
 tie inside a clock's nine ticks. The app's own icon is white with navy ticks; yellow (the logo as drawn), navy,
-purple, teal and yellow without the ticks are the alternates in Settings. The reports' PDF have the logo as a banner.
+purple, teal and yellow without the ticks are the alternates in Settings. The reports' PDF have the logo as a stamp.
+`scripts/review.py` writes all four texts below with the submission (the name in App Information, whose copy opens
+with the new version); the keywords, subtitle and screenshots carry over.
 
 **Name** (in App Information; changes with this version's submission):
 
@@ -284,4 +287,27 @@ purple, teal and yellow without the ticks are the alternates in Settings. The re
 • סנכרון ב-iCloud בין המכשירים שלך, נעילה עם Face ID, מצב כהה וגיבוי לקובץ.
 
 הכול בחינם, בלי רכישות בתוך האפליקציה. הכול נשמר באייפון שלך וב-iCloud שלך: בלי חשבון, בלי פרסומות ובלי מעקב.
+```
+
+**App Review notes** (1.4's, with the new name and the icon in Settings):
+
+```
+1. This version renames the app from Shifty to מר משמרת ("Mr. Shift") and gives it a new icon, with five alternates in Settings › אייקון (Icon); the PDF reports carry the new logo. How the app works is as before. It has been free in full, with no in-app purchase, since 1.4. The app has no account, login or user-generated content.
+
+2. Purpose and audience: מר משמרת is a Hebrew app for hourly and shift workers in Israel, at any employer; it is not a business's internal app. It records the hours worked and shows the wage they earn. A shift is started and ended with a tap, and the app computes the regular hours, overtime at 125% and 150%, Shabbat and holiday hours, night hours and travel, as Israeli payslips do, and adds them up by pay period. Workers see what they have earned before the payslip comes, and check the payslip against it.
+
+3. Setup and main features: no account, login or sample files. A first setup asks for the workplace and the wage; it can be skipped. The tabs, right to left:
+- Now (עכשיו): "התחל משמרת" starts a shift; the dial shows the time worked and the pay rising each second; "הפסקה" takes a break; holding "סיום משמרת" until the button fills ends the shift. A long press on start or break, or a tap on end, sets it some minutes earlier or at another time.
+- Shifts (משמרות): the pay period's shifts and totals, and the hours report as a PDF. Tap a shift to edit it, swipe to delete it, long press for its menu; the plus adds a shift, or a day off on a long press.
+- Calendar (לוח): the period's days, each filled by its hours; tap a day for its shifts.
+- Settings (הגדרות): the workplaces (מקומות עבודה), each with its pay (by the hour or monthly), pay period, hours, overtime, vacation, pension, travel and location reminder; then holidays, an income target, the net pay's credit points, the look and the app's icon, notifications, the lock, iCloud and a backup to a file.
+Permissions, all optional and asked only when a feature needs them: notifications (the day's hours done, a break reminder, the period's summary); location, When In Use then Always, only for a workplace's reminder (on arriving and on leaving, a notification asks whether to start or end the shift; the location never leaves the device); Face ID for the lock.
+
+4. External services: none: no server, account, analytics, advertising or AI. Only Apple's: iCloud key-value storage to sync the user's own devices, Live Activities and widgets, App Intents for Siri, the Control Center and the Action button, region monitoring and local notifications.
+
+5. Regional differences: none. The app is offered in Israel only, in Hebrew, and its holidays, overtime rules and tax estimate are Israel's.
+
+6. Regulated industry or third-party material: neither. The app computes the user's own wage from the hours they record; it moves no money and gives no financial advice, and it shows the net pay as an estimate.
+
+7. In-App Purchase: none.
 ```

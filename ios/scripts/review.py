@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Sends the newest build to App Review through the App Store Connect API, as one would on the version's
 page in App Store Connect: the version of ios/project.yml (MARKETING_VERSION) is made if it isn't there
-yet, its "What's New in This Version" is the one under that version in ios/store/listing.md, its build is
-the newest of that version in TestFlight, and it is submitted. The rest of the page (description,
-keywords, screenshots, review notes) carries over from the version before, as App Store Connect does
-by itself; its copyright and way of release are taken from that version too.
+yet, its texts are the ones under that version in ios/store/listing.md, its build is the newest of that
+version in TestFlight, and it is submitted. Of the texts, "What's New in This Version" is always there;
+the app's name (in App Information), the description and the App Review notes are written when the
+version's section has them. The rest of the page (the texts the section hasn't, keywords, screenshots,
+App Review's contact) carries over from the version before, as App Store Connect does by itself; its
+copyright and way of release are taken from that version too.
 
 Runs on Codemagic (codemagic.yaml, workflow "review") with the key of the variable group app_store.
 The build's log is public, so nothing of the key, nor the token made from it, is printed. Without
@@ -13,7 +15,7 @@ SUBMIT=yes it only looks and says what it would do:
     python ios/scripts/codemagic.py start review               # a look, nothing changes
     python ios/scripts/codemagic.py start review SUBMIT=yes    # submit
     python ios/scripts/codemagic.py log <build id> "App Review"
-    python ios/scripts/review.py text                          # the version and its What's New, here
+    python ios/scripts/review.py text                          # the version and its texts, here
 """
 import base64
 import json
@@ -42,17 +44,44 @@ def version():
         return re.search(r'MARKETING_VERSION:\s*"?([0-9.]+)', f.read()).group(1)
 
 
-def whats_new(v):
-    """The block under "What's New" in listing.md's section "## Version <v>"."""
+# The texts listing.md may give a version: the bold title they are under there, their name in the log, and
+# App Store Connect's limit
+TEXTS = {"whatsNew": ("What's New", "What's New", 4000), "name": ("Name", "name", 30),
+         "description": ("Description", "description", 4000), "notes": ("App Review notes", "App Review notes", 4000)}
+
+
+def texts(v):
+    """The texts in listing.md's section "## Version <v>", each the ``` block under its bold title: What's New
+    always; the name, the description and the App Review notes only when the section has them."""
     with open(os.path.join(IOS, "store", "listing.md"), encoding="utf-8") as f:
         text = f.read().replace("\r\n", "\n")
     section = re.search(rf"^## Version {re.escape(v)}[ \t]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
     if not section:
         sys.exit(f'listing.md has no section "## Version {v}"')
-    block = re.search(r"\*\*What's New[^\n]*\n+```[^\n]*\n(.*?)\n```", section.group(1), re.S)
-    if not block:
+    found = {}
+    for field, (title, said, limit) in TEXTS.items():
+        block = re.search(rf"^\*\*{re.escape(title)}[^\n]*\n+```[^\n]*\n(.*?)\n```", section.group(1), re.M | re.S)
+        if block and block.group(1).strip():
+            found[field] = block.group(1).strip()
+            if len(found[field]) > limit:
+                sys.exit(f"listing.md's {said} of {v} is {len(found[field])} characters, over the {limit} allowed")
+    if "whatsNew" not in found:
         sys.exit(f"listing.md's section of {v} has no What's New block")
-    return block.group(1).strip()
+    return found
+
+
+def show(found, whole=False):
+    """The texts for the log: the name and What's New in full, the long ones by their length and first words."""
+    for field, value in found.items():
+        said, limit = TEXTS[field][1:]
+        if whole or field in ("name", "whatsNew"):
+            print(f"\n{said} ({len(value)} of {limit}):\n{value}")
+        else:
+            print(f"\n{said}: {len(value)} of {limit}, beginning \"{value.splitlines()[0][:60]}…\"")
+
+
+def hebrew(items):
+    return [x for x in items if x["attributes"]["locale"].split("-")[0] == "he"]
 
 
 # The key and the token ---------------------------------------------------------------------------
@@ -131,8 +160,9 @@ def api(method, path, query=None, body=None):
 
 
 def state(item):
+    """A version's state, or App Information's."""
     a = item["attributes"]
-    return a.get("appVersionState") or a.get("appStoreState") or "?"
+    return a.get("appVersionState") or a.get("state") or a.get("appStoreState") or "?"
 
 
 def related(kind, item_id):
@@ -145,9 +175,10 @@ def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     v = version()
-    notes = whats_new(v)
+    store = texts(v)
     if sys.argv[1:] == ["text"]:
-        print(f"Version {v}\n\n{notes}")
+        print(f"Version {v}")
+        show(store, whole=True)
         return
     submit = os.environ.get("SUBMIT", "").strip().lower() == "yes"
     key_id, issuer, p8 = clean("APPLE_API_KEY"), clean("APPLE_API_ISSUER"), os.environ.get("APPLE_API_KEY_P8", "")
@@ -205,9 +236,15 @@ def main():
     if any(r["attributes"]["state"] != "READY_FOR_REVIEW" for r in reviews):
         sys.exit("Something of the app is with App Review already: submit after it.")
 
+    infos = api("GET", f"/v1/apps/{app_id}/appInfos")["data"]
+    for info in infos:
+        names = hebrew(api("GET", f"/v1/appInfos/{info['id']}/appInfoLocalizations")["data"])
+        print(f"App Information {state(info)}: " + ", ".join(f'"{n["attributes"].get("name")}"' for n in names))
+
     if not submit:
         print(f"\nA look only, nothing changed. With SUBMIT=yes: {'version ' + v + ' made' if not current else v}, "
-              f"build {number} on it, this What's New, submitted to App Review:\n\n{notes}")
+              f"build {number} on it, these texts of listing.md written, and it submitted to App Review:")
+        show(store)
         return
 
     if not current:
@@ -227,14 +264,43 @@ def main():
     api("PATCH", f"/v1/appStoreVersions/{version_id}/relationships/build", body=related("builds", build["id"]))
     print(f"Its build: {v} ({number})")
 
-    texts = api("GET", f"/v1/appStoreVersions/{version_id}/appStoreVersionLocalizations")["data"]
-    hebrew = [t for t in texts if t["attributes"]["locale"].split("-")[0] == "he"]
-    if not hebrew:
-        sys.exit("The version has no Hebrew text for What's New: " + ", ".join(t["attributes"]["locale"] for t in texts))
-    for t in hebrew:
+    locales = api("GET", f"/v1/appStoreVersions/{version_id}/appStoreVersionLocalizations")["data"]
+    page = {field: store[field] for field in ("whatsNew", "description") if field in store}
+    if not hebrew(locales):
+        sys.exit("The version has no Hebrew texts: " + ", ".join(t["attributes"]["locale"] for t in locales))
+    for t in hebrew(locales):
         api("PATCH", f"/v1/appStoreVersionLocalizations/{t['id']}", body={"data": {
-            "type": "appStoreVersionLocalizations", "id": t["id"], "attributes": {"whatsNew": notes}}})
-    print("Its What's New: written")
+            "type": "appStoreVersionLocalizations", "id": t["id"], "attributes": page}})
+    print("Its " + " and ".join(TEXTS[field][1] for field in page) + ": written")
+
+    if "name" in store:
+        # The name is App Information's, which has a copy of its own to change while a version is prepared
+        infos = api("GET", f"/v1/apps/{app_id}/appInfos")["data"]
+        open_info = next((i for i in infos if state(i) in EDITABLE), None)
+        if not open_info:
+            sys.exit("No App Information open to change the name in: " + ", ".join(state(i) for i in infos))
+        names = hebrew(api("GET", f"/v1/appInfos/{open_info['id']}/appInfoLocalizations")["data"])
+        if not names:
+            sys.exit("App Information has no Hebrew name to change")
+        for n in names:
+            if n["attributes"].get("name") != store["name"]:
+                api("PATCH", f"/v1/appInfoLocalizations/{n['id']}", body={"data": {
+                    "type": "appInfoLocalizations", "id": n["id"], "attributes": {"name": store["name"]}}})
+        print(f"Its name: {store['name']}")
+
+    if "notes" in store:
+        try:
+            detail = api("GET", f"/v1/appStoreVersions/{version_id}/appStoreReviewDetail")["data"]
+        except Refused as refused:
+            if refused.status != 404:
+                raise
+            detail = None
+        if not detail:
+            sys.exit("The version has no App Review Information to write the notes in: fill it in App Store Connect, "
+                     "then run again")
+        api("PATCH", f"/v1/appStoreReviewDetails/{detail['id']}", body={"data": {
+            "type": "appStoreReviewDetails", "id": detail["id"], "attributes": {"notes": store["notes"]}}})
+        print("Its App Review notes: written")
 
     draft = next((r for r in reviews if r["attributes"]["state"] == "READY_FOR_REVIEW"), None)
     if not draft:
