@@ -456,26 +456,26 @@ private struct ReportPage: View {
     }
 }
 
-/// Where a report was made, at the top left of its first page: the app's name and, past a thin line, the man of its
-/// icon in white lines (BannerMark, scripts/icons.py), on the logo's navy.
+/// Where a report was made, at the top left of its first page, as the app's stamp: its name and, past a thin line,
+/// the man of its icon (BannerMark, scripts/icons.py), in the logo's navy on the page's white.
 private struct ReportBanner: View {
+    private static let ink = Color(red: 10 / 255, green: 20 / 255, blue: 53 / 255)
+
     var body: some View {
         HStack(spacing: 9) {
             Text("מר משמרת")
                 .font(.system(size: 15, weight: .heavy))
-                .foregroundStyle(Color.white)
+                .foregroundStyle(Self.ink)
                 .fixedSize()
             Rectangle()
-                .fill(Color.white.opacity(0.55))
+                .fill(Self.ink.opacity(0.45))
                 .frame(width: 1, height: 22)
             Image("BannerMark")
+                .renderingMode(.template)
                 .resizable()
                 .frame(width: 34, height: 34)
+                .foregroundStyle(Self.ink)
         }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 9, style: .continuous)
-            .fill(Color(red: 10 / 255, green: 20 / 255, blue: 53 / 255)))
     }
 }
 

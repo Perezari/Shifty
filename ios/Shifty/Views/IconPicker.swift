@@ -53,7 +53,7 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
 }
 
 /// The icons in Settings › אייקון, three to a row, the one on the Home Screen ringed in the accent; a tap sets another,
-/// and iOS says that the icon has changed.
+/// the ring moving to it with a light tap of the iPhone, without iOS's own alert (IconChangeAlert).
 struct IconPicker: View {
     @State private var chosen = AppIconChoice.standard
     private static let size: CGFloat = 54
@@ -105,6 +105,8 @@ struct IconPicker: View {
         guard UIApplication.shared.alternateIconName != choice.iconName, UIApplication.shared.supportsAlternateIcons else { return }
         let before = chosen
         withAnimation(.snappy(duration: 0.2)) { chosen = choice }
+        UISelectionFeedbackGenerator().selectionChanged()
+        IconChangeAlert.skipNext()
         Task { @MainActor in
             do {
                 try await UIApplication.shared.setAlternateIconName(choice.iconName)
@@ -112,5 +114,48 @@ struct IconPicker: View {
                 withAnimation(.snappy(duration: 0.2)) { chosen = before }
             }
         }
+    }
+}
+
+/// iOS's own alert after an icon change ("שינית את האייקון של…") comes out wrong in Hebrew: its text to the left, away
+/// from the icon, under it an empty band. The picker's ring says the same, so it is let go: for three seconds after the
+/// picker asks for a change, the first alert with one button that a screen is about to present is not presented. Every
+/// other presentation goes on as always, and should a later iOS present the alert another way, it shows as before.
+@MainActor
+enum IconChangeAlert {
+    private static var until = Date.distantPast
+    private static var installed = false
+
+    static func skipNext() {
+        install()
+        until = Date().addingTimeInterval(3)
+    }
+
+    fileprivate static func skips(_ controller: UIViewController) -> Bool {
+        guard Date() < until, let alert = controller as? UIAlertController, alert.actions.count <= 1 else { return false }
+        until = .distantPast
+        return true
+    }
+
+    /// UIKit's present goes by way of `iconChangePresent` from the first change on.
+    private static func install() {
+        guard !installed else { return }
+        installed = true
+        let type = UIViewController.self
+        guard let original = class_getInstanceMethod(type, #selector(UIViewController.present(_:animated:completion:))),
+              let replacement = class_getInstanceMethod(type, #selector(UIViewController.iconChangePresent(_:animated:completion:)))
+        else { return }
+        method_exchangeImplementations(original, replacement)
+    }
+}
+
+extension UIViewController {
+    /// UIKit's present, exchanged with it by IconChangeAlert: under this name, after the exchange, is the original.
+    @objc fileprivate func iconChangePresent(_ controller: UIViewController, animated: Bool, completion: (() -> Void)?) {
+        if IconChangeAlert.skips(controller) {
+            completion?()
+            return
+        }
+        iconChangePresent(controller, animated: animated, completion: completion)
     }
 }

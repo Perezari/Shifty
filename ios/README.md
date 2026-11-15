@@ -34,7 +34,7 @@ does not have: `codemagic.yaml`, at the root of the repository, builds it on Cod
   place's reminder; and the sheet of a pay: by the hour or global, what a global pay does with the overtime, all
   of it covered, some hours, none, or a bonus at each target of hours a month, and an annual bonus) and
   `ShiftEditor` (a shift by hand), `AdjustmentSheet` (a sum once on a day, added or taken off) and `ReportSheet` (the
-  pay period's hours report, or the year's on one page for Form 106, as a PDF with the app's banner at the top
+  pay period's hours report, or the year's on one page for Form 106, as a PDF with the app's stamp at the top
   left of its first page, on `Core/Report.swift`). `Components` holds what they share: the period's bar and picker, the
   summary card, a shift's row, the settings' cards and the wheel of hours and minutes.
 - `Shifty/Live/`: the shift outside the app. `ShiftIntents` holds what its buttons do (start, end, a
@@ -94,7 +94,7 @@ does not have: `codemagic.yaml`, at the root of the repository, builds it on Cod
   `-Purple`, `-Teal` and `-Plain`, yellow without the ticks), each light, dark and tinted, with a small picture
   `IconChoice-…` for the picker. The app's own again as `Icon` inside the app and, light and dark, as
   `LaunchMister`, the launch screen's picture; `OpeningMark`, its ticks and man, for the opening; `BannerMark`,
-  the man in white lines, for the reports' banner. Then the accent color and the background, light and dark.
+  the man in lines of one color, for the reports' stamp. Then the accent color and the background, light and dark.
 - `scripts/`: the builds (`testflight.sh`, `screenshots.sh`, `review.py`, and `codemagic.py` to run
   them from the computer), the icons (`icons.py`) and the check of the Swift without a Mac (`check-swift.sh`).
 - `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).

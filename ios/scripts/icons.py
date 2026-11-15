@@ -12,7 +12,8 @@ The icons, picked in Settings › אייקון (Views/IconPicker.swift):
 each light, dark (a dark ground, the ticks and an edge round the man in its color) and tinted (grey on black).
 Besides them: IconChoice-… (the picker's pictures), Icon (the app's own, inside the app), LaunchMister (the launch
 screen's picture and Views/Opening.swift's first frame), OpeningMark (the ticks and the man, for the opening) and
-BannerMark (the man in white lines, for the reports' banner, Views/ReportSheet.swift).
+BannerMark (the man's lines and dark parts in one color, for the reports' stamp, which draws it in navy,
+Views/ReportSheet.swift).
 """
 import json
 import os
