@@ -2,7 +2,10 @@
   1. its first frame is the launch picture: the built-in scene `launch`;
   2. from its `rest` on it is the finished Now screen, and stands still: the built-in scene `done`;
   3. no jumps: no frame differs from the one before far more than its neighbors do (a pop: something appearing,
-     vanishing or moving at once). The same detector as mock/tools/check.py.
+     vanishing or moving at once). The same detector as mock/tools/check.py;
+  4. every number of every frame is one: none is NaN or infinite (a division by an angle of the day's that is 0).
+     The dumper writes such a number as 0, so the shape lands at the screen's corner or is not drawn, and counts
+     them in each frame ("bad" in its JSON, main.swift): a day with any fails, and its moments are named.
 
     python tools/check.py <scene id> [--layout mock] [--theme light] [--fps 30] [--to <seconds>]
     python tools/check.py <scene id> all [--jobs 4]          every layout in both themes, and a table of them
@@ -24,6 +27,29 @@ S = 0.5
 TOL = 2
 
 
+def unfinished(dumped):
+    """The report's lines on the numbers that are not numbers (NaN, infinite) in what was dumped: nothing if there
+    are none, else each scene's moments that have some, a run of frames one after another as one stretch."""
+    lines = []
+    for one in dumped["sets"]:
+        runs = []                                               # [first moment, last moment, frames, most in a frame]
+        last = None
+        for i, frame in enumerate(one["frames"]):
+            n = frame.get("bad", 0)
+            if not n:
+                continue
+            if runs and last == i - 1:
+                runs[-1][1:] = [frame["t"], runs[-1][2] + 1, max(runs[-1][3], n)]
+            else:
+                runs.append([frame["t"], frame["t"], 1, n])
+            last = i
+        if runs:
+            lines.append(f"       {one['scene']}: " + ", ".join(
+                f"t = {a:.3f} ({most})" if count == 1 else f"t = {a:.3f} to {b:.3f} ({count} frames, {most} at most in one)"
+                for a, b, count, most in runs))
+    return lines
+
+
 def check(scene, meta, layout, theme, fps=30, upto=None):
     """Returns (passed, the report's lines)."""
     rest, end = meta["rest"], meta["end"]
@@ -36,6 +62,13 @@ def check(scene, meta, layout, theme, fps=30, upto=None):
     n = int(round(upto * fps)) + 1
     times = [opening.moment(i / fps) for i in range(n)]
     dumped = opening.dump(scene, layout, theme, [(scene, sorted(set([0.0] + late + times))), ("launch", [0.0]), ("done", late)])
+    # 4: numbers that are not numbers, first: they explain a picture that is wrong below
+    bad = unfinished(dumped)
+    ok &= not bad
+    lines.append("  FAIL numbers that are not numbers (NaN or infinite, written as 0: the shape lands at the screen's corner "
+                 "or is not drawn); the moments, and how many in a frame:" if bad
+                 else "  ok   every number of every frame is one (none NaN or infinite)")
+    lines += bad
     # two sheets: the scene's frames, and the two ends they are held against, each at the place of the frame it is
     # held against (Chrome lays letters a hair differently from place to place)
     shots = opening.grid([dumped], [{"dump": 0, "scene": scene, "t": t} for t in [0.0] + late + times], s=S)

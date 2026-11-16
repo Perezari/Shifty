@@ -9,7 +9,8 @@ import Foundation
 ///
 /// Every dial has a knob, so it plays the same whatever the day is: he rides the last 30 degrees to now over
 /// whatever is there (time worked, a break, the bare track with no shift running), and what lies ahead of him, if
-/// anything does, runs out from him once the dial has landed.
+/// anything does, runs out from him once the dial has landed. The flag then pops at its place: under him as a part
+/// of the dial, but over him on a day that has it standing on the knob or beside it, as the app's dial lays the two.
 struct MrNowOpening: OpeningScene {
     let id = "mrnow"
     let name = "מר עכשיו"
@@ -62,6 +63,24 @@ struct MrNowOpening: OpeningScene {
         // ---- the dial: the road under the knob, then all of it, then the finished Now screen's
         let sweep = K.seg(t, L, L + 0.34, E.io2)                    // what lies ahead, from the knob to its end
         let flag = K.seg(t, L + 0.28, L + 0.52, E.back)
+        // The dial lays the flag over the knob wherever the two meet (K.dial: the knob, then the flag), and the knob
+        // here is on the pen over the dial's. So on a day whose flag stands on the knob or beside it (a plan come
+        // due this minute, the goal reached a moment ago) the flag pops on the knob's pen, after him: it grows over
+        // him, and what stands there in the end is what K.dial draws from then on. "Beside" is less than 56 points
+        // between the two marks' middles on the finished dial: at 56 the flag's halo at the top of its pop (24) and
+        // the knob's shadow (27 below him) are still apart. Further off the two never meet, and the flag pops on
+        // the dial's own pen, as the rest of the dial.
+        var onKnob = false
+        if let stands = DIAL.flag { onKnob = 2 * DIAL.r * abs(sind((stands - DIAL.now) / 2)) < 56 }
+        // a mark of the dial's, popping with the flag at its place on the dial as the camera has it
+        func pop(_ ctx: OpeningPen, _ deg: Double, _ draw: (OpeningPen?) -> Void) {
+            let f = K.at(cx, cy, DIAL.start + deg, DIAL.r * zd)
+            ctx.save()
+            ctx.translate(f.x, f.y)
+            ctx.scale(zd * flag, zd * flag)
+            draw(ctx)
+            ctx.restore()
+        }
         if still {
             K.dial()
         } else if t > 0.59 {
@@ -97,14 +116,8 @@ struct MrNowOpening: OpeningScene {
                 K.ahead(g, from: behind, to: K.lerp(behind, max(DIAL.end, DIAL.now), sweep), cx: cx, cy: cy, k: zd)
             }
             if flag > 0, let goal = DIAL.goal, let stands = DIAL.flag {
-                for (deg, draw) in [(goal, K.planDot), (stands, K.flag)] {
-                    let f = K.at(cx, cy, DIAL.start + deg, DIAL.r * zd)
-                    g.save()
-                    g.translate(f.x, f.y)
-                    g.scale(zd * flag, zd * flag)
-                    draw(g)
-                    g.restore()
-                }
+                pop(g, goal, K.planDot)                             // a plan's dot at the goal: under the knob, always
+                if !onKnob { pop(g, stands, K.flag) }
             }
         }
 
@@ -197,6 +210,9 @@ struct MrNowOpening: OpeningScene {
                     o.stroke(line, K.mix(C.line, ink, fly), width: K.lerp(s.w, rim, fly), cap: .round)
                 }
             }
+
+            // the flag of a day that has it on the knob or beside it: over him, as the dial has it
+            if flag > 0, onKnob, DIAL.goal != nil, let stands = DIAL.flag { pop(o, stands, K.flag) }
         }
 
         // ---- the Now screen comes in round the dial: the words in its middle as it comes to rest (held to the dial's own

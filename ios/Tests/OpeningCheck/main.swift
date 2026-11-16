@@ -10,7 +10,11 @@ import Foundation
 //     dump frames <layout> <light|dark> [screen=x,y,w,h] [facts=x,y,w,h] <scene>@<t>,<t>,... [<scene>@<t>,...] ...
 //         the frames of those moments; <scene> is the built scene's id, or `launch`, or `done`
 //
-// The layouts are days the Now screen's dial can show (Core/Dial.swift), on made-up hours.
+// The layouts are days the Now screen's dial can show (Core/Dial.swift), on made-up hours: each as the app would give
+// it (Calc.dial's pieces and angles, NowView.swift's colors for each kind of piece, for the knob and for the flag).
+//
+// A number that is not one (NaN, an infinity) is written as 0, as the kit writes it (OpeningJSON.number); each frame
+// says how many of its numbers were such, as "bad", and tools/check.py fails a day that has any.
 
 /// A day on the dial by its name; `mock` is the shift the openings were designed on, with the dial's ticks drawn as
 /// the mock draws them, and `running` the same shift with the app's ticks.
@@ -22,6 +26,9 @@ func layoutPreset(_ name: String, _ theme: OpeningTheme) -> (layout: OpeningLayo
     let vacation = theme.dark ? OpeningColor(59, 158, 245) : OpeningColor(41, 148, 242)
     let secondary = theme.tickBig
     let ahead = accent.alpha(0.18)
+    // a plan's pieces: short of the goal in a pale red, past it in a pale gold
+    let short = theme.red.alpha(0.22)
+    let longer = gold.alpha(0.4)
     switch name {
     case "mock":
         return (.mock(theme), true)
@@ -56,12 +63,68 @@ func layoutPreset(_ name: String, _ theme: OpeningTheme) -> (layout: OpeningLayo
         // eleven hours in, the goal long behind: the arc has nearly come round to its start
         return (OpeningLayout(start: 300, pieces: [Piece(0, 255, accent), Piece(255, 330, gold)],
                               now: 330, goal: 255, flag: 255, knob: gold, flagColor: accent, reached: true), false)
+    case "planShort":
+        // the mock's hours with a plan to leave at 15:30, before the goal: the red flag stands mid-way on the time
+        // ahead, which is pale up to it and a pale red from it to the goal, where a dot is left
+        return (OpeningLayout(start: 255, pieces: [Piece(0, 171, accent), Piece(171, 210, ahead, ahead: true),
+                                                   Piece(210, 255, short, ahead: true)],
+                              now: 171, goal: 255, flag: 210, knob: accent, flagColor: theme.red), false)
+    case "leaveNow":
+        // that plan come due this minute: the flag on the knob, and nothing ahead but the pale red to the goal
+        return (OpeningLayout(start: 255, pieces: [Piece(0, 210, accent), Piece(210, 255, short, ahead: true)],
+                              now: 210, goal: 255, flag: 210, knob: accent, flagColor: theme.red), false)
+    case "reachedJust":
+        // the goal reached three minutes ago, no plan: the check a degree and a half behind the knob, the overtime
+        // just begun
+        return (OpeningLayout(start: 240, pieces: [Piece(0, 255, accent), Piece(255, 256.5, gold)],
+                              now: 256.5, goal: 255, flag: 255, knob: gold, flagColor: accent, reached: true), false)
+    case "fullRing":
+        // a shift of twelve hours and more: now is 360, where the app stops it, and the knob is back on the start
+        return (OpeningLayout(start: 210, pieces: [Piece(0, 255, accent), Piece(255, 360, gold)],
+                              now: 360, goal: 255, flag: 255, knob: gold, flagColor: accent, reached: true), false)
+    case "startNow":
+        // started this very second: now is 0, nothing is worked yet, the knob stands on the start
+        return (OpeningLayout(start: 255, pieces: [Piece(0, 255, ahead, ahead: true)],
+                              now: 0, goal: 255, flag: 255, knob: accent, flagColor: accent), false)
+    case "startAtTop":
+        // since 12:00 sharp, three and a half hours in: the app gives such a start as 0, never as 360
+        return (OpeningLayout(start: 0, pieces: [Piece(0, 105, accent), Piece(105, 255, ahead, ahead: true)],
+                              now: 105, goal: 255, flag: 255, knob: accent, flagColor: accent), false)
+    case "eveningAfter":
+        // no shift running, one finished this morning (07:00 to 11:00), pale; the knob far on, at the clock's 18:30
+        return (OpeningLayout(start: 210, pieces: [Piece(0, 120, accent.alpha(0.45))],
+                              now: 345, goal: nil, flag: nil, knob: secondary, flagColor: accent), false)
+    case "nightAfter":
+        // no shift running, a day's work finished (08:00 to 17:00), pale, and thirteen hours since it began: now is
+        // 360, where the app stops it, so the knob stands where the arc starts, on the pale arc's own beginning
+        return (OpeningLayout(start: 240, pieces: [Piece(0, 270, accent.alpha(0.45))],
+                              now: 360, goal: nil, flag: nil, knob: secondary, flagColor: accent), false)
+    case "planLong":
+        // a plan to stay an hour past the goal, set before the goal is reached: the time ahead pale to the goal,
+        // where the plan's dot stands mid-way, and a pale gold from there to the gold flag
+        return (OpeningLayout(start: 255, pieces: [Piece(0, 171, accent), Piece(171, 255, ahead, ahead: true),
+                                                   Piece(255, 285, longer, ahead: true)],
+                              now: 171, goal: 255, flag: 285, knob: accent, flagColor: gold), false)
+    case "overdue":
+        // past the goal, and a plan to stay on that has come due: the gold flag on the knob, the dot behind it at
+        // the goal, and ahead the piece of no length at all that the app then gives
+        return (OpeningLayout(start: 210, pieces: [Piece(0, 255, accent), Piece(255, 285, gold),
+                                                   Piece(285, 285, longer, ahead: true)],
+                              now: 285, goal: 255, flag: 285, knob: gold, flagColor: gold), false)
+    case "onBreak":
+        // on a break since 13:30, for twenty-four minutes now: the break's orange ends at the knob, which is orange
+        // too, and the goal has moved on by as much
+        return (OpeningLayout(start: 255, pieces: [Piece(0, 150, accent), Piece(150, 162, theme.orange),
+                                                   Piece(162, 267, ahead, ahead: true)],
+                              now: 162, goal: 267, flag: 267, knob: theme.orange, flagColor: accent), false)
     default:
         return nil
     }
 }
 
-let layoutNames = ["mock", "running", "idle", "idleToday", "break", "overtime", "dayOff", "justStarted", "nearlyFull"]
+let layoutNames = ["mock", "running", "idle", "idleToday", "break", "overtime", "dayOff", "justStarted", "nearlyFull",
+                   "planShort", "leaveNow", "reachedJust", "fullRing", "startNow", "startAtTop", "eveningAfter",
+                   "planLong", "overdue", "onBreak", "nightAfter"]
 
 func fail(_ message: String) -> Never {
     FileHandle.standardError.write((message + "\n").data(using: .utf8)!)
@@ -94,13 +157,101 @@ func json(_ scene: OpeningScene) -> String {
         + "\"poster\":\(OpeningJSON.number(scene.poster)),\"haptics\":[\(taps)]"
 }
 
+// MARK: - Numbers that are not numbers
+//
+// A scene that divides by an angle of the day's which is 0 (the mock's `ridden / DIAL.now`) makes a NaN or an
+// infinity. The JSON has it as 0, and the shape lands at the screen's corner or is not drawn, without a word. So
+// every number a frame writes is looked at here: the same ones the kit's `json` writes, and no others. What the pen
+// or the kit has bounded before it reached the list is not seen, being a number by then: a color's parts and its
+// alpha, a radius (an arc's, a shadow's, a blur's), an edge's width, K.clamp and so K.seg, a part's `shown` and
+// K.count all make 0 of a NaN, and the pen's `alpha` does not take one at all.
+
+/// How many of these are not numbers: NaN, or an infinity.
+func notFinite(_ numbers: Double...) -> Int {
+    numbers.filter { !$0.isFinite }.count
+}
+
+func notFinite(_ color: OpeningColor) -> Int {
+    notFinite(color.r, color.g, color.b, color.a)
+}
+
+func notFinite(_ paint: OpeningPaint) -> Int {
+    func each(_ stops: [OpeningStop]) -> Int {
+        stops.reduce(0) { $0 + notFinite($1.at) + notFinite($1.color) }
+    }
+    switch paint {
+    case .color(let color):
+        return notFinite(color)
+    case .linear(let x0, let y0, let x1, let y1, let stops):
+        return notFinite(x0, y0, x1, y1) + each(stops)
+    case .radial(let x, let y, let r0, let r1, let stops):
+        return notFinite(x, y, r0, r1) + each(stops)
+    }
+}
+
+func notFinite(_ path: OpeningPath) -> Int {
+    path.elements.reduce(0) { sum, element in
+        switch element {
+        case .move(let x, let y), .line(let x, let y):
+            return sum + notFinite(x, y)
+        case .quad(let cx, let cy, let x, let y):
+            return sum + notFinite(cx, cy, x, y)
+        case .cubic(let c1x, let c1y, let c2x, let c2y, let x, let y):
+            return sum + notFinite(c1x, c1y, c2x, c2y, x, y)
+        case .arc(let x, let y, let r, let start, let delta):
+            return sum + notFinite(x, y, r, start, delta)
+        case .ellipse(let x, let y, let rx, let ry, let rotation, let start, let delta):
+            return sum + notFinite(x, y, rx, ry, rotation, start, delta)
+        case .roundRect(let x, let y, let w, let h, let r):
+            return sum + notFinite(x, y, w, h, r)
+        case .close:
+            return sum
+        }
+    }
+}
+
+func notFinite(_ ops: [OpeningPen.Op]) -> Int {
+    ops.reduce(0) { sum, op in
+        switch op {
+        case .save, .restore, .mark:
+            return sum
+        case .translate(let x, let y), .scale(let x, let y):
+            return sum + notFinite(x, y)
+        case .rotate(let x), .alpha(let x), .blur(let x), .hours(let x):
+            return sum + notFinite(x)
+        case .clip(let path, _):
+            return sum + notFinite(path)
+        case .fill(let path, let paint, _):
+            return sum + notFinite(path) + notFinite(paint)
+        case .stroke(let path, let paint, let width, _, _):
+            return sum + notFinite(path) + notFinite(paint) + notFinite(width)
+        case .image(_, let x, let y, let w, let h):
+            return sum + notFinite(x, y, w, h)
+        case .shadow(let color, let radius, let dx, let dy):
+            return sum + notFinite(color) + notFinite(radius, dx, dy)
+        case .group(let edge, let inside):
+            return sum + (edge.map { notFinite($0.color) + notFinite($0.width) } ?? 0) + notFinite(inside)
+        }
+    }
+}
+
+/// How many numbers of a frame are not numbers: in its two lists, in its parts' states and in its count.
+func notFinite(_ frame: OpeningFrame) -> Int {
+    let parts = OpeningScreenPart.allCases.reduce(0) { sum, id in
+        let s = frame.parts[id] ?? OpeningPartState()
+        return sum + notFinite(s.shown, s.dx, s.dy, s.scale)
+    }
+    return notFinite(frame.under) + notFinite(frame.over) + parts + (frame.counted.map { notFinite($0) } ?? 0)
+}
+
 func json(_ frame: OpeningFrame, at t: Double) -> String {
     let parts = OpeningScreenPart.allCases.map { id -> String in
         let s = frame.parts[id] ?? OpeningPartState()
         return "\"\(id.rawValue)\":[\(OpeningJSON.numbers([s.shown, s.dx, s.dy, s.scale]))]"
     }
     return "{\"t\":\(OpeningJSON.number(t)),\"under\":\(OpeningJSON.list(frame.under)),\"over\":\(OpeningJSON.list(frame.over)),"
-        + "\"parts\":{" + parts.joined(separator: ",") + "},\"count\":\(frame.counted.map(OpeningJSON.number) ?? "null")}"
+        + "\"parts\":{" + parts.joined(separator: ",") + "},\"count\":\(frame.counted.map(OpeningJSON.number) ?? "null"),"
+        + "\"bad\":\(notFinite(frame))}"
 }
 
 let arguments = Array(CommandLine.arguments.dropFirst())

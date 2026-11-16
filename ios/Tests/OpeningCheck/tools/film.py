@@ -7,7 +7,8 @@ scene of the same id.
                          [--mock | --both]
 
 --layout  mock (the designed shift, drawn as the mock draws it), running, idle, idleToday, break, overtime, dayOff,
-          justStarted, nearlyFull (main.swift)
+          justStarted, nearlyFull, and the days added since: planShort, leaveNow, reachedJust, fullRing, startNow,
+          startAtTop, eveningAfter, planLong, overdue, onBreak, nightAfter (main.swift's layoutNames)
 --theme   light or dark
 --n       how many moments, evenly from --from to --to (the scene's `rest` by default); --at: these moments instead
 --s       the size of each picture against the real screen (402 x 874 points); with --view, of that part

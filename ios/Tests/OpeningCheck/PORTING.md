@@ -218,9 +218,13 @@ inside `K.dial`), and so are the four numerals.
 - `K.layout.reached`: the goal is reached and there is no plan: the app's flag is then a white check on a disc in
   the accent (not a flag on a white disc). `K.flag` draws whichever it is; it only matters to a shape of yours that
   becomes the flag's disc.
-- Any of these may be 0, and `DIAL.goal` and `DIAL.flag` nil: `idle` and `dayOff` have `now` 0 and `worked` 0. Never
-  divide by one of them unguarded (the mock's `ridden / DIAL.now`): a frame with a number that is not one draws
-  nothing where it should, without a word.
+- Any of these may be 0, and `DIAL.goal` and `DIAL.flag` nil: `idle`, `dayOff` and `startNow` have `now` 0 and
+  `worked` 0. Never divide by one of them unguarded (the mock's `ridden / DIAL.now`): a frame with a number that is
+  not one draws nothing where it should, and `check.py` fails the day for it (see "The commands").
+- `DIAL.now` may be 360: the knob is then back on the start mark (`fullRing`) or, with no shift running, on the
+  beginning of the day's first pale piece (`nightAfter`). `DIAL.start` is 0 for a start at 12 o'clock, never 360
+  (`startAtTop`). And the app gives a plan that has come due past the goal a piece ahead of no length at all
+  (`overdue`): take a day's pieces with `where piece.to > piece.from`.
 - The pieces behind now (`span` shows them from the start on; `tint` mixes them toward a color): work, breaks in
   orange, overtime in gold, the day's finished shifts pale. The pieces ahead of now (`ahead` is their alpha,
   `aheadTo` how far they are drawn): the pale time to the goal, a plan's pieces, a day off's whole round.
@@ -230,6 +234,20 @@ the app draws), `idle` (nothing today: no pieces, a gray knob at the clock's tim
 (two finished shifts, pale; the knob further on), `break` (work, an orange break, work, the time ahead), `overtime`
 (past the goal in gold, and a plan: the flag further on, a dot at the goal), `dayOff` (the whole round in a color,
 the knob at its start), `justStarted` (now is 2 degrees), `nearlyFull` (now is 330 degrees, the goal behind it).
+
+And eleven more, for the marks where those nine never have them (mid-way on the arc ahead, on the knob, beside it)
+and for the dial's two ends. Each is as the app would give it (`Calc.dial` in Core/Dial.swift, the colors in
+NowView.swift): `planShort` (a plan to leave before the goal: the red flag mid-way on the time ahead, which is pale
+up to it and a pale red from it to the goal, where the plan's dot stands), `leaveNow` (that plan come due: the flag
+on the knob), `planLong` (a plan to stay past a goal not reached yet: the dot mid-way, a pale gold from it to the
+gold flag), `overdue` (past the goal, a plan to stay on come due: the gold flag on the knob, the dot behind it),
+`reachedJust` (the goal reached three minutes ago: the check a degree and a half behind the knob), `fullRing`
+(twelve hours and more: now is 360), `startNow` (now is 0, nothing behind, the knob on the start), `startAtTop` (a
+start at 12 o'clock), `onBreak` (a break under way: its orange ends at the knob, which is orange too),
+`eveningAfter` (no shift running, one pale shift of the morning, the knob 225 degrees past its end) and `nightAfter`
+(no shift running, a day's work finished, pale, more than twelve hours since it began: now is 360, as on most
+evenings after work). Where the flag stands on the knob or a hair from it, K.dial draws the knob and then the flag
+over it.
 
 Go through every place the mock uses `DIAL.now`, `DIAL.goal`, `C.teal` or a pale teal, and ask what it stands for:
 
@@ -253,7 +271,11 @@ Go through every place the mock uses `DIAL.now`, `DIAL.goal`, `C.teal` or a pale
 What mrnow needed, as an example: the ring behind the giant knob is `K.worked` over the bare track where
 `K.covered` says the pieces do not hide it; what runs out ahead of him is `K.ahead` to `max(DIAL.end, DIAL.now)`;
 the flag and the plan's dot pop only `if let` they are there; the rim and the dot are in the knob's color. Nothing
-else changed, and with the mock's layout every frame is still the mock's, pixel for pixel.
+else changed, and with the mock's layout every frame is still the mock's, pixel for pixel. One thing the new days
+showed later: its knob is on the pen `o`, over the dial's, and `K.dial` lays the flag over the knob. So on a day
+whose flag stands on the knob or beside it (`leaveNow`, `reachedJust`, `overdue`) the flag pops on `o`, after the
+knob; drawn on `g` it would grow unseen under him and appear whole in one frame at the hand-over. A scene whose own
+knob is on `o` does the same.
 
 ## The commands
 
@@ -273,7 +295,7 @@ python tools/film.py <id> --mock --n 12         # the mock's scene alone
 python tools/film.py done --with <id> --layout overtime --at 0    # the finished Now screen of a day (also: launch)
 python tools/compare.py <id>                    # against the mock, frame by frame, 0 to rest + 0.2 at 30 a second
 python tools/check.py <id> --layout break --theme dark            # the two ends and no jumps, one day, one theme
-python tools/check.py <id> all                  # every layout in both themes: 18 checks, about a minute
+python tools/check.py <id> all                  # every layout in both themes: 40 checks, four or five minutes
 python tools/build.py --app                     # the kit and ALL scenes type-checked together, as the app compiles them
 ```
 
@@ -293,12 +315,21 @@ appears at once (a pale arc, a mark, a tick, a plan's dot) passes it. On the moc
 frame; on the other layouts nothing but your eyes holds what you changed for them: film each hand-over there closely,
 a frame every 0.03 to 0.05 s (`--at`, `--view`).
 
+`check.py` also fails a day on which any frame holds a number that is not one (NaN, an infinity). The dumper writes
+such a number as 0, as before, and counts them in each frame (`"bad"` in the frame's JSON: `main.swift`); `check.py`
+names the moments and how many a frame has, `t = 0.300 to 1.167 (27 frames, 3 at most in one)`. It sees what
+reaches a frame's two lists, its parts' states and its count. What the pen or the kit has bounded on the way is not
+seen, for it is a number by then: a color's parts and its alpha, a radius (an arc's, a shadow's, a blur's), an
+edge's width, `K.clamp` and so `K.seg`, a part's `shown` and `K.count` all make 0 of a NaN, and the pen's `alpha`
+does not take one at all.
+
 ## Done means
 
 1. `python tools/compare.py <id>` says PASSED.
-2. `python tools/check.py <id> all` says PASSED: all 18.
+2. `python tools/check.py <id> all` says PASSED: all 40.
 3. You have looked at film strips in the dark theme and in the layouts that are least like the mock's (`idle`,
-   `dayOff`, `justStarted`, `nearlyFull`, `break`), close up where the logo's element becomes the dial's, and it makes
+   `dayOff`, `justStarted`, `nearlyFull`, `break`, and those with a mark on the knob or mid-way on the arc ahead:
+   `leaveNow`, `reachedJust`, `planShort`), close up where the logo's element becomes the dial's, and it makes
    sense there: every hand-over ends on what `K.dial()` really draws, by a real hand-over where the day allows one and
    a short cross-fade where it does not; never a jump, never a leftover; and in the dark everything of yours reads.
 4. No literal color that only reads on a light ground; nothing that counts on the screen ending at 402 x 874.
@@ -324,8 +355,29 @@ a frame every 0.03 to 0.05 s (`--at`, `--view`).
 - "The compiler is unable to type-check this expression in reasonable time": a long line of arithmetic, as the mock
   is fond of. Cut it into two or three `let`s, and write whole numbers that are meant as fractions with their point
   (`216.0 / 32`), or as `Double(i)`.
-- A number that is not one (a division by a `DIAL.now` of 0, a `K.seg` over no time) is written to the list as 0:
-  the shape lands at the screen's corner or is not drawn. If something vanishes on `idle` or `dayOff` only, look
-  for that.
+- A number that is not one (a division by a `DIAL.now` of 0) is written to the list as 0: the shape lands at the
+  screen's corner or is not drawn. `check.py` fails the day and names the moments. A `K.seg` over no time is not one
+  of them: it is 0 up to that moment and 1 after it, a step, and nothing tells of it.
 - "Chrome's picture was not whole": the page did not finish (a scene id it does not know, a script that failed).
   Film the same moments with `film.py` and read what the picture says.
+- `K.markAt(.start)` is the knob's place with no shift running, when there is no start mark. A scene that lands
+  where the day's arc starts, mark or none, takes `K.at(DIAL.x, DIAL.y, DIAL.start, DIAL.r)` (ride's hop).
+- `K.mark(ctx, .flag, s)` draws a plan's dot at the goal and the flag, both at once. Marks that pop one by one are
+  drawn by hand, each at its place and size, in K.dial's order, so that they lie one over another as the dial's do:
+  `K.startMark`, `K.planDot`, `K.knob`, `K.flag` (the knob over the start and a plan's dot, the flag over the knob).
+- `K.man` and `K.sprite` each open an edged group of their own in the dark look. A man drawn layer by layer, or a
+  part put together of sprites and shapes of your own, takes ONE `K.edged(ctx, width) { … }` round all of it, with
+  `edge: 0` on every call inside; a part that lies on his face takes `edge: 0` as well. Where the edge belongs under
+  him and the part over him, the part is drawn twice: an edged copy before the man, a bare one after him.
+- A small picture of a scene (the picker's, at `poster`) is its two lists alone, on the mock's shift, with none of
+  the Now screen's parts. `film.py` always draws the parts: judge a poster moment with them hidden (the words in the
+  dial's middle, the cards), not by the film, or the picker shows an empty disc where the film showed a clock
+  (monocle's lens).
+- `K.facts` is the real card of facts, in the design's points: 20, 482, 362, 76 on the design's screen, wider or
+  narrower on another iPhone, and as tall as its words. A scene whose shape becomes the card, or that hides
+  something behind it, takes its numbers from there, never the design's.
+- Each engineer works in a scratch folder of their own (trial copies of a scene or of the harness, pictures given
+  with `--out`), never loose in a folder others use: several scenes are ported and checked at the same time.
+- The app's time worked, break and overtime are opaque colors, and a scene may rely on `K.covered` for them: a
+  running shift's pieces behind now hide the track. A day's finished shifts are pale (the accent at 0.45): the track
+  shows through them, `K.covered` is false there, and a shape of the scene's own laid over them must fade into them.

@@ -246,15 +246,25 @@ private struct OpeningPoster: View {
     }
 
     /// Each picture's cut of the design's screen of 402 x 874 points (the dial's middle is at 201, 293 and its size
-    /// 350; the launch icon's is at 201, 437 and its side 120). To be tuned by eye, here alone.
+    /// 350; the launch icon's is at 201, 437 and its side 120). Tuned by eye on the pictures as they are drawn here,
+    /// the two canvases alone at 58 points, light and dark: each cut is close on what the man does at his scene's
+    /// poster moment, so that it reads at this size and the seven weigh about the same. A cut goes with its scene's
+    /// `poster` (Opening/Scenes): whoever changes the one looks at the other.
     private static let cuts: [OpeningChoice: Cut] = [
-        .classic: Cut(x: 201, y: 293, side: 372),
-        .handlebar: Cut(x: 201, y: 340, side: 440),
-        .monocle: Cut(x: 201, y: 293, side: 372),
-        .mrnow: Cut(x: 265, y: 400, side: 300),
-        .chapeau: Cut(x: 201, y: 293, side: 372),
-        .ride: Cut(x: 201, y: 288, side: 392),
-        .butterfly: Cut(x: 215, y: 500, side: 330),
+        // the whole ring with air round it, about the size of the handlebar's loop beside it
+        .classic: Cut(x: 201, y: 293, side: 420),
+        // the whole loop of mustache over him, down to his bow tie
+        .handlebar: Cut(x: 201, y: 325, side: 434),
+        // his face, the monocle in the picture's very middle
+        .monocle: Cut(x: 201, y: 294, side: 280),
+        // the giant knob with him in it, the ring's road coming in from the corner
+        .mrnow: Cut(x: 273, y: 391, side: 222),
+        // his head and the mustache held out beside it, at the dial's own height: its ring shows in the corners alone
+        .chapeau: Cut(x: 203, y: 293, side: 300),
+        // the medallion on the ring at 12, the arc behind him and the bare track ahead
+        .ride: Cut(x: 205, y: 137, side: 150),
+        // him in his tile and the bow tie in the air beside his head
+        .butterfly: Cut(x: 245, y: 536, side: 226),
     ]
     /// The dial and the launch icon's place, both whole: for a choice the table does not name.
     private static let wide = Cut(x: 201, y: 310, side: 402)

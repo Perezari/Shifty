@@ -19,7 +19,8 @@ struct ButterflyOpening: OpeningScene {
     let rest = 2.75
     let end = 4.35
     let haptics = [OpeningHaptic(1.3, .light), OpeningHaptic(1.94, .light)]
-    let poster = 0.98
+    /// The bow tie off his collar, its wings spread beside his head, and he looks at it.
+    let poster = 0.88
     let arrive = 0.5
 
     private enum Side {
