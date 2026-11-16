@@ -76,6 +76,12 @@ struct SettingsView: View {
                     IconPicker()
                 }
 
+                // the opening at a launch (OpeningPicker.swift): a tap chooses one and plays it
+                SettingsSection(title: "פתיחה",
+                                note: "האנימציה שמתנגנת כשפותחים את האפליקציה. הקשה על אחת בוחרת אותה ומציגה אותה.") {
+                    OpeningPicker()
+                }
+
                 SettingsSection(title: "מסך הנעילה והתראות", note: alertsNote) {
                     Toggle("התראות על המשמרת", isOn: $alerts)
                         .settingsRow()

@@ -84,9 +84,23 @@ does not have: `codemagic.yaml`, at the root of the repository, builds it on Cod
   (`holidayPay`, `Calc.holidayPays`). `Net` has each year's rates in `Calc.taxYears`: each January its year is added
   there and a version submitted; a period takes its last day's year, and until its rates are in, the net says so. With one workplace and one pay, the settings are as the web
   app's and the engine gives its results.
+- `Shifty/Opening/`: the openings in which the logo's man acts (since 1.7; Settings › פתיחה chooses one, the
+  classic one, or another at each launch), without SwiftUI. A scene (`Scenes/`, one file each) draws each
+  moment's whole frame from nothing with the kit (`OpeningKit`): two lists of drawing operations (`OpeningPen`),
+  one under the Now screen's parts and one over them, and each part's state. In `Shifty/Views`,
+  `OpeningStage.swift` is a scene's host on the real screen (where the scenes' design of 402 x 874 points lies
+  on this iPhone, the day on the dial and the app's colors as the scene is told them, the two canvases),
+  `OpeningRenderer.swift` plays a list on a SwiftUI canvas, `OpeningPicker.swift` is the choice, its small
+  pictures and its preview, and `Opening.swift` decides whether an opening is shown, begins it and ends it, and
+  plays the classic one itself. No file with SwiftUI may be put under `Shifty/Opening/`: the check below
+  compiles that folder on its own.
 - `Tests/`: the proof that the engine equals the web app's (`calc-cases.mjs`, `CalcCheck`,
   `compare.mjs`), and the checks of the store (`StoreCheck`), the cloud mirror (`SyncCheck`) and the pay
-  period (`PeriodCheck`).
+  period (`PeriodCheck`). `OpeningCheck/` holds the openings against the browser mock they were designed in
+  (`mock/`): WSL's Swift dumps a scene's frames as JSON, headless Chrome replays them in the mock's own page,
+  and `tools/compare.py` holds them against the mock's picture by picture, `tools/check.py` on nine days of the
+  dial in light and dark (the first frame is the launch picture, the last ones the finished Now screen, no
+  jumps between), `tools/film.py` makes strips to look at. `PORTING.md` there is the guide to writing a scene.
 - `brand/MrShift.webp`: the logo since 1.6, the user's own picture: the man on flat yellow inside nine clock
   ticks, his shirt running off the bottom and both sides, for iOS's own rounded corners to cut it.
 - `Shifty/Assets.xcassets`: the icons, all made from the logo by `scripts/icons.py`: the app's own, white with
@@ -94,9 +108,12 @@ does not have: `codemagic.yaml`, at the root of the repository, builds it on Cod
   `-Purple`, `-Teal` and `-Plain`, yellow without the ticks), each light, dark and tinted, with a small picture
   `IconChoice-…` for the picker. The app's own again as `Icon` inside the app and, light and dark, as
   `LaunchMister`, the launch screen's picture; `OpeningMark`, its ticks and man, for the opening; `BannerMark`,
-  the man in lines of one color, for the reports' stamp. Then the accent color and the background, light and dark.
+  the man in lines of one color, for the reports' stamp. `OpeningRig-…` are the man in twelve layers (the shirt,
+  the head, the bow tie's wings and knot, the mustache whole and in halves, the brows, the eyes), cut from the
+  logo by `scripts/rig.py`, for the openings to move him. Then the accent color and the background, light and dark.
 - `scripts/`: the builds (`testflight.sh`, `screenshots.sh`, `review.py`, and `codemagic.py` to run
-  them from the computer), the icons (`icons.py`) and the check of the Swift without a Mac (`check-swift.sh`).
+  them from the computer), the icons (`icons.py`), the man's layers (`rig.py`) and the check of the Swift
+  without a Mac (`check-swift.sh`).
 - `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).
 
 ## Checking the Swift without a Mac

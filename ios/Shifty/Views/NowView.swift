@@ -41,6 +41,8 @@ struct NowView: View {
     @State private var wave: Date?
     /// The buttons turning into each other as a shift starts and ends (actions).
     @Namespace private var buttonSpace
+    /// Where the screen is scrolled to: back to its top for an opening played again from the settings.
+    @State private var scroll = ScrollPosition(edge: .top)
 
     var body: some View {
         let running = store.active != nil
@@ -53,20 +55,25 @@ struct NowView: View {
                 }
                 arrival()
                 actions()
-                    .openingPart(0.85)
+                    .openingPart(0.85, .buttons)
                 TimelineView(.everyMinute) { context in
                     cards(at: context.date)
                 }
-                .openingPart(0.9)
+                .openingPart(0.9, .week)
             }
             .padding(.horizontal, ScreenMargin.side)
             .padding(.top, 8)
             .padding(.bottom, 24)
         }
+        .scrollPosition($scroll)
         .scrollIndicators(.hidden)
         // what is left of the days off, after one is added from here
         .safeAreaInset(edge: .bottom, spacing: 0) {
             UndoStrip()
+        }
+        // what one of the man's openings draws under the screen's parts, the dial first of all (OpeningStage.swift)
+        .background {
+            OpeningUnder()
         }
         .background(Color.appBackground.ignoresSafeArea())
         .sensoryFeedback(.impact(weight: .medium), trigger: tapped)
@@ -99,6 +106,9 @@ struct NowView: View {
             draftStart = nil
             startUndo = nil
             if old == nil, new != nil, shown { drawArc() }
+        }
+        .onChange(of: Opening.shared.replays) { _, _ in
+            scroll.scrollTo(edge: .top)
         }
         .onAppear {
             shown = true
@@ -141,10 +151,16 @@ struct NowView: View {
         return VStack(spacing: 14) {
             NowCapsule(status: status, place: placeName(settings), choices: placeChoices(settings), now: date,
                        dayOff: Self.offToday(in: shifts, on: date))
-                .openingPart(0.8)
+                .openingPart(0.8, .cap)
             dial(status, settings, shifts, at: date, reached: reached, overtime: overtime)
             NowFacts(cells: facts(status, settings, totals: periodTotals, global: overtime != nil, at: date))
-                .openingPart(0.8)
+                .openingPart(0.8, .facts)
+                // where the card is, for one of the man's openings that ends on it (OpeningStage.swift)
+                .background {
+                    if !Opening.shared.over, Opening.shared.scene != nil {
+                        OpeningFactsReport()
+                    }
+                }
         }
         .onChange(of: reached) { was, now in
             // not at the start of a shift with no regular hours left in its week
@@ -219,7 +235,7 @@ struct NowView: View {
                 } close: {
                     withAnimation { arrivalTipShift = active.id }
                 }
-                .openingPart(0.85)
+                .openingPart(0.85, .buttons)
             }
         }
     }
@@ -288,6 +304,12 @@ struct NowView: View {
                       movingStart: draftStart != nil, drawn: drawn, wave: wave, second: Int(status.netMs / 1000)) {
                 if let leave = plan {
                     planCenter(active, leave: leave, settings, at: date, global: overtime != nil)
+                } else if Opening.shared.scene != nil {
+                    // one of the man's openings may count the time and the pay up, a frame at a time (OpeningStage.swift)
+                    OpeningCounted { share in
+                        runningCenter(status, overtime: overtime, settings, at: date, note: note,
+                                      undo: undo != nil ? undoStart : nil, counted: share)
+                    }
                 } else {
                     runningCenter(status, overtime: overtime, settings, at: date, note: note, undo: undo != nil ? undoStart : nil)
                 }
@@ -307,14 +329,17 @@ struct NowView: View {
     }
 
     /// A running shift's middle: the time worked, or the time left to the goal and past it the time beyond it; a tap
-    /// changes which, and it stays so.
+    /// changes which, and it stays so. An opening may count them up: `counted` is the share of the time and of the pay
+    /// to show, from 0 to 1 (their digits are of one width, so the words stand still as they run).
     private func runningCenter(_ status: NowStatus, overtime: MonthOvertime?, _ settings: Settings, at date: Date,
-                               note: (text: String, accent: Bool)?, undo: (() -> Void)?) -> some View {
-        let left = status.remaining * Calc.hour
+                               note: (text: String, accent: Bool)?, undo: (() -> Void)?, counted: Double? = nil) -> some View {
+        let share = counted ?? 1
+        let worked = status.netMs * share
+        let left = status.remaining * Calc.hour * share
         let past = status.remaining <= 0.001
-        let time: String = !showsLeft ? Format.timer(status.netMs) : past ? "+" + Format.timer(-left) : Format.timer(left)
+        let time: String = !showsLeft ? Format.timer(worked) : past ? "+" + Format.timer(-left) : Format.timer(left)
         let leftLine: (text: String, accent: Bool)? = showsLeft ? (past ? "מעבר ליעד" : "נשארו עד היעד", false) : nil
-        return shiftCenter(hoursText: time, pay: status.pay, overtime: overtime, faint: false, settings, at: date,
+        return shiftCenter(hoursText: time, pay: status.pay * share, overtime: overtime, faint: false, settings, at: date,
                            note: note ?? leftLine, undo: undo, timeColor: showsLeft && past ? Color("Holiday") : nil)
             .contentShape(Rectangle())
             .onTapGesture {
@@ -1079,12 +1104,9 @@ private struct ShiftDial<Center: View>: View {
     var body: some View {
         GeometryReader { geo in
             let size = min(geo.size.width, geo.size.height)
-            // at a launch it is built out of the icon, a frame at a time (Opening.swift), and then it stands still
-            TimelineView(.animation(minimumInterval: nil, paused: Opening.shared.over)) { context in
-                stage(size, at: Opening.shared.time(at: context.date))
-            }
-            .frame(width: size, height: size)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            staged(size)
+                .frame(width: size, height: size)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .aspectRatio(1, contentMode: .fit)
         .frame(maxWidth: 350)
@@ -1097,6 +1119,35 @@ private struct ShiftDial<Center: View>: View {
                             Opening.shared.dialMiddle = middle
                         }
                 }
+            }
+        }
+        .background {
+            // and for one of the man's openings: its whole place, the day on it and its colors (OpeningStage.swift)
+            if !Opening.shared.over, Opening.shared.scene != nil {
+                OpeningDialReport(layout: layout, reached: reached, knob: knob, flag: flagColor)
+            }
+        }
+    }
+
+    /// The dial through the opening. One of the man's openings draws all of the dial itself, under the screen
+    /// (OpeningStage.swift): only the middle's words are here then, as its frames say, and the dial itself once it is
+    /// over, at once, where the opening left one drawn the same.
+    @ViewBuilder
+    private func staged(_ size: CGFloat) -> some View {
+        if Opening.shared.scene != nil {
+            ZStack {
+                if Opening.shared.over {
+                    face(size, at: 9)
+                        .environment(\.layoutDirection, .leftToRight)
+                }
+                center
+                    .modifier(OpeningScenePart(part: .center))
+            }
+            .frame(width: size, height: size)
+        } else {
+            // at a launch it is built out of the icon, a frame at a time (Opening.swift), and then it stands still
+            TimelineView(.animation(minimumInterval: nil, paused: Opening.shared.over)) { context in
+                stage(size, at: Opening.shared.time(at: context.date))
             }
         }
     }
@@ -1185,13 +1236,7 @@ private struct ShiftDial<Center: View>: View {
     private func marks(_ c: CGFloat, _ r: CGFloat, at t: Double) -> some View {
         if let goal = layout.goalDeg {
             // the start, dragged along the dial to correct it, in a finger's room
-            Image(systemName: "play.fill")
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(Circle().fill(Color.accentColor))
-                .background(Circle().fill(Color.accentColor.opacity(movingStart ? 0.22 : 0)).frame(width: 40, height: 40))
-                .frame(width: 44, height: 44)
+            DialStartMark(moving: movingStart)
                 .contentShape(Circle())
                 .scaleEffect(OpeningCurve.pop(t, 0.66))
                 .position(Self.point(layout.startDeg, r, c))
@@ -1232,30 +1277,15 @@ private struct ShiftDial<Center: View>: View {
         }
     }
 
-    /// Now: a white knob ringed in the state's color.
+    /// Now: a white knob ringed in the state's color (DialMarks.swift, as the start's mark and the flag are: an
+    /// opening draws the same views).
     private var knobView: some View {
-        Circle()
-            .fill(Color.white)
-            .frame(width: 32, height: 32)
-            .overlay(Circle().stroke(knob, lineWidth: 3.5))
-            .overlay(Circle().fill(knob).frame(width: 9, height: 9))
-            .shadow(color: .black.opacity(0.22), radius: 7, y: 4)
+        DialKnob(color: knob)
     }
 
     /// The goal's flag, in a halo that asks to be dragged; a check once the goal is reached.
     private var flag: some View {
-        ZStack {
-            Circle()
-                .fill(flagColor.opacity(0.18))
-                .frame(width: 42, height: 42)
-            Circle()
-                .fill(reached ? Color.accentColor : Color.white)
-                .frame(width: 30, height: 30)
-                .shadow(color: .black.opacity(0.16), radius: 4, y: 2)
-            Image(systemName: reached ? "checkmark" : "flag.fill")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(reached ? Color.white : flagColor)
-        }
+        DialFlag(color: flagColor, reached: reached)
     }
 
     private var flagColor: Color {
@@ -1310,8 +1340,8 @@ private struct DialFace: View {
     }
 }
 
-/// The dial's four hours.
-private struct DialHours: View {
+/// The dial's four hours; an opening's canvases draw them too (OpeningStage.swift).
+struct DialHours: View {
     let size: CGFloat
 
     var body: some View {
@@ -1405,13 +1435,15 @@ private struct WeekCard: View {
             }
         }
         .card()
-        .task {
-            // with the opening, down until its cards come up (at its 0.9), then up one after another
+        // again with each opening played again from the settings
+        .task(id: Opening.shared.replays) {
+            // with the opening, down until its cards come up (at its 0.9; in one of the man's, when its week's card
+            // does), then up one after another
             guard !Opening.shared.over else { return }
             var instant = Transaction()
             instant.disablesAnimations = true
             withTransaction(instant) { grown = false }
-            await Opening.shared.reach(1.05)
+            await Opening.shared.weekRises()
             grown = true
         }
     }

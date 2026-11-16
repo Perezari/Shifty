@@ -7,6 +7,11 @@ import UIKit
 /// the dial draws itself by it (ShiftDial, DialOpening), the screen's other parts come up by it (`openingPart`), and
 /// the cover here hides the tab bar. Not at the first launch, which opens on the first setup, nor by a quick action or
 /// a widget's link, nor with Reduce Motion; with the lock on, after it.
+///
+/// It is the classic one of the openings to choose from in Settings › פתיחה (OpeningPicker.swift). The others are
+/// scenes in which the logo's man acts (Opening/Scenes), drawn on canvases by OpeningStage.swift: for one of them, all
+/// that is here is when an opening is shown at all, its beginning and its end, by the same rules, and the choice
+/// between the two wherever the Now screen's parts are built.
 @MainActor @Observable
 final class Opening {
     static let shared = Opening()
@@ -25,15 +30,27 @@ final class Opening {
     /// The screen's middle, and the dial's in its place, on the screen: from where the dial begins.
     var screenMiddle: CGFloat?
     var dialMiddle: CGFloat?
+    /// The scene this opening plays, if it is one of the man's; nil for the classic. It stays once the opening is over:
+    /// the Now screen's parts are built one way or the other by it, and change only with an opening played again.
+    private(set) var scene: (any OpeningScene)?
+    /// Counts the openings played again from the settings.
+    private(set) var replays = 0
+    /// On its way: the app is in front, and unlocked, and the beat on the icon has begun. Only from here on are a
+    /// scene's canvases and parts drawn with each tick of the display (OpeningStage.swift): behind the lock they wait.
+    private(set) var started = false
 
     @ObservationIgnored private var waitsForLock = false
-    @ObservationIgnored private var started = false
+    /// Ended by a skip, not by its own end.
+    @ObservationIgnored private(set) var skipped = false
+    @ObservationIgnored private var running: Task<Void, Never>?
 
     /// At the app's launch: to be shown, unless the app opens on the first setup, motion is to be reduced or the
     /// screen is being read out.
     func arm(firstSetup: Bool) {
         guard !firstSetup, !UIAccessibility.isReduceMotionEnabled, !UIAccessibility.isVoiceOverRunning else { return }
         waitsForLock = UserDefaults.standard.bool(forKey: AppLock.key)
+        scene = OpeningChoice.kept.scene()
+        OpeningStage.shared.ready(for: scene)
         over = false
     }
 
@@ -54,6 +71,22 @@ final class Opening {
         if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
     }
 
+    /// Waits until the week's card comes up, for its bars to grow: the classic's moment 1.05, or a scene's own, in its
+    /// real seconds. A scene's wait is in short steps, so that a skip, which brings the card up at once, ends it.
+    func weekRises() async {
+        guard scene != nil else { return await reach(1.05) }
+        while !over, began == nil, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        guard !over, let began else { return }
+        let rises = began.addingTimeInterval(OpeningStage.shared.weekAt)
+        while !over, !Task.isCancelled {
+            let wait: TimeInterval = rises.timeIntervalSinceNow
+            guard wait > 0 else { return }
+            try? await Task.sleep(for: .seconds(min(wait, 0.05)))
+        }
+    }
+
     /// From the dial's place to the screen's middle.
     var travel: CGFloat {
         guard let screenMiddle, let dialMiddle else { return 0 }
@@ -64,7 +97,7 @@ final class Opening {
     func start() {
         guard !over, !started, !waitsForLock else { return }
         started = true
-        Task { await run() }
+        running = Task { await run() }
     }
 
     /// The lock is open.
@@ -77,7 +110,36 @@ final class Opening {
     /// A tap on it, or the app opened for something else: the screen as it is, at once.
     func skip() {
         guard !over else { return }
+        skipped = true
+        running?.cancel()
         withAnimation(.easeOut(duration: 0.2)) { over = true }
+        if scene != nil { OpeningStage.shared.rest() }
+    }
+
+    /// Ended where it is, with no ease: an opening played again from the settings, left.
+    func stop() {
+        guard !over else { return }
+        skipped = true
+        running?.cancel()
+        over = true
+        if scene != nil { OpeningStage.shared.rest() }
+    }
+
+    /// Played again, from the settings (OpeningPicker.swift's OpeningPreview): the classic, or a scene. Whatever `arm`
+    /// would say, Reduce Motion too: it was asked for. Only once the opening before it is over.
+    func replay(_ scene: (any OpeningScene)?) {
+        guard over else { return }
+        running?.cancel()
+        self.scene = scene
+        OpeningStage.shared.ready(for: scene)
+        replays += 1
+        waitsForLock = false
+        started = false
+        skipped = false
+        began = nil
+        dialMiddle = nil
+        over = false
+        start()
     }
 
     private func run() async {
@@ -93,6 +155,11 @@ final class Opening {
             skip()
             return
         }
+        // one of the man's scenes, by its own clock
+        if let scene {
+            await play(scene)
+            return
+        }
         began = Date()
         let tap = UIImpactFeedbackGenerator(style: .light)
         tap.prepare()
@@ -100,6 +167,53 @@ final class Opening {
         if !over { tap.impactOccurred() }
         try? await Task.sleep(for: .seconds((Self.end - Self.landing) * Self.stretch))
         over = true
+    }
+
+    /// A scene's run, once the stage knows where the dial is and what day is on it (if it never does, none): real
+    /// seconds from its first frame, the iPhone's taps at their moments, each readied a little ahead, and at the
+    /// scene's rest the real screen alone, with nothing to see as it takes over: the scene's last frames are the
+    /// finished dial, drawn the same. Nothing of it after a skip.
+    private func play(_ scene: any OpeningScene) async {
+        let stage = OpeningStage.shared
+        var waited = 0.0
+        while !stage.placed, waited < 1 {
+            try? await Task.sleep(for: .milliseconds(50))
+            waited += 0.05
+        }
+        guard !over else { return }
+        guard stage.placed else {
+            skip()
+            return
+        }
+        // the scene's first frame is on its canvases, under the still picture, before that picture goes: long since,
+        // unless the screen was slow to come up; then a moment for it, and two ticks of the display more
+        var drawing = 0.0
+        while !stage.drawn, drawing < 0.3 {
+            try? await Task.sleep(for: .milliseconds(16))
+            drawing += 0.016
+        }
+        if drawing > 0 { try? await Task.sleep(for: .milliseconds(34)) }
+        guard !over else { return }
+        let first = Date()
+        began = first
+        let taps = OpeningTaps()
+        for tap in scene.haptics.sorted(by: { $0.at < $1.at }) where tap.at < scene.rest {
+            await Self.sleep(until: first.addingTimeInterval(tap.at - 0.3))
+            guard !over else { return }
+            taps.ready(tap.style)
+            await Self.sleep(until: first.addingTimeInterval(tap.at))
+            guard !over else { return }
+            taps.play(tap.style)
+        }
+        await Self.sleep(until: first.addingTimeInterval(scene.rest))
+        guard !over else { return }
+        over = true
+        stage.rest()
+    }
+
+    private static func sleep(until date: Date) async {
+        let wait = date.timeIntervalSinceNow
+        if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
     }
 }
 
@@ -141,28 +255,38 @@ enum OpeningCurve {
 
 extension View {
     /// A part of the Now screen coming up in the opening, from the moment `start` (the design's seconds); once it is
-    /// over, as it is.
-    func openingPart(_ start: Double) -> some View {
-        modifier(OpeningPart(start: start))
+    /// over, as it is. With one of the man's scenes it is the scene's part `part` instead, and does as the scene's
+    /// frames say (OpeningStage.swift); one with no part named stays hidden until the scene is over.
+    func openingPart(_ start: Double, _ part: OpeningScreenPart? = nil) -> some View {
+        modifier(OpeningPart(start: start, part: part))
     }
 }
 
 private struct OpeningPart: ViewModifier {
     let start: Double
+    let part: OpeningScreenPart?
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        TimelineView(.animation(minimumInterval: nil, paused: Opening.shared.over)) { context in
-            let shown = OpeningCurve.out3(Opening.shared.time(at: context.date), start, start + 0.34)
+        if Opening.shared.scene != nil {
             content
-                .opacity(shown)
-                .offset(y: CGFloat(1 - shown) * 46)
+                .modifier(OpeningScenePart(part: part))
+        } else {
+            TimelineView(.animation(minimumInterval: nil, paused: Opening.shared.over)) { context in
+                let shown = OpeningCurve.out3(Opening.shared.time(at: context.date), start, start + 0.34)
+                content
+                    .opacity(shown)
+                    .offset(y: CGFloat(1 - shown) * 46)
+            }
         }
     }
 }
 
 /// Over the tabs while the opening is on: the icon on the app's background until it begins, the very picture of
 /// iOS's launch screen, so that the launch runs straight into it; then only over the tab bar, which the Now screen's
-/// parts cannot hide, until its turn comes. A tap anywhere skips it.
+/// parts cannot hide, until its turn comes; with one of the man's scenes, what the scene draws over the screen too.
+/// A tap anywhere skips it. And while an opening is played again from the settings, what that shows before it and
+/// after it (OpeningPicker.swift); a tap then goes back to the settings.
 struct OpeningCover: View {
     @Environment(\.scenePhase) private var phase
 
@@ -171,24 +295,48 @@ struct OpeningCover: View {
         if !opening.over {
             GeometryReader { proxy in
                 ZStack {
+                    // one of the man's scenes: there from the start, under the still picture, with its first frame
+                    // drawn, which is that very picture, so that the picture's going uncovers it and nothing is seen
+                    if opening.scene != nil {
+                        OpeningOver()
+                    }
                     if opening.began == nil {
                         Color.appBackground
                         Image("LaunchMister")
-                    } else {
+                    } else if opening.scene == nil {
                         OpeningCurtain()
                     }
                     Color.clear
                         .contentShape(Rectangle())
-                        .onTapGesture { opening.skip() }
+                        .onTapGesture {
+                            // played again from the settings, a tap goes straight back to them, with no ease into
+                            // the Now screen on the way
+                            if OpeningPreview.shared.stage != nil {
+                                OpeningPreview.shared.stop()
+                            } else {
+                                opening.skip()
+                            }
+                        }
                 }
                 .onChange(of: proxy.frame(in: .global).midY, initial: true) { _, middle in
                     opening.screenMiddle = middle
                 }
+                // the whole screen, for a scene's canvases to lay their design on
+                .onChange(of: proxy.frame(in: .global), initial: true) { _, frame in
+                    OpeningStage.shared.screen = frame
+                }
             }
             .ignoresSafeArea()
             .onChange(of: phase, initial: true) { _, now in
-                if now == .active { opening.start() }
+                if now == .active {
+                    opening.start()
+                } else {
+                    // played again from the settings, it does not go on behind the lock or in the background
+                    OpeningPreview.shared.stop()
+                }
             }
+        } else if OpeningPreview.shared.stage != nil {
+            OpeningPreviewCover()
         }
     }
 }

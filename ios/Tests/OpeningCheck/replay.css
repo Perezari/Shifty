@@ -1,0 +1,20 @@
+/* The replay page's own styles, over the mock's page.css: a phone in the app's dark look, for frames drawn in the
+   dark theme (replay.js sets `dark` on such a picture's box). */
+.dark {
+  --app-bg: #15171C; --app-card: #212429; --app-ink: #FFFFFF; --app-gray: rgba(235, 235, 245, .6); --app-teal: #1BB3A3;
+  --app-orange: #FF9F0A; --app-red: #FF453A; --app-line: rgba(255, 255, 255, .08);
+}
+.dark .btn { background: rgba(255, 255, 255, .1); box-shadow: none; }
+.dark .col .track { background: rgba(255, 255, 255, .08); }
+.dark .tabs { background: rgba(44, 46, 53, .9); box-shadow: 0 2px 14px rgba(0, 0, 0, .4); }
+.dark .tabs div { color: #C6C8D0; }
+.dark .tabs div:first-child { color: var(--app-teal); }
+/* The screen is not to scroll. With the mock's `overflow: hidden` it can, to the left (it reads right to left): a
+   part a scene has grown far beyond it, as the words in the dial's middle at a camera's zoom, then moves the whole
+   picture by a pixel in some places of a sheet and not in others. */
+.screen { overflow: clip; }
+/* a note of something gone wrong, over everything */
+.replay-error {
+  position: fixed; left: 0; top: 0; z-index: 9; margin: 0; padding: 6px 10px; background: #fff; color: #c00;
+  font: bold 14px/1.3 monospace; direction: ltr; white-space: pre-wrap;
+}

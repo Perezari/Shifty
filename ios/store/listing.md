@@ -311,3 +311,18 @@ Permissions, all optional and asked only when a feature needs them: notification
 
 7. In-App Purchase: none.
 ```
+
+## Version 1.7
+
+Six new openings beside the one the app had (the user's pick of all six, 16 November 2026), in which the logo's man
+himself acts and a part of him becomes a part of the Now screen's dial: his mustache the ring, a brow a monocle that
+grows into the dial, himself the "now" knob, the mustache doffed like a hat, a ride round the ring, his bow tie
+flying to it. Chosen in Settings › פתיחה, where a tap plays one; "כל פעם אחרת" plays another at each launch. The
+name, the description, the keywords and the screenshots carry over from 1.6.
+
+**What's New in This Version** (what was built after 1.6's build, 749ff18):
+
+```
+• שש פתיחות חדשות, שבהן מר משמרת עצמו משחק: מסלסל את השפם, מרכיב מונוקל, מסיר את השפם כמו כובע ועוד.
+• בהגדרות › פתיחה בוחרים איזו פתיחה תתנגן, או פתיחה אחרת בכל כניסה.
+```

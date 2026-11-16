@@ -130,6 +130,10 @@ struct RootView: View {
         .onChange(of: QuickActions.shared.shiftActions) { _, _ in
             tab = .now
         }
+        // an opening played again from the settings: on the Now screen, under its cover, and back (OpeningPicker.swift)
+        .onChange(of: OpeningPreview.shared.onNow) { _, on in
+            tab = on ? AppTab.now : AppTab.settings
+        }
         // the first setup: into the app after it, a shift started or not, or to the settings to restore a backup
         .fullScreenCover(isPresented: $welcoming) {
             Welcome { finish in

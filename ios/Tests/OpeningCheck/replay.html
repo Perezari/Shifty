@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<title>replay</title>
+<!-- The Swift scenes' frames (main.swift's JSON) played on the mock's own page: its phone, its engine, its styles.
+     tools/*.py open it with #job=<a job file's URL>; see replay.js. -->
+<link rel="stylesheet" href="mock/page.css">
+<link rel="stylesheet" href="replay.css">
+</head>
+<body>
+<script src="mock/rig.js"></script>
+<script>
+  // the mock's engine looks for the man's pictures beside the page: they are beside the mock
+  window.OPENING_ASSETS = Object.fromEntries([...Object.keys(window.RIG.layers), 'man'].map(name => [name, `mock/assets/${name}.png`]));
+</script>
+<script src="mock/engine.js"></script>
+<script src="replay.js"></script>
+</body>
+</html>
