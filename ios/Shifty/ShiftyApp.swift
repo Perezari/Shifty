@@ -29,6 +29,8 @@ struct ShiftyApp: App {
                 .environment(store)
                 .environment(\.layoutDirection, .rightToLeft)
                 .environment(\.locale, Locale(identifier: "he_IL"))
+                // in SwiftWin's build alone, which has no asset catalog (Theme.swift)
+                .accentWithoutCatalog()
         }
     }
 }

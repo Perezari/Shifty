@@ -1036,7 +1036,7 @@ struct DayPreview: View {
             if let holiday {
                 Text(holiday)
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Color("Holiday"))
+                    .foregroundStyle(Color.holidayGold)
             }
             if shifts.isEmpty && holidayPays.isEmpty {
                 Text("אין משמרת ביום זה")

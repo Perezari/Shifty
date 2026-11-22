@@ -340,7 +340,7 @@ struct NowView: View {
         let time: String = !showsLeft ? Format.timer(worked) : past ? "+" + Format.timer(-left) : Format.timer(left)
         let leftLine: (text: String, accent: Bool)? = showsLeft ? (past ? "מעבר ליעד" : "נשארו עד היעד", false) : nil
         return shiftCenter(hoursText: time, pay: status.pay * share, overtime: overtime, faint: false, settings, at: date,
-                           note: note ?? leftLine, undo: undo, timeColor: showsLeft && past ? Color("Holiday") : nil)
+                           note: note ?? leftLine, undo: undo, timeColor: showsLeft && past ? Color.holidayGold : nil)
             .contentShape(Rectangle())
             .onTapGesture {
                 showsLeft.toggle()
@@ -398,7 +398,7 @@ struct NowView: View {
 
     private func knobColor(_ status: NowStatus, reached: Bool) -> Color {
         if status.activeBreak != nil { return .orange }
-        return reached ? Color("Holiday") : .accentColor
+        return reached ? Color.holidayGold : .accentColor
     }
 
     /// The day, the time worked and the wage: the running shift's, or today's. A global pay's has the period's
@@ -426,7 +426,7 @@ struct NowView: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                    .foregroundStyle(Color("Holiday"))
+                    .foregroundStyle(Color.holidayGold)
                 if let bonus = overtime.bonusLine {
                     Text(bonus)
                         .font(.system(size: 14, weight: .medium))
@@ -502,7 +502,7 @@ struct NowView: View {
             Text(planDelta(extra, extraPay: global ? nil : leaving.pay - atGoal.pay, settings))
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
-                .foregroundStyle(extra >= -0.001 ? Color("Holiday") : Color.red)
+                .foregroundStyle(extra >= -0.001 ? Color.holidayGold : Color.red)
             Button("חזרה") {
                 withAnimation { plan = nil }
             }
@@ -575,10 +575,10 @@ struct NowView: View {
         var cells = [FactCell(title: "התחלה", value: Format.clock(active.start))]
         if let plan {
             let past = Calc.leaving(active, at: plan, settings, now: date).netHours >= status.goal - 0.001
-            let color: Color = past ? Color("Holiday") : Color.red
+            let color: Color = past ? Color.holidayGold : Color.red
             cells.append(FactCell(title: "יציאה מתוכננת", value: Format.clock(plan), color: color))
         } else if status.remaining <= 0.001 {
-            cells.append(FactCell(title: "שעות נוספות", value: "+" + Format.hoursToHM(status.overtimeHours), color: Color("Holiday")))
+            cells.append(FactCell(title: "שעות נוספות", value: "+" + Format.hoursToHM(status.overtimeHours), color: Color.holidayGold))
         } else if let finish = status.finishMs {
             cells.append(FactCell(title: "יעד · עוד " + Format.hoursToHM(status.remaining), value: Format.clock(Date(ms: finish))))
         }
@@ -1290,7 +1290,7 @@ private struct ShiftDial<Center: View>: View {
 
     private var flagColor: Color {
         guard planned, let goal = layout.goalDeg, let leave = layout.leaveDeg else { return .accentColor }
-        return leave >= goal ? Color("Holiday") : .red
+        return leave >= goal ? Color.holidayGold : .red
     }
 
     static func point(_ degrees: Double, _ radius: CGFloat, _ c: CGFloat) -> CGPoint {
@@ -1304,11 +1304,11 @@ extension DialLayout.Kind {
     var color: Color {
         switch self {
         case .work: Color.accentColor
-        case .overtime: Color("Holiday")
+        case .overtime: Color.holidayGold
         case .pause: Color.orange
         case .ahead: Color.accentColor.opacity(0.18)
         case .short: Color.red.opacity(0.22)
-        case .plannedOvertime: Color("Holiday").opacity(0.4)
+        case .plannedOvertime: Color.holidayGold.opacity(0.4)
         case .today: Color.accentColor.opacity(0.45)
         case .dayOff(let type): type.dayOffColor.opacity(0.85)
         }
@@ -1593,10 +1593,10 @@ private struct PeriodCard: View {
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 30)
                 if let overtime, let target = overtime.target {
                     // a global pay's overtime against the hours it covers, or the next bonus's target
-                    mini(Format.hoursToHM(overtime.hours), "נוספות", shown(overtime.hours, in: Color("Holiday")),
+                    mini(Format.hoursToHM(overtime.hours), "נוספות", shown(overtime.hours, in: Color.holidayGold),
                          of: "מתוך " + (target == target.rounded() ? String(Int(target)) : Format.hoursToHM(target)))
                 } else {
-                    mini(Format.hoursToHM(totals.overtimeHours), "נוספות", shown(totals.overtimeHours, in: Color("Holiday")))
+                    mini(Format.hoursToHM(totals.overtimeHours), "נוספות", shown(totals.overtimeHours, in: Color.holidayGold))
                 }
                 Rectangle().fill(Color.primary.opacity(0.08)).frame(width: 1, height: 30)
                 mini(Format.hoursToHM(missing), "חוסר", shown(missing, in: .red))
@@ -1941,9 +1941,9 @@ private struct HolidayBanner: View {
         HStack(spacing: 12) {
             Image(systemName: "calendar")
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Color("Holiday"))
+                .foregroundStyle(Color.holidayGold)
                 .frame(width: 36, height: 36)
-                .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color("Holiday").opacity(0.18)))
+                .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(Color.holidayGold.opacity(0.18)))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))

@@ -1,5 +1,7 @@
 import StoreKit
 import SwiftUI
+// requestReview's module, which Xcode adds by itself where StoreKit and SwiftUI meet; SwiftWin's build doesn't
+import _StoreKit_SwiftUI
 
 /// Asks for a rating on the App Store at a good moment, the day's goal reached: after a week of shifts and ten of
 /// them, once a version, never in the screenshots. iOS shows Apple's dialog only when it chooses, at most three

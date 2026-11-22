@@ -3,7 +3,13 @@ import UIKit
 
 extension Color {
     /// The screens' background, light and dark (Assets.xcassets): the web app's.
-    static let appBackground = Color("Background")
+    static let appBackground = asset("Background", light: 0xF4F5F7, dark: 0x15171C)
+    /// A holiday's gold, light and dark (Assets.xcassets): the holidays and their pay, and time past the plan.
+    static let holidayGold = asset("Holiday", light: 0xB07D2A, dark: 0xD8A64E)
+    /// The accent where the app has no compiled asset catalog to tint with (SwiftWin's build, swiftwin.toml);
+    /// nil where it has one, as iOS then tints with its AccentColor.
+    static let accentWithoutCatalog: Color? = UIColor(named: "AccentColor") == nil
+        ? asset("AccentColor", light: 0x0F9D8F, dark: 0x1BB3A3) : nil
     /// A vacation day's sky blue, and a day of reserve duty's olive (ShiftType.dayOffColor).
     static let vacation = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark ? UIColor(red: 0.23, green: 0.62, blue: 0.96, alpha: 1) : UIColor(red: 0.16, green: 0.58, blue: 0.95, alpha: 1)
@@ -15,6 +21,17 @@ extension Color {
     static let cardBackground = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark ? UIColor(red: 0.13, green: 0.14, blue: 0.16, alpha: 1) : .white
     })
+
+    /// A color of Assets.xcassets. Built by SwiftWin on Windows (swiftwin.toml), the app has the catalog's images
+    /// but not the compiled catalog, and draws the same light and dark values from here: keep them as the catalog's.
+    private static func asset(_ name: String, light: UInt32, dark: UInt32) -> Color {
+        if UIColor(named: name) != nil { return Color(name) }
+        func rgb(_ value: UInt32) -> UIColor {
+            UIColor(red: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255,
+                    blue: CGFloat(value & 0xFF) / 255, alpha: 1)
+        }
+        return Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? rgb(dark) : rgb(light) })
+    }
 }
 
 /// The cards' look, this device's (Settings › תצוגה): plain, as iOS's grouped cards, or of Liquid Glass as they
@@ -43,10 +60,26 @@ enum UnrecordedDays {
 
 extension EnvironmentValues {
     /// The cards are of glass (CardLook), set over the tabs.
-    @Entry var glassCards = false
+    var glassCards: Bool {
+        get { self[GlassCardsKey.self] }
+        set { self[GlassCardsKey.self] = newValue }
+    }
+}
+
+/// glassCards' key, written out: SwiftUI's @Entry is a macro whose plugin comes with Xcode alone, not with the
+/// Swift toolchain SwiftWin builds with on Windows (swiftwin.toml).
+private struct GlassCardsKey: EnvironmentKey {
+    static var defaultValue: Bool { false }
 }
 
 extension View {
+    /// The accent in a build without the asset catalog (SwiftWin's); in the app's own build no modifier at all, so
+    /// that iOS tints with the catalog's AccentColor as it always has.
+    @ViewBuilder
+    func accentWithoutCatalog() -> some View {
+        if let accent = Color.accentWithoutCatalog { tint(accent) } else { self }
+    }
+
     /// A rounded card over the background.
     func card(padding: CGFloat = 18) -> some View {
         self.padding(padding)

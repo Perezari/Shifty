@@ -9,11 +9,12 @@ enum ShiftAction {
 
 /// Runs an action on the app's store and answers in a sentence, for Siri. The intents are compiled into the
 /// widget extension too, for its buttons; as Live Activity intents the system always performs them in the
-/// app, which alone is built with SHIFTY_APP (project.yml).
+/// app. The extension is built with SHIFTY_WIDGET (project.yml), and the app with no flag, as SwiftWin's build
+/// passes none (swiftwin.toml).
 @MainActor
 enum ShiftIntents {
     static func run(_ action: ShiftAction) async -> String {
-        #if SHIFTY_APP
+        #if !SHIFTY_WIDGET
         return await ShiftActions.run(action)
         #else
         return ""

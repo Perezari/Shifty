@@ -115,6 +115,7 @@ does not have: `codemagic.yaml`, at the root of the repository, builds it on Cod
   them from the computer), the icons (`icons.py`), the man's layers (`rig.py`) and the check of the Swift
   without a Mac (`check-swift.sh`).
 - `preview/`: the screens in the browser, to see a design before a build (`preview/README.md`).
+- `swiftwin.toml`: the app for SwiftWin, on the iPhone from Windows (below).
 
 ## Checking the Swift without a Mac
 
@@ -135,6 +136,25 @@ same. Run it after any change to the engine, here or in `assets/js`. From Git Ba
 ```bash
 bash ios/scripts/check-calc.sh
 ```
+
+## Running on the iPhone from Windows
+
+SwiftWin (github.com/Dadon-11/SwiftWin-Studio, in `%LOCALAPPDATA%\SwiftWin\bin`) builds the app with the Swift
+toolchain for Windows and Xcode's iOS SDK, signs it with an App Store Connect key, installs it on the iPhone over
+USB and shows the phone live in a window: a change runs on the phone in seconds, without a Codemagic build.
+`swiftwin.toml` makes it a separate app, `com.perezari.shifty.dev` ("משמרת פיתוח"), with data of its own. In `ios/`:
+
+```powershell
+swiftwin run
+swiftwin launch com.perezari.shifty.dev --arg=-screenshot --arg now
+swiftwin phone
+```
+
+`run` builds, installs and opens it; `launch` with `-screenshot` opens it on the made-up shifts (`Shifty/Demo.swift`)
+at one of `Screenshot`'s screens; `phone` shows the iPhone on the computer's screen. It has no widgets, Live Activity,
+iCloud or icon choices, and with no compiled asset catalog its colors come from code (`Color.asset`, `Theme.swift`,
+kept equal to the catalog's) and each image keeps one of its looks. For it the app uses no SwiftUI macro (`@Entry`
+is written out) and no compiler flag of its own (the widget extension carries `SHIFTY_WIDGET`).
 
 ## Building
 

@@ -36,13 +36,31 @@ extension ShiftStore {
             store.upsert(shift)
         }
 
+        // the place's crossings (Place.demoCrossings): a few minutes before each shift and after it, and last
+        // Friday at work with no shift recorded, for the day's detail
+        var crossings: [Crossing] = []
+        for shift in store.shifts where shift.type == .work {
+            guard let end = shift.end else { continue }
+            let early = Double(4 + Int(shift.start.timeIntervalSince1970 / 60) % 9) * 60
+            crossings.append(Crossing(place: nil, arrived: true, at: shift.start.addingTimeInterval(-early)))
+            crossings.append(Crossing(place: nil, arrived: false, at: end.addingTimeInterval(early / 2)))
+        }
+        if let friday = (1...7).map({ LocalTime.addingDays(-$0, to: today) }).first(where: { LocalTime.parts($0).weekday == 5 }) {
+            let p = LocalTime.parts(friday)
+            crossings.append(Crossing(place: nil, arrived: true, at: LocalTime.date(p.year, p.month0, p.day, 8, 2)))
+            crossings.append(Crossing(place: nil, arrived: false, at: LocalTime.date(p.year, p.month0, p.day, 13, 15)))
+        }
+
         if screen != .idle {
             // the shift running now, for 4:52 net after a break of 25 minutes
-            let start = Date().addingTimeInterval(-(5 * 3600 + 17 * 60 + 13))
+            let ran: TimeInterval = 5 * 3600 + 17 * 60 + 13
+            let start = Date().addingTimeInterval(-ran)
             store.startShift(at: start)
+            crossings.append(Crossing(place: nil, arrived: true, at: start.addingTimeInterval(-6 * 60)))
             store.startBreak(at: start.addingTimeInterval(2.5 * 3600))
             store.endBreak(at: start.addingTimeInterval(2.5 * 3600 + 25 * 60))
         }
+        Place.demoCrossings = crossings
         return store
     }
 }

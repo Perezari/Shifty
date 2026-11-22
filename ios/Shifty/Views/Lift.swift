@@ -62,13 +62,28 @@ final class Lifter {
 
 extension EnvironmentValues {
     /// The screen's lifter, set by liftHost().
-    @Entry var lifter: Lifter? = nil
+    var lifter: Lifter? {
+        get { self[LifterKey.self] }
+        set { self[LifterKey.self] = newValue }
+    }
+}
+
+/// The keys written out, as glassCards' (Theme.swift): @Entry's macro plugin comes with Xcode alone.
+private struct LifterKey: EnvironmentKey {
+    static var defaultValue: Lifter? { nil }
 }
 
 #if DEBUG
 extension EnvironmentValues {
     /// The thing the screenshot of a menu lifts once its screen is up (Screenshot.menu).
-    @Entry var liftsForScreenshot = false
+    var liftsForScreenshot: Bool {
+        get { self[LiftsForScreenshotKey.self] }
+        set { self[LiftsForScreenshotKey.self] = newValue }
+    }
+}
+
+private struct LiftsForScreenshotKey: EnvironmentKey {
+    static var defaultValue: Bool { false }
 }
 #endif
 

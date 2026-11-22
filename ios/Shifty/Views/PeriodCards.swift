@@ -168,7 +168,7 @@ private struct PeriodLineRow: View {
         case .regular:
             dot(.accentColor)
         case .overtime, .rest, .holidayPay:
-            dot(Color("Holiday"))
+            dot(Color.holidayGold)
         case .night:
             dot(.indigo)
         case .money:
@@ -237,7 +237,7 @@ private struct PeriodWeekBar: View {
         let past = Self.height * CGFloat(max(0, week.hours - limit) / max(scale, 1))
         return VStack(spacing: 0) {
             Rectangle()
-                .fill(Color("Holiday"))
+                .fill(Color.holidayGold)
                 .frame(height: past)
             Rectangle()
                 .fill(Color.accentColor)

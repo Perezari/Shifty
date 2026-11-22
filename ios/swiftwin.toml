@@ -1,0 +1,25 @@
+# SwiftWin (github.com/Dadon-11/SwiftWin-Studio) builds the app on Windows and runs it on an iPhone over USB, to try
+# a change on the phone before a Codemagic build (README.md, "Running on the iPhone from Windows"). A separate app,
+# with a bundle id and data of its own. It has no widgets or Live Activity, no iCloud and no icon choices, and
+# without Xcode's compiled asset catalog its colors come from code (Theme.swift) and each image keeps one look.
+[app]
+name = "Shifty"
+display_name = "משמרת פיתוח"
+bundle_id = "com.perezari.shifty.dev"
+version = "1.8"
+build = "1"
+deployment_target = "26.0"
+sources = "Shifty"
+assets = "Shifty/Assets.xcassets"
+orientations = ["portrait"]
+
+# The app's Info.plist keys (project.yml), but its link scheme, which stays the store app's.
+[info]
+CFBundleDevelopmentRegion = "he"
+CFBundleLocalizations = ["he"]
+NSFaceIDUsageDescription = "מר משמרת משתמש ב-Face ID כדי להיפתח כשהנעילה פועלת."
+NSLocationWhenInUseUsageDescription = "מר משמרת שומר את מקום העבודה שלך כדי לשאול על המשמרת כשמגיעים וכשיוצאים."
+NSLocationAlwaysAndWhenInUseUsageDescription = "כדי לשאול אם להתחיל משמרת כשמגיעים לעבודה ואם לסיים כשיוצאים, גם כשהאפליקציה סגורה."
+UIRequiresFullScreen = true
+CADisableMinimumFrameDurationOnPhone = true
+UILaunchScreen = { UIColorName = "Background", UIImageName = "LaunchMister" }

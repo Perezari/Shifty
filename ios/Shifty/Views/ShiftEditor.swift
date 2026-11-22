@@ -138,7 +138,7 @@ struct ShiftEditor: View {
             if b.overtimeHours > 0.01 {
                 Text(Format.hoursToHM(b.overtimeHours) + " נוספות")
                     .font(.subheadline)
-                    .foregroundStyle(Color("Holiday"))
+                    .foregroundStyle(Color.holidayGold)
             }
             Spacer(minLength: 8)
             if !settings.isMonthly(draft) {

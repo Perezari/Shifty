@@ -9,7 +9,7 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    MARKETING_VERSION: "1.7"
+    MARKETING_VERSION: "1.8"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
     TARGETED_DEVICE_FAMILY: "1"
@@ -71,8 +71,6 @@ targets:
         ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "AppIcon-Yellow AppIcon-Navy AppIcon-Purple AppIcon-Teal AppIcon-Plain"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
-        # The intents' work in the app alone (Live/ShiftIntents.swift); the widget extension has them too.
-        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) SHIFTY_APP"
     dependencies:
       - target: ShiftyWidget
   # The shift's widget, its Live Activity and its switch in the Control Center (Widget/), with the app's
@@ -111,6 +109,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.perezari.shifty.widget
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
+        # The intents compiled here too leave their work to the app (Live/ShiftIntents.swift). The flag is the
+        # extension's, so that the app builds with none, as SwiftWin's build passes none (swiftwin.toml).
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) SHIFTY_WIDGET"
     dependencies:
       - sdk: WidgetKit.framework
       - sdk: SwiftUI.framework

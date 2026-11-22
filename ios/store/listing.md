@@ -326,3 +326,15 @@ name, the description, the keywords and the screenshots carry over from 1.6.
 • שש פתיחות חדשות, שבהן מר משמרת עצמו משחק: מסלסל את השפם, מרכיב מונוקל, מסיר את השפם כמו כובע ועוד.
 • בהגדרות › פתיחה בוחרים איזו פתיחה תתנגן, או פתיחה אחרת בכל כניסה.
 ```
+
+## Version 1.8
+
+When the iPhone arrived at work and left, by the location reminder's place, kept on the iPhone and shown in each
+day's detail beside the shifts recorded; on a day with no shift, a tap records one in those hours (the user's pick
+of the ideas of 22 November 2026). The name, the description, the keywords and the screenshots carry over from 1.7.
+
+**What's New in This Version** (what was built after 1.7's build, 59b76df):
+
+```
+• בפירוט של כל יום: מתי הגעת לעבודה ומתי יצאת, לפי תזכורת המיקום, ליד המשמרות שנרשמו. ביום שלא נרשמה בו משמרת, לחיצה רושמת אחת בשעות האלה.
+```

@@ -270,7 +270,7 @@ private struct DayCell: View {
         } else if let name = holiday?.name {
             Text(name)
                 .font(.system(size: 8, weight: .medium))
-                .foregroundStyle(Color("Holiday"))
+                .foregroundStyle(Color.holidayGold)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -297,7 +297,7 @@ private struct DayCell: View {
         if sum?.dayOff != nil { return .white }
         if let sum, sum.short { return .red }
         if worked { return .accentColor }
-        if holiday != nil { return Color("Holiday") }
+        if holiday != nil { return Color.holidayGold }
         return today ? .accentColor : .primary
     }
 
@@ -311,7 +311,7 @@ private struct DayCell: View {
             return Color.accentColor.opacity(0.09 + share * 0.17)
         }
         if let holiday {
-            return Color("Holiday").opacity(holiday.kind == .chag ? 0.14 : 0.07)
+            return Color.holidayGold.opacity(holiday.kind == .chag ? 0.14 : 0.07)
         }
         return inPeriod ? Color.primary.opacity(0.04) : Color.clear
     }
@@ -332,6 +332,8 @@ struct DayDetail: View {
     @State private var adjusting = false
     @State private var editing: Shift?
     @State private var copying: Shift?
+    /// A shift in the hours of a day's stay at work, to be recorded.
+    @State private var recording: Shift?
 
     /// The days a swipe reaches, each way: two months.
     private static let reach = 62
@@ -348,12 +350,15 @@ struct DayDetail: View {
         let before = Calc.workedBefore(all, settings, asOf: Date().ms)
         // each day's shifts, once for all the pages
         let byDay = Dictionary(grouping: all) { LocalTime.dayKey($0.start) }
+        // the stays at work by the location, this iPhone's
+        let stays = Stays.of(Place.crossings())
         NavigationStack {
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
                     ForEach(-Self.reach...Self.reach, id: \.self) { offset in
                         let day = LocalTime.addingDays(offset, to: LocalTime.startOfDay(date))
-                        dayPage(day, (byDay[LocalTime.dayKey(day)] ?? []).sorted { $0.start < $1.start }, settings, sick, before, all)
+                        dayPage(day, (byDay[LocalTime.dayKey(day)] ?? []).sorted { $0.start < $1.start }, settings, sick, before, all,
+                                Stays.day(LocalTime.dayKey(day), stays))
                             .containerRelativeFrame(.horizontal)
                             .id(offset)
                     }
@@ -410,6 +415,10 @@ struct DayDetail: View {
                 ShiftEditor(shift: nil, day: day)
                     .environment(store)
             }
+            .sheet(item: $recording) { shift in
+                ShiftEditor(shift: nil, day: shift.start, from: shift)
+                    .environment(store)
+            }
             .sheet(isPresented: $adjusting) {
                 AdjustmentSheet(day: day)
                     .environment(store)
@@ -426,9 +435,10 @@ struct DayDetail: View {
         .presentationDetents([.medium, .large])
     }
 
-    /// A day's page: its shifts or day off, each opening, and lifted by a long press with its menu; and adding to it.
+    /// A day's page: its shifts or day off, each opening, and lifted by a long press with its menu; when the iPhone
+    /// arrived at work and left by the location; and adding to it.
     private func dayPage(_ day: Date, _ shifts: [Shift], _ settings: Settings, _ sick: Set<String>,
-                         _ before: [String: WorkedBefore], _ all: [Shift]) -> some View {
+                         _ before: [String: WorkedBefore], _ all: [Shift], _ stays: [Stay]) -> some View {
         let hasDayOff = shifts.contains { $0.isDayOff }
         let hasWork = shifts.contains { $0.type == .work }
         let holidayPays = Calc.holidayPays(all, settings, range: Calc.dayRange(day), asOf: Date().ms)
@@ -456,6 +466,10 @@ struct DayDetail: View {
                     HolidayPayRow(day: pay, currency: settings.currency,
                                   place: settings.workplaces.isEmpty ? nil : settings.place(pay.place.isEmpty ? nil : pay.place).name,
                                   showsDate: false)
+                }
+                ForEach(Array(stays.enumerated()), id: \.offset) { _, stay in
+                    StayRow(stay: stay, place: settings.workplaces.isEmpty ? nil : settings.place(stay.place).name,
+                            record: hasWork || hasDayOff ? nil : Self.shift(in: stay).map { shift in { recording = shift } })
                 }
                 if !hasDayOff {
                     VStack(spacing: 10) {
@@ -511,6 +525,13 @@ struct DayDetail: View {
         .scrollIndicators(.hidden)
     }
 
+    /// A new shift in a stay's hours, at its workplace, where both are known and on one day.
+    private static func shift(in stay: Stay) -> Shift? {
+        guard let arrived = stay.arrived, let left = stay.left,
+              LocalTime.dayKey(arrived) == LocalTime.dayKey(left) else { return nil }
+        return Shift(id: "stay", start: arrived, end: left, workplaceId: stay.place)
+    }
+
     /// The day before (-1) or after (1), sliding in.
     private func step(_ by: Int) {
         let next = min(Self.reach, max(-Self.reach, (page ?? 0) + by))
@@ -527,7 +548,7 @@ struct DayDetail: View {
 
     /// The Hebrew date when it is on, "כ״ג בחשוון תשפ״ז", then the holiday's line in its color.
     private func dateLine(_ day: Date, _ settings: Settings) -> Text {
-        let holiday = holidayLine(day, settings).map { Text($0).foregroundStyle(Color("Holiday")) }
+        let holiday = holidayLine(day, settings).map { Text($0).foregroundStyle(Color.holidayGold) }
         guard hebrewDate else { return holiday ?? Text(verbatim: "") }
         let hebrew = Text(Format.hebrewDate(day) + " " + Holidays.hebrewDate(day).year).foregroundStyle(.secondary)
         guard let holiday else { return hebrew }
@@ -537,5 +558,55 @@ struct DayDetail: View {
     private func addDayOff(_ type: ShiftType, on day: Date) {
         store.addDayOff(day, type: type)
         dismiss()
+    }
+}
+
+/// When the iPhone arrived at work on a day and left, by the location reminder's place (Place, Stays), beside the
+/// shifts recorded; on a day with none, a shift in those hours a tap away.
+private struct StayRow: View {
+    let stay: Stay
+    /// Its workplace's name, with more than one.
+    var place: String? = nil
+    /// Records a shift in its hours; nil where the day has one, or its hours aren't both known on one day.
+    var record: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                Image(systemName: "location.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("לפי המיקום")
+                        .font(.body.weight(.semibold))
+                    Text(([place, times] as [String?]).compactMap { $0 }.joined(separator: " · "))
+                        .font(.footnote)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            if let record {
+                Button(action: record) {
+                    Label("רישום משמרת בשעות האלה", systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+            }
+        }
+        .card(padding: 14)
+    }
+
+    /// "הגעה 07:52 · יציאה 17:10": the leaving the next day's after a night, or still there.
+    private var times: String {
+        var parts: [String] = []
+        if let arrived = stay.arrived { parts.append("הגעה " + Format.clock(arrived)) }
+        if let left = stay.left {
+            let nextDay = stay.arrived.map { LocalTime.dayKey($0) != LocalTime.dayKey(left) } ?? false
+            parts.append("יציאה " + Format.clock(left) + (nextDay ? " למחרת" : ""))
+        } else if let arrived = stay.arrived, Date().timeIntervalSince(arrived) < Stays.longest {
+            parts.append("עדיין שם")
+        }
+        return parts.joined(separator: " · ")
     }
 }

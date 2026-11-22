@@ -6,7 +6,7 @@ import UserNotifications
 /// leaving it whether to end the one running there, in notifications whose buttons do it without opening the app.
 /// iOS watches the places and wakes the app when one is crossed, also when the app is closed, once the location is
 /// allowed "always". The places are this iPhone's (UserDefaults), as the lock is: the own workplace's under the
-/// keys below, another's under them and its id.
+/// keys below, another's under them and its id. Each crossing is kept there too, for a day's detail (Core/Stays.swift).
 final class Place: NSObject, CLLocationManagerDelegate {
     static let shared = Place()
     static let enabledKey = "placeEnabled"
@@ -17,6 +17,12 @@ final class Place: NSObject, CLLocationManagerDelegate {
     /// a shift started later; and the shift whose offer was taken or closed.
     static let arrivedKey = "placeArrived"
     static let arrivalTipKey = "placeArrivalTip"
+    /// The crossings of the places (Stays), four months of them.
+    static let crossingsKey = "placeCrossings"
+    #if DEBUG
+    /// The made-up shifts' crossings (Demo.swift), in place of the kept ones.
+    nonisolated(unsafe) static var demoCrossings: [Crossing]?
+    #endif
     /// The own workplace's region; another's is this and its id.
     private static let region = "shifty.work"
 
@@ -55,6 +61,30 @@ final class Place: NSObject, CLLocationManagerDelegate {
     static func arrival(_ place: String?) -> Date? {
         let seconds = UserDefaults.standard.double(forKey: key(arrivedKey, place))
         return seconds > 0 ? Date(timeIntervalSince1970: seconds) : nil
+    }
+
+    /// The crossings kept, by time.
+    static func crossings() -> [Crossing] {
+        #if DEBUG
+        if let demoCrossings { return demoCrossings }
+        #endif
+        return kept()
+    }
+
+    private static func kept() -> [Crossing] {
+        guard let data = UserDefaults.standard.data(forKey: crossingsKey) else { return [] }
+        return (try? JSONDecoder().decode([Crossing].self, from: data)) ?? []
+    }
+
+    /// A crossing kept, and those older than four months let go.
+    private static func keep(_ place: String?, arrived: Bool) {
+        let now = Date()
+        let since = now.addingTimeInterval(-Double(Stays.keptDays) * 86_400)
+        var list = kept().filter { $0.at > since }
+        list.append(Crossing(place: place, arrived: arrived, at: now))
+        if let data = try? JSONEncoder().encode(list) {
+            UserDefaults.standard.set(data, forKey: crossingsKey)
+        }
     }
 
     /// The workplace a region is watched for: nil for the own one; not one of these, none.
@@ -127,11 +157,13 @@ final class Place: NSObject, CLLocationManagerDelegate {
 
     func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
         guard let place = Self.place(of: region) else { return }
+        Self.keep(place, arrived: true)
         Task { @MainActor in await Self.arrived(at: place) }
     }
 
     func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
         guard let place = Self.place(of: region) else { return }
+        Self.keep(place, arrived: false)
         Task { @MainActor in await Self.left(place) }
     }
 
