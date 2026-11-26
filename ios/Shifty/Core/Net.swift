@@ -126,15 +126,16 @@ extension Calc {
         let totals = summary.totals
         let rates = taxRates(year: taxYear(of: range))
         let gross = totals.total + totals.deductions
-        // a holiday's whole shift is in its base pay, at the holiday's multiplier; a month's fixed pay is, but
-        // not its overtime or a bonus. Each employer saves of its own wages and month's pay, by its own rules.
+        // a holiday's whole shift is in its base pay, at the holiday's multiplier; a month's fixed pay is (its base,
+        // where the terms name one), but not its overtime or a bonus. Each employer saves of its own wages and month's
+        // pay, by its own rules.
         var wages: [String: Double] = [:]
         for shift in summary.shifts where !s.isMonthly(shift) {
             wages[s.workplace(of: shift)?.id ?? "", default: 0] += summary.breakdowns[shift.id]?.basePay ?? 0
         }
         var salaries: [String: Double] = [:]
         for place in s.payPlaces {
-            salaries[place.id ?? "", default: 0] += Calc.salary(place.pay, range: range)
+            salaries[place.id ?? "", default: 0] += Calc.salary(place.pay, range: range, pensionable: true)
         }
         // holiday pay is saved of as a wage, and stays as it is
         for day in summary.holidayPays {

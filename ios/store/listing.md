@@ -338,3 +338,15 @@ of the ideas of 22 November 2026). The name, the description, the keywords and t
 ```
 • בפירוט של כל יום: מתי הגעת לעבודה ומתי יצאת, לפי תזכורת המיקום, ליד המשמרות שנרשמו. ביום שלא נרשמה בו משמרת, לחיצה רושמת אחת בשעות האלה.
 ```
+
+## Version 1.9
+
+A global salary's base: the part of the month's pay the pension and the study fund are saved of, where the rest is
+an addition such as a global overtime, so that the net estimate takes them from it.
+The name, the description, the keywords and the screenshots carry over from 1.8.
+
+**What's New in This Version** (what was built after 1.8's build, fc61d97):
+
+```
+• שכר גלובלי: בשינוי השכר אפשר לרשום מתוכו את שכר הבסיס, שממנו מופרשות הפנסיה וקרן ההשתלמות, והנטו המשוער מחושב לפיו.
+```

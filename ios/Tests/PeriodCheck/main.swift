@@ -185,6 +185,16 @@ expect(Calc.monthlyOvertime(mixed, global, range: november, asOf: now.ms).map { 
        "2:24 of overtime, of an hour covered")
 expect(near(Calc.periodNet(mixed, global, range: november, asOf: now.ms, projected: false).pension, (8 * 50 + 6_000) * 0.06),
        "the pension from the wages and the month's pay, not from its overtime")
+// the month's pay a base and an addition (a global overtime): the pension of the base alone, the income of all of it
+global.payTerms[1].pensionBase = 9_000
+expect(near(Calc.periodNet(mixed, global, range: november, asOf: now.ms, projected: false).pension, (8 * 50 + 4_500) * 0.06),
+       "the pension from the base: 9,000 of the 12,000, for 15 of November's 30 days")
+expect(near(Calc.periodTotals(mixed, global, range: november, asOf: now.ms).salary, 12_000.0 * 15 / 30),
+       "the income from all of the month's pay")
+global.payTerms[1].pensionBase = 15_000
+expect(near(Calc.periodNet(mixed, global, range: november, asOf: now.ms, projected: false).pension, (8 * 50 + 6_000) * 0.06),
+       "a base above the pay: the pay")
+global.payTerms[1].pensionBase = 0
 global.payTerms[1].overtimeCover = .all
 expect(Calc.periodTotals(mixed, global, range: november, asOf: now.ms).extraOvertime == 0, "all of it covered")
 global.payTerms[1].overtimeCover = .none

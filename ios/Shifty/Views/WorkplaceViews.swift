@@ -181,6 +181,10 @@ struct WorkplacePage: View {
                                 Divider()
                                 valueRow("ערך שעה", Format.money(now.hourValue, s.currency))
                             }
+                            if now.pensionBase > 0 {
+                                Divider()
+                                valueRow("שכר בסיס לפנסיה", PayText.amount(now.pensionable, s.currency))
+                            }
                         }
                         if now.bonus > 0 {
                             if now.kind == .monthly { Divider() }
@@ -906,7 +910,9 @@ struct PayTermsSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    SettingsSection(title: nil) {
+                    SettingsSection(title: nil, note: terms.kind == .monthly
+                        ? "שכר הבסיס הוא החלק של השכר שממנו מופרשות הפנסיה וקרן ההשתלמות, כשהשאר הוא תוספת כמו שעות נוספות גלובליות. 0: מכל השכר."
+                        : nil) {
                         if !edit.first {
                             DatePicker("מתאריך", selection: $terms.from, displayedComponents: .date)
                                 .settingsRow()
@@ -923,6 +929,8 @@ struct PayTermsSheet: View {
                             NumberRow(title: "שכר לשעה", value: $terms.hourlyWage, unit: currency)
                         } else {
                             NumberRow(title: "שכר חודשי", value: $terms.monthlySalary, unit: currency)
+                            Divider()
+                            NumberRow(title: "מתוכו שכר בסיס", value: $terms.pensionBase, unit: currency)
                         }
                     }
 

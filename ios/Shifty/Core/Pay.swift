@@ -35,6 +35,14 @@ struct PayTerms: Hashable, Identifiable {
     /// A fixed bonus paid once a year, with the pay of `bonusMonth` (0 January); 0: none.
     var bonus = 0.0
     var bonusMonth = 0
+    /// The part of a month's pay the pension and the study fund are saved of, where the rest is an addition (a global
+    /// salary of a base and a global overtime); 0: all of it.
+    var pensionBase = 0.0
+
+    /// The month's pay the pension is saved of: its base, at most the pay; or all of it.
+    var pensionable: Double {
+        pensionBase > 0 ? min(pensionBase, monthlySalary) : monthlySalary
+    }
 
     /// The worth of an hour: the hourly wage, or the month's pay over 182, as Israeli payslips count it.
     var hourValue: Double {
@@ -588,8 +596,10 @@ extension Calc {
     }
 
     /// A workplace's month's fixed pay in a period: each month's pay for the part of the period its terms hold, from
-    /// their date to the next terms', within the work there (from the midnight of `start`, up to `until`).
-    static func salary(_ pay: [PayTerms], range: TimeRange, from start: Date? = nil, until: Date? = nil) -> Double {
+    /// their date to the next terms', within the work there (from the midnight of `start`, up to `until`); `pensionable`,
+    /// the part of it the pension is saved of (PayTerms.pensionBase).
+    static func salary(_ pay: [PayTerms], range: TimeRange, from start: Date? = nil, until: Date? = nil,
+                       pensionable: Bool = false) -> Double {
         let days = max(1, daysBetween(range.start, range.end))
         var salary = 0.0
         for (i, t) in pay.enumerated() where t.kind == .monthly {
@@ -597,7 +607,7 @@ extension Calc {
             var to = min(i + 1 < pay.count ? pay[i + 1].from : range.end, range.end)
             if let start { from = max(from, LocalTime.startOfDay(start)) }
             if let until { to = min(to, until) }
-            if to > from { salary += t.monthlySalary * Double(daysBetween(from, to)) / Double(days) }
+            if to > from { salary += (pensionable ? t.pensionable : t.monthlySalary) * Double(daysBetween(from, to)) / Double(days) }
         }
         return salary
     }
@@ -686,7 +696,7 @@ extension OvertimeTier: Codable {}
 
 extension PayTerms: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, from, kind, hourlyWage, monthlySalary, overtimeCover, overtimeHours, overtimeTiers, bonus, bonusMonth
+        case id, from, kind, hourlyWage, monthlySalary, overtimeCover, overtimeHours, overtimeTiers, bonus, bonusMonth, pensionBase
     }
 
     init(from decoder: Decoder) throws {
@@ -702,6 +712,7 @@ extension PayTerms: Codable {
         overtimeTiers = (try? c.decodeIfPresent([OvertimeTier].self, forKey: .overtimeTiers)) ?? d.overtimeTiers
         bonus = (try? c.decodeIfPresent(Double.self, forKey: .bonus)) ?? d.bonus
         bonusMonth = (try? c.decodeIfPresent(Int.self, forKey: .bonusMonth)) ?? d.bonusMonth
+        pensionBase = (try? c.decodeIfPresent(Double.self, forKey: .pensionBase)) ?? d.pensionBase
     }
 
     func encode(to encoder: Encoder) throws {
@@ -716,6 +727,7 @@ extension PayTerms: Codable {
         if !overtimeTiers.isEmpty { try c.encode(overtimeTiers, forKey: .overtimeTiers) }
         try c.encode(bonus, forKey: .bonus)
         try c.encode(bonusMonth, forKey: .bonusMonth)
+        if pensionBase > 0 { try c.encode(pensionBase, forKey: .pensionBase) }
     }
 }
 
