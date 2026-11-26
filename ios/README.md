@@ -163,6 +163,12 @@ personal account has 500 free Mac minutes a month. `scripts/codemagic.py` reache
 Codemagic's API, with the token in `~/.codemagic-token`: the latest builds, starting one, following it,
 a failed step's errors, a step's log, and the screenshots downloaded into `build/screenshots`.
 
+When the month's free minutes are spent, Codemagic refuses a build (HTTP 402), and `codemagic.py start` sends
+TestFlight and App Review to CircleCI's Macs instead, on its Free plan with no card (`.circleci/config.yml`, the
+pipeline "shifty" of the account's Sogia project, whose environment variables hold the App Store key; the token
+in `~/.circleci-token`, the project in `scripts/circleci.json`). Such a build is `circleci:<pipeline id>`, which
+`wait`, `errors` and `log` take too; `start testflight circleci` goes there at once.
+
 - "Shifty · TestFlight" signs the app and uploads it to TestFlight. It reads the variable group
   `app_store`: `APPLE_API_ISSUER`, `APPLE_API_KEY` (the Key ID), `APPLE_API_KEY_P8` (the text of the
   .p8 file) and `APPLE_DEVELOPMENT_TEAM`.

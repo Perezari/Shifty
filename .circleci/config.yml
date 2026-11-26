@@ -1,0 +1,71 @@
+# The native iPhone app (ios/README.md) on CircleCI's Macs (M4 Pro), on the Free plan's 30,000 credits a month,
+# with no card (about 150 Mac minutes, shared with Sogia). codemagic.yaml does the same on Codemagic's Macs;
+# ios/scripts/codemagic.py starts a build here when Codemagic's free minutes are spent.
+#
+# Its pipeline is "shifty" in CircleCI's Sogia project, whose environment variables hold the App Store Connect key
+# for every app of the account: APPLE_API_ISSUER, APPLE_API_KEY (the Key ID), APPLE_API_KEY_P8 (the text of the .p8
+# file) and APPLE_DEVELOPMENT_TEAM, as Codemagic's group "app_store".
+#
+# Nothing builds on its own: the pipeline has no trigger, and a build is one started through the API with the
+# parameter run: testflight, or review (with submit: look, or yes).
+version: 2.1
+
+parameters:
+  run:
+    type: enum
+    enum: [none, testflight, review]
+    default: none
+  # review.py: look (nothing changes), or yes (submit).
+  submit:
+    type: string
+    default: look
+
+# Xcode 26, as on Codemagic. From April 2027 App Store Connect takes only builds with the iOS 27 SDK (Xcode 27).
+executors:
+  mac:
+    macos:
+      xcode: "26.6.0"
+    resource_class: m4pro.medium
+    environment:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+
+jobs:
+  testflight:
+    executor: mac
+    steps:
+      - checkout
+      - run:
+          name: Xcode project
+          command: |
+            xcodebuild -version
+            brew install xcodegen
+            cd ios
+            xcodegen generate
+      - run:
+          name: App Store build, uploaded to TestFlight
+          # The archive is quiet for long minutes.
+          no_output_timeout: 45m
+          command: bash ios/scripts/testflight.sh
+
+  review:
+    docker:
+      - image: cimg/python:3.12
+    resource_class: small
+    steps:
+      - checkout
+      - run:
+          name: The newest build to App Review
+          command: SUBMIT="<< pipeline.parameters.submit >>" python3 ios/scripts/review.py
+
+workflows:
+  testflight:
+    when:
+      equal: [testflight, << pipeline.parameters.run >>]
+    jobs:
+      - testflight
+  review:
+    when:
+      equal: [review, << pipeline.parameters.run >>]
+    jobs:
+      - review

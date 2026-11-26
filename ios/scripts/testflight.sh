@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Archives the app for the App Store, signs it in Apple's cloud with the App Store Connect key and
 # uploads it to App Store Connect, where it appears in TestFlight. Runs on Codemagic's Macs
-# (codemagic.yaml). Needs APPLE_API_ISSUER, APPLE_API_KEY (Key ID), APPLE_API_KEY_P8 and
-# APPLE_DEVELOPMENT_TEAM.
+# (codemagic.yaml) or CircleCI's (.circleci/config.yml). Needs APPLE_API_ISSUER, APPLE_API_KEY (Key ID),
+# APPLE_API_KEY_P8 and APPLE_DEVELOPMENT_TEAM.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
